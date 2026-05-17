@@ -41,6 +41,7 @@ const TYPE_EMOJI: Record<string, string> = {
   rust: '😴',
   krachttraining: '💪',
   cross: '🚴',
+  core: '🧘',
 }
 
 interface SortableSessieProps {

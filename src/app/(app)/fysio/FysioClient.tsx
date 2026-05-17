@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import type { PhysioExercise } from '@/types/database'
-import { Upload, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, Loader2, Pencil, Check } from 'lucide-react'
+import { Upload, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, Loader2, Pencil, Check, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Props {
@@ -37,6 +37,9 @@ export function FysioClient({ oefeningen: initOefeningen, physioKlacht: initKlac
     e.target.value = ''
   }
 
+  const [schemaPrompt, setSchemaPrompt] = useState(false)
+  const [schemaGenereert, setSchemaGenereert] = useState(false)
+
   async function klachtOpslaan() {
     setKlachtLaden(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -45,6 +48,14 @@ export function FysioClient({ oefeningen: initOefeningen, physioKlacht: initKlac
     }
     setKlachtLaden(false)
     setKlachtEdit(false)
+    setSchemaPrompt(true)
+  }
+
+  async function schemaHergenereren() {
+    setSchemaGenereert(true)
+    await fetch('/api/training/genereer', { method: 'POST' })
+    setSchemaGenereert(false)
+    setSchemaPrompt(false)
   }
 
   function setPijn(id: string, score: number) {
@@ -114,6 +125,36 @@ export function FysioClient({ oefeningen: initOefeningen, physioKlacht: initKlac
           </p>
         )}
       </Card>
+
+      {/* Schema hergenereren prompt */}
+      {schemaPrompt && (
+        <Card className="bg-[#f97316]/10 border border-[#f97316]/30">
+          <p className="text-sm text-[#1a1612] font-medium mb-1">Klacht gewijzigd</p>
+          <p className="text-xs text-[#6b6560] mb-3">
+            {klacht
+              ? 'Wil je het trainingsschema aanpassen op basis van je huidige klacht?'
+              : 'Je klacht is verwijderd. Wil je het schema opnieuw genereren zonder beperkingen?'}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={schemaHergenereren}
+              disabled={schemaGenereert}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-[#f97316] text-white text-sm font-medium transition-all active:scale-95"
+            >
+              {schemaGenereert
+                ? <Loader2 size={14} className="animate-spin" />
+                : <RefreshCw size={14} />}
+              {schemaGenereert ? 'Bezig...' : 'Schema aanpassen'}
+            </button>
+            <button
+              onClick={() => setSchemaPrompt(false)}
+              className="px-4 py-2.5 rounded-2xl bg-[#f0ede8] text-[#6b6560] text-sm font-medium"
+            >
+              Later
+            </button>
+          </div>
+        </Card>
+      )}
 
       {/* Voortgangsbalk */}
       {totaal > 0 && (

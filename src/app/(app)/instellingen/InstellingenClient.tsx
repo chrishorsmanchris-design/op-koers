@@ -45,6 +45,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   const [activiteiten, setActiviteiten] = useState(initActiviteiten)
   const [naam, setNaam] = useState(profiel?.naam ?? '')
   const [kmPerWeek, setKmPerWeek] = useState(String(profiel?.km_per_week ?? ''))
+  const [wilCore, setWilCore] = useState(profiel?.wil_core ?? false)
   const [laden, setLaden] = useState(false)
   const [opgeslagen, setOpgeslagen] = useState(false)
 
@@ -56,6 +57,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
     await supabase.from('profiles').update({
       naam,
       km_per_week: parseFloat(kmPerWeek) || null,
+      wil_core: wilCore,
     } as never).eq('id', profiel?.id ?? '')
     setOpgeslagen(true)
     setTimeout(() => setOpgeslagen(false), 2000)
@@ -109,6 +111,35 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             <Input id="naam" label="Naam" value={naam} onChange={e => setNaam(e.target.value)} />
             <Input id="km" type="number" label="Km per week (huidig)" value={kmPerWeek}
               onChange={e => setKmPerWeek(e.target.value)} placeholder="bijv. 25" />
+
+            <button
+              onClick={() => setWilCore(v => !v)}
+              className={cn(
+                'flex items-center justify-between p-3 rounded-2xl border-2 transition-all text-left',
+                wilCore
+                  ? 'border-[#f97316] bg-[#f97316]/10'
+                  : 'border-[#e8e3dc] bg-[#f5f3f0]'
+              )}
+            >
+              <div>
+                <p className={cn('font-medium text-sm', wilCore ? 'text-[#f97316]' : 'text-[#1a1612]')}>
+                  🧘 Core stability training
+                </p>
+                <p className="text-xs text-[#6b6560] mt-0.5">
+                  Oefeningen voor onderrug, lenigheid en rompkracht worden in je schema opgenomen
+                </p>
+              </div>
+              <div className={cn(
+                'w-10 h-6 rounded-full transition-all shrink-0 ml-3 relative',
+                wilCore ? 'bg-[#f97316]' : 'bg-[#d0cbc4]'
+              )}>
+                <div className={cn(
+                  'absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all',
+                  wilCore ? 'left-5' : 'left-1'
+                )} />
+              </div>
+            </button>
+
             <Button onClick={profielOpslaan} loading={laden}>
               {opgeslagen ? '✓ Opgeslagen' : 'Opslaan'}
             </Button>

@@ -52,6 +52,7 @@ PROFIEL:
 - Weken: ${wekenTotDoel}
 - Eerdere resultaten: ${resultaten?.map(r => `${r.type}: ${r.tijd}`).join(', ') || 'geen'}
 - Fysio/blessure: ${profiel?.physio_klacht || 'geen bekende klachten'}
+- Core stability gewenst: ${profiel?.wil_core ? 'ja — voeg 1-2 core sessies per week toe (onderrug, rompkracht, lenigheid)' : 'nee'}
 
 VAKANTIES:
 ${vakanties?.map(v => `- ${v.naam}: ${v.start_datum} t/m ${v.eind_datum} (trainen: ${v.kan_trainen})`).join('\n') || 'Geen'}
@@ -59,9 +60,9 @@ ${vakanties?.map(v => `- ${v.naam}: ${v.start_datum} t/m ${v.eind_datum} (traine
 VASTE ACTIVITEITEN (plan GEEN hardlopen op deze dagen):
 ${activiteitenTekst}
 
-Genereer het schema als JSON. Alleen hardloopsessies en rustdagen (max 4-5 sessies/week). Geen hardlopen op geblokkeerde dagen.
+Genereer het schema als JSON. Max 4-5 sessies/week. Geen hardlopen op geblokkeerde dagen. Gebruik type "core" voor core/stabiliteit sessies.
 
-{"sessies":[{"datum":"YYYY-MM-DD","type":"hardlopen|rust|krachttraining|cross","beschrijving":"...","duur_minuten":45,"afstand_km":8.0,"intensiteit":"herstel|makkelijk|gemiddeld|zwaar|interval","week_nummer":1,"volgorde":1}],"uitleg":"..."}`
+{"sessies":[{"datum":"YYYY-MM-DD","type":"hardlopen|rust|krachttraining|cross|core","beschrijving":"...","duur_minuten":45,"afstand_km":8.0,"intensiteit":"herstel|makkelijk|gemiddeld|zwaar|interval","week_nummer":1,"volgorde":1}],"uitleg":"..."}`
 
     const response = await claude.messages.create({
       model: 'claude-sonnet-4-6',
