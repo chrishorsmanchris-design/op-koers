@@ -9,6 +9,11 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'Op Koers',
+    startupImage: '/icons/icon-512.png',
+  },
+  icons: {
+    icon: '/icons/favicon-32.png',
+    apple: '/icons/apple-touch-icon.png',
   },
 }
 
@@ -24,8 +29,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="nl" className="h-full">
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Op Koers" />
+        <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="h-full antialiased">
         {children}
