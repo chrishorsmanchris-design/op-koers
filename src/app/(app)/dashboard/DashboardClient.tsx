@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { datumNaarNederlands, formatDuur, cn } from '@/lib/utils'
 import { CheckCircle2, ChevronRight, Dumbbell, Timer, MapPin, Flame } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Goal, PhysioExercise, TrainingSession, Profile } from '@/types/database'
+import type { Goal, PhysioExercise, TrainingSession, Profile, RecurringActivity } from '@/types/database'
 import { FeedbackModal } from '@/components/training/FeedbackModal'
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
   fysioOefeningen: PhysioExercise[]
   doel: Goal | null
   vandaag: string
+  activiteiten: RecurringActivity[]
 }
 
 const INTENSITEIT_KLEUR = {
@@ -24,18 +25,69 @@ const INTENSITEIT_KLEUR = {
   interval: 'bg-red-100 text-red-700',
 }
 
-export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vandaag }: Props) {
+const TYPE_EMOJI: Record<string, string> = {
+  hardlopen: '🏃',
+  rust: '😴',
+  krachttraining: '💪',
+  cross: '🚴',
+  core: '🧘',
+}
+
+// dag_van_week: 0=maandag … 6=zondag → JS getDay(): 0=zondag, 1=maandag …
+function dagVanWeekNaarDatum(dagVanWeek: number, vanaf: Date, weken = 3): Date[] {
+  const jsDag = (dagVanWeek + 1) % 7
+  const resultaten: Date[] = []
+  for (let i = 0; i < weken * 7; i++) {
+    const d = new Date(vanaf)
+    d.setDate(vanaf.getDate() + i)
+    if (d.getDay() === jsDag) resultaten.push(d)
+  }
+  return resultaten
+}
+
+type AgendaItem =
+  | { soort: 'training'; datum: string; sessie: TrainingSession & { session_feedback: unknown[] } }
+  | { soort: 'activiteit'; datum: string; activiteit: RecurringActivity }
+
+export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vandaag, activiteiten }: Props) {
   const supabase = createClient()
   const [feedbackSessie, setFeedbackSessie] = useState<TrainingSession | null>(null)
   const [lokaaleSessies, setLokaaleSessies] = useState(sessies)
 
-  const vandaagSessie = lokaaleSessies.find(s => s.datum === vandaag)
-  const komendeSessies = lokaaleSessies.filter(s => s.datum > vandaag).slice(0, 4)
+  const vandaagSessie = lokaaleSessies.find(s => s.datum === vandaag && !s.overgeslagen)
+  const komendeSessies = lokaaleSessies.filter(s => s.datum > vandaag && !s.overgeslagen)
   const heeftFysio = fysioOefeningen.length > 0
 
   const dagenTotDoel = doel
     ? Math.ceil((new Date(doel.datum).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : null
+
+  // Vandaag's activiteiten
+  const vandaagDag = new Date(vandaag + 'T12:00:00').getDay() // 0=zondag
+  const vandaagActiviteiten = activiteiten.filter(a => (a.dag_van_week + 1) % 7 === vandaagDag)
+
+  // Bouw gecombineerde agenda voor komende week (trainingen + activiteiten)
+  const vandaagDate = new Date(vandaag + 'T12:00:00')
+  const morgen = new Date(vandaagDate)
+  morgen.setDate(vandaagDate.getDate() + 1)
+
+  const activiteitItems: AgendaItem[] = activiteiten.flatMap(a =>
+    dagVanWeekNaarDatum(a.dag_van_week, morgen, 2).map(d => ({
+      soort: 'activiteit' as const,
+      datum: d.toISOString().split('T')[0],
+      activiteit: a,
+    }))
+  )
+
+  const trainingItems: AgendaItem[] = komendeSessies.map(s => ({
+    soort: 'training' as const,
+    datum: s.datum,
+    sessie: s,
+  }))
+
+  const agenda = [...trainingItems, ...activiteitItems]
+    .sort((a, b) => a.datum.localeCompare(b.datum))
+    .slice(0, 6)
 
   async function sessieAfronden(sessieId: string) {
     await supabase.from('training_sessions').update({ voltooid: true } as never).eq('id', sessieId)
@@ -54,29 +106,33 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
   const begroeting = uur < 12 ? 'Goedemorgen' : uur < 18 ? 'Goedemiddag' : 'Goedenavond'
 
   return (
-    <div className="flex flex-col gap-5 p-4 pt-8">
+    <div className="flex flex-col gap-5 p-4 pt-8 pb-24">
       {/* Header */}
       <div>
         <p className="text-[#6b6560] text-sm">{begroeting}</p>
         <h1 className="text-2xl font-bold text-[#1a1612]">{naam} 👋</h1>
       </div>
 
-      {/* Doel teller of CTA */}
+      {/* Doel teller */}
       {doel ? (
         <Card className="bg-gradient-to-br from-[#f97316] to-[#ea6c0a] shadow-md">
           <div className="flex justify-between items-center">
             <div>
               <p className="text-sm text-white/80 font-medium">{doel.naam}</p>
-              <p className="text-3xl font-bold text-white mt-1">{dagenTotDoel} <span className="text-lg font-normal text-white/70">dagen</span></p>
+              <p className="text-3xl font-bold text-white mt-1">
+                {dagenTotDoel} <span className="text-lg font-normal text-white/70">dagen</span>
+              </p>
             </div>
             <div className="text-4xl">🏁</div>
           </div>
           {doel.tijdsdoel && (
-            <p className="text-sm text-white/70 mt-2">Tijdsdoel: <span className="text-white font-medium">{doel.tijdsdoel}</span></p>
+            <p className="text-sm text-white/70 mt-2">
+              Tijdsdoel: <span className="text-white font-medium">{doel.tijdsdoel}</span>
+            </p>
           )}
         </Card>
       ) : (
-        <Card onClick={() => window.location.href = '/doel'} className="border-2 border-dashed border-[#e8e3dc] text-center py-6">
+        <Card onClick={() => window.location.href = '/doel'} className="border-2 border-dashed border-[#e8e3dc] text-center py-6 cursor-pointer">
           <div className="text-4xl mb-2">🎯</div>
           <p className="font-semibold text-[#1a1612]">Stel een doel in</p>
           <p className="text-sm text-[#6b6560] mt-1">Marathon, triathlon of alleen fysio</p>
@@ -89,13 +145,15 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
       {/* Vandaag */}
       <div>
         <h2 className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Vandaag</h2>
+
         {vandaagSessie ? (
           <Card className={cn(vandaagSessie.voltooid && 'opacity-60')}>
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm">{TYPE_EMOJI[vandaagSessie.type] ?? '🏃'}</span>
                   {vandaagSessie.intensiteit && (
-                    <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', INTENSITEIT_KLEUR[vandaagSessie.intensiteit])}>
+                    <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', INTENSITEIT_KLEUR[vandaagSessie.intensiteit as keyof typeof INTENSITEIT_KLEUR])}>
                       {vandaagSessie.intensiteit}
                     </span>
                   )}
@@ -103,13 +161,13 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
                 </div>
                 <h3 className="font-semibold text-[#1a1612]">{vandaagSessie.beschrijving}</h3>
               </div>
-              <Flame size={22} className="text-[#f97316] mt-1" />
+              <Flame size={22} className="text-[#f97316] mt-1 shrink-0" />
             </div>
             <div className="flex gap-4 text-sm text-[#a09990] mb-4">
               {vandaagSessie.duur_minuten && (
                 <span className="flex items-center gap-1"><Timer size={14} /> {formatDuur(vandaagSessie.duur_minuten)}</span>
               )}
-              {vandaagSessie.afstand_km && (
+              {vandaagSessie.afstand_km != null && vandaagSessie.afstand_km > 0 && (
                 <span className="flex items-center gap-1"><MapPin size={14} /> {vandaagSessie.afstand_km} km</span>
               )}
             </div>
@@ -131,8 +189,24 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
           </Card>
         )}
 
+        {/* Vaste activiteiten vandaag */}
+        {vandaagActiviteiten.map(a => (
+          <Card key={a.id} className="mt-2 border border-[#e8e3dc] bg-[#f5f3f0]">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🏑</span>
+              <div>
+                <p className="font-medium text-sm text-[#1a1612]">{a.naam}</p>
+                <p className="text-xs text-[#a09990]">
+                  {a.tijdstip ? `${a.tijdstip.charAt(0).toUpperCase() + a.tijdstip.slice(1)} · ` : ''}
+                  {a.blokkeert_hardlopen ? 'geen hardlopen vandaag' : 'geen invloed op training'}
+                </p>
+              </div>
+            </div>
+          </Card>
+        ))}
+
         {heeftFysio && (
-          <Card className="mt-3" onClick={() => window.location.href = '/fysio'}>
+          <Card className="mt-3 cursor-pointer" onClick={() => window.location.href = '/fysio'}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-[#fff3ec] rounded-2xl flex items-center justify-center">
@@ -149,24 +223,49 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
         )}
       </div>
 
-      {komendeSessies.length > 0 && (
+      {/* Komende agenda */}
+      {agenda.length > 0 && (
         <div>
-          <h2 className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Komende trainingen</h2>
+          <h2 className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Komende week</h2>
           <div className="flex flex-col gap-2">
-            {komendeSessies.map(sessie => (
-              <Card key={sessie.id} className="py-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-[#a09990] capitalize">{datumNaarNederlands(sessie.datum)}</p>
-                    <p className="text-sm font-medium text-[#1a1612] mt-0.5">{sessie.beschrijving}</p>
+            {agenda.map((item, i) => {
+              const datumLabel = datumNaarNederlands(item.datum + 'T12:00:00')
+
+              if (item.soort === 'activiteit') {
+                return (
+                  <div key={`act-${item.activiteit.id}-${item.datum}`} className="flex gap-3 items-center px-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#d0cbc4] shrink-0 mt-0.5" />
+                    <div className="flex-1 flex items-center justify-between py-2 border-b border-[#f0ede8]">
+                      <div>
+                        <p className="text-xs text-[#a09990] capitalize">{datumLabel}</p>
+                        <p className="text-sm text-[#6b6560]">
+                          {item.activiteit.naam}
+                          {item.activiteit.tijdstip ? ` · ${item.activiteit.tijdstip}` : ''}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right text-xs text-[#a09990]">
-                    {sessie.duur_minuten && <p>{formatDuur(sessie.duur_minuten)}</p>}
-                    {sessie.afstand_km && <p>{sessie.afstand_km} km</p>}
+                )
+              }
+
+              const s = item.sessie
+              return (
+                <Card key={`tr-${s.id}-${i}`} className="py-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="text-xs text-[#a09990] capitalize">
+                        {TYPE_EMOJI[s.type] ?? '🏃'} {datumLabel}
+                      </p>
+                      <p className="text-sm font-medium text-[#1a1612] mt-0.5">{s.beschrijving}</p>
+                    </div>
+                    <div className="text-right text-xs text-[#a09990] shrink-0 ml-3">
+                      {s.duur_minuten ? <p>{formatDuur(s.duur_minuten)}</p> : null}
+                      {s.afstand_km && s.afstand_km > 0 ? <p>{s.afstand_km} km</p> : null}
+                    </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              )
+            })}
           </div>
         </div>
       )}

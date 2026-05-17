@@ -9,14 +9,14 @@ export default async function DashboardPage() {
 
   const vandaag = new Date().toISOString().split('T')[0]
 
-  const [{ data: profiel }, { data: sessies }, { data: fysioOefeningen }, { data: doelen }] = await Promise.all([
+  const [{ data: profiel }, { data: sessies }, { data: fysioOefeningen }, { data: doelen }, { data: activiteiten }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('training_sessions')
       .select('*, session_feedback(*)')
       .eq('user_id', user.id)
       .gte('datum', vandaag)
       .order('datum', { ascending: true })
-      .limit(7),
+      .limit(10),
     supabase.from('physio_exercises')
       .select('*')
       .eq('user_id', user.id)
@@ -27,6 +27,9 @@ export default async function DashboardPage() {
       .eq('actief', true)
       .order('datum', { ascending: true })
       .limit(1),
+    supabase.from('recurring_activities')
+      .select('*')
+      .eq('user_id', user.id),
   ])
 
   if (profiel && !(profiel as Record<string, unknown>).onboarding_voltooid) {
@@ -40,6 +43,7 @@ export default async function DashboardPage() {
       fysioOefeningen={fysioOefeningen ?? []}
       doel={doelen?.[0] ?? null}
       vandaag={vandaag}
+      activiteiten={activiteiten ?? []}
     />
   )
 }
