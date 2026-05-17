@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { formatDuur, cn } from '@/lib/utils'
-import { CheckCircle2, ChevronRight, ChevronLeft, Dumbbell, Timer, MapPin, XCircle, Sparkles, Bell } from 'lucide-react'
+import { CheckCircle2, ChevronRight, ChevronLeft, Dumbbell, Timer, MapPin, XCircle, Sparkles, Bell, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Goal, PhysioExercise, TrainingSession, Profile, RecurringActivity } from '@/types/database'
 import { FeedbackModal } from '@/components/training/FeedbackModal'
@@ -187,6 +187,11 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
   const heeftCoreVandaag = heeftCoreDag(geselecteerdeDag)
   const heeftFysioVandaag = heeftFysioDag(geselecteerdeDag)
 
+  async function verwijderSessie(sessieId: string) {
+    await supabase.from('training_sessions').delete().eq('id', sessieId)
+    setLokaaleSessies(prev => prev.filter(s => s.id !== sessieId))
+  }
+
   async function verplaatsSessie(sessieId: string, nieuweDatum: string) {
     await supabase.from('training_sessions').update({ datum: nieuweDatum } as never).eq('id', sessieId)
     setLokaaleSessies(prev => prev.map(s => s.id === sessieId ? { ...s, datum: nieuweDatum } : s))
@@ -227,13 +232,15 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
 
       {/* Push notificaties banner */}
       {pushStatus === 'unknown' && (
-        <button onClick={pushAanvragen} className="w-full flex items-center gap-3 bg-[#1a1612] text-white rounded-2xl px-4 py-3 text-left">
-          <Bell size={18} className="shrink-0 text-[#f97316]" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold">Ochtendmeldingen aanzetten</p>
-            <p className="text-xs text-white/60">Dagelijkse reminder met je training van vandaag</p>
+        <button onClick={pushAanvragen} className="w-full flex items-center gap-3 bg-white border border-[#e8e3dc] rounded-2xl px-4 py-3 text-left shadow-sm">
+          <div className="w-8 h-8 rounded-xl bg-[#f97316]/10 flex items-center justify-center shrink-0">
+            <Bell size={16} className="text-[#f97316]" />
           </div>
-          <ChevronRight size={16} className="text-white/40 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-[#1a1612]">Ochtendmeldingen aanzetten</p>
+            <p className="text-xs text-[#a09990]">Dagelijkse reminder met je training van vandaag</p>
+          </div>
+          <ChevronRight size={16} className="text-[#d0cbc4] shrink-0" />
         </button>
       )}
 
@@ -382,18 +389,18 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
 
       {/* AI Coach bericht */}
       {(coachBericht || coachLaden) && (
-        <div className="bg-[#1a1612] rounded-3xl p-4 flex gap-3">
-          <div className="w-8 h-8 bg-[#f97316] rounded-xl flex items-center justify-center shrink-0 mt-0.5">
-            <Sparkles size={15} className="text-white" />
+        <div className="bg-white border border-[#e8e3dc] rounded-3xl p-4 flex gap-3 shadow-sm">
+          <div className="w-8 h-8 bg-[#f97316]/10 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+            <Sparkles size={15} className="text-[#f97316]" />
           </div>
           <div>
             <p className="text-xs font-semibold text-[#f97316] mb-1">Coach</p>
             {coachLaden ? (
-              <div className="flex gap-1">
-                {[0,1,2].map(i => <div key={i} className="w-1.5 h-1.5 bg-white/30 rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />)}
+              <div className="flex gap-1 pt-1">
+                {[0,1,2].map(i => <div key={i} className="w-1.5 h-1.5 bg-[#d0cbc4] rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />)}
               </div>
             ) : (
-              <p className="text-sm text-white/90 leading-relaxed">{coachBericht}</p>
+              <p className="text-sm text-[#6b6560] leading-relaxed">{coachBericht}</p>
             )}
           </div>
         </div>
@@ -462,35 +469,49 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
           </Card>
         ))}
 
-        {/* Core stability kaart — toon altijd als wil_core aan staat */}
-        {profiel?.wil_core && (
-          <Card
-            className={cn('mt-2', coreVandaagVoltooid ? 'opacity-70' : 'cursor-pointer')}
-            onClick={coreVandaagVoltooid ? undefined : () => window.location.href = '/core/sessie'}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  'w-10 h-10 rounded-2xl flex items-center justify-center text-lg',
-                  coreVandaagVoltooid ? 'bg-green-100' : heeftCoreVandaag ? 'bg-[#06b6d4]/20' : 'bg-[#f5f3f0]'
-                )}>🧘</div>
-                <div>
-                  <h3 className="font-semibold text-[#1a1612]">Core stability</h3>
-                  <p className="text-sm text-[#6b6560]">
-                    {coreVandaagVoltooid
-                      ? 'Gedaan vandaag 💪'
-                      : heeftCoreVandaag
-                        ? 'Vandaag ingepland · tik om te starten'
-                        : 'Tik om nu te doen'}
-                  </p>
+        {/* Core stability kaart */}
+        {profiel?.wil_core && (() => {
+          const coreSessieVandaag = lokaaleSessies.find(s => s.datum === geselecteerdeDag && s.type === 'core' && s.voltooid)
+          return (
+            <Card
+              className={cn('mt-2', coreSessieVandaag ? '' : 'cursor-pointer')}
+              onClick={coreSessieVandaag ? undefined : () => window.location.href = '/core/sessie'}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    'w-10 h-10 rounded-2xl flex items-center justify-center text-lg',
+                    coreSessieVandaag ? 'bg-green-100' : heeftCoreVandaag ? 'bg-[#06b6d4]/20' : 'bg-[#f5f3f0]'
+                  )}>🧘</div>
+                  <div>
+                    <h3 className="font-semibold text-[#1a1612]">Core stability</h3>
+                    <p className="text-sm text-[#6b6560]">
+                      {coreSessieVandaag
+                        ? coreSessieVandaag.beschrijving ?? 'Gedaan vandaag'
+                        : heeftCoreVandaag
+                          ? 'Vandaag ingepland · tik om te starten'
+                          : 'Tik om nu te doen'}
+                    </p>
+                  </div>
                 </div>
+                {coreSessieVandaag ? (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={18} className="text-green-500" />
+                    <button
+                      onClick={e => { e.stopPropagation(); verwijderSessie(coreSessieVandaag.id) }}
+                      className="w-7 h-7 rounded-lg bg-[#f5f3f0] flex items-center justify-center text-[#a09990] hover:text-red-400 hover:bg-red-50 transition-colors"
+                      title="Verwijder sessie"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ) : (
+                  <ChevronRight size={18} className="text-[#a09990]" />
+                )}
               </div>
-              {coreVandaagVoltooid
-                ? <CheckCircle2 size={18} className="text-green-500" />
-                : <ChevronRight size={18} className="text-[#a09990]" />}
-            </div>
-          </Card>
-        )}
+            </Card>
+          )
+        })()}
 
         {/* Fysio kaart */}
         {fysioOefeningen.length > 0 && (
