@@ -141,6 +141,20 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['physio_feedback']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['physio_feedback']['Insert']>
       }
+      recurring_activities: {
+        Row: {
+          id: string
+          user_id: string
+          naam: string
+          dag_van_week: number
+          tijdstip: 'ochtend' | 'middag' | 'avond' | null
+          blokkeert_hardlopen: boolean
+          blokkeert_fysio: boolean
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['recurring_activities']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['recurring_activities']['Insert']>
+      }
     }
   }
 }
@@ -154,3 +168,4 @@ export type SessionFeedback = Database['public']['Tables']['session_feedback']['
 export type PhysioExercise = Database['public']['Tables']['physio_exercises']['Row']
 export type PhysioSession = Database['public']['Tables']['physio_sessions']['Row']
 export type PhysioFeedback = Database['public']['Tables']['physio_feedback']['Row']
+export type RecurringActivity = Database['public']['Tables']['recurring_activities']['Row']

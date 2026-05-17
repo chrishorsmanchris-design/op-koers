@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
-import type { Goal, Profile, Vacation, PreviousResult } from '@/types/database'
+import type { Goal, Profile, Vacation, PreviousResult, RecurringActivity } from '@/types/database'
 import { cn } from '@/lib/utils'
 import { Plus, Trash2, LogOut, Link } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -14,25 +14,42 @@ interface Props {
   doelen: Goal[]
   vakanties: Vacation[]
   resultaten: PreviousResult[]
+  activiteiten: RecurringActivity[]
 }
 
 const KAN_TRAINEN_OPTIES = [
-  { value: 'ja', label: 'Ja', kleur: 'border-green-500 bg-green-500/10 text-green-400' },
-  { value: 'beperkt', label: 'Beperkt', kleur: 'border-yellow-500 bg-yellow-500/10 text-yellow-400' },
-  { value: 'nee', label: 'Nee', kleur: 'border-red-500 bg-red-500/10 text-red-400' },
+  { value: 'ja', label: 'Ja', kleur: 'border-green-500 bg-green-500/10 text-green-600' },
+  { value: 'beperkt', label: 'Beperkt', kleur: 'border-yellow-500 bg-yellow-500/10 text-yellow-600' },
+  { value: 'nee', label: 'Nee', kleur: 'border-red-500 bg-red-500/10 text-red-600' },
 ]
 
-export function InstellingenClient({ profiel, doelen, vakanties: initVakanties }: Props) {
+const DAGEN = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
+const TIJDSTIPPEN = [
+  { value: 'ochtend', label: 'Ochtend' },
+  { value: 'middag', label: 'Middag' },
+  { value: 'avond', label: 'Avond' },
+]
+
+type NieuweActiviteit = {
+  naam: string
+  dag_van_week: number
+  tijdstip: 'ochtend' | 'middag' | 'avond'
+  blokkeert_hardlopen: boolean
+  blokkeert_fysio: boolean
+}
+
+export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, activiteiten: initActiviteiten }: Props) {
   const supabase = createClient()
   const router = useRouter()
   const [vakanties, setVakanties] = useState(initVakanties)
+  const [activiteiten, setActiviteiten] = useState(initActiviteiten)
   const [naam, setNaam] = useState(profiel?.naam ?? '')
   const [kmPerWeek, setKmPerWeek] = useState(String(profiel?.km_per_week ?? ''))
   const [laden, setLaden] = useState(false)
   const [opgeslagen, setOpgeslagen] = useState(false)
 
-  // Nieuwe vakantie
   const [nieuwV, setNieuwV] = useState<{ naam: string; start_datum: string; eind_datum: string; kan_trainen: 'ja' | 'nee' | 'beperkt' }>({ naam: '', start_datum: '', eind_datum: '', kan_trainen: 'ja' })
+  const [nieuwA, setNieuwA] = useState<NieuweActiviteit>({ naam: '', dag_van_week: 1, tijdstip: 'avond', blokkeert_hardlopen: true, blokkeert_fysio: false })
 
   async function profielOpslaan() {
     setLaden(true)
@@ -60,13 +77,28 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties }
     setVakanties(prev => prev.filter(v => v.id !== id))
   }
 
+  async function activiteitToevoegen() {
+    if (!nieuwA.naam) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await supabase.from('recurring_activities').insert({ ...nieuwA, user_id: user.id } as any).select().single()
+    if (data) setActiviteiten(prev => [...prev, data as unknown as RecurringActivity])
+    setNieuwA({ naam: '', dag_van_week: 1, tijdstip: 'avond', blokkeert_hardlopen: true, blokkeert_fysio: false })
+  }
+
+  async function activiteitVerwijderen(id: string) {
+    await supabase.from('recurring_activities').delete().eq('id', id)
+    setActiviteiten(prev => prev.filter(a => a.id !== id))
+  }
+
   async function uitloggen() {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
   return (
-    <div className="flex flex-col gap-6 p-4 pt-8">
+    <div className="flex flex-col gap-6 p-4 pt-8 pb-24">
       <h1 className="text-2xl font-bold text-[#1a1612]">Instellingen</h1>
 
       {/* Profiel */}
@@ -103,6 +135,101 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties }
         ))}
       </section>
 
+      {/* Vaste activiteiten */}
+      <section>
+        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Vaste activiteiten</h2>
+        <p className="text-xs text-[#a09990] mb-3">Momenten die je trainingsschema beïnvloeden, bijv. hockeywedstrijd op dinsdag.</p>
+
+        {activiteiten.map(a => (
+          <Card key={a.id} className="mb-2">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-semibold text-[#1a1612]">{a.naam}</h3>
+                <p className="text-sm text-[#6b6560]">
+                  {DAGEN[a.dag_van_week]}{a.tijdstip ? ` · ${a.tijdstip}` : ''}
+                </p>
+                <div className="flex gap-1.5 mt-1">
+                  {a.blokkeert_hardlopen && (
+                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Geen hardlopen</span>
+                  )}
+                  {a.blokkeert_fysio && (
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Geen fysio</span>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => activiteitVerwijderen(a.id)} className="text-[#a09990]">
+                <Trash2 size={18} />
+              </button>
+            </div>
+          </Card>
+        ))}
+
+        <Card className="mt-2">
+          <div className="flex flex-col gap-3">
+            <Input id="a-naam" label="Activiteit" value={nieuwA.naam}
+              onChange={e => setNieuwA({ ...nieuwA, naam: e.target.value })} placeholder="bijv. Hockey" />
+
+            <div>
+              <p className="text-xs font-medium text-[#6b6560] mb-1.5">Dag</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {DAGEN.map((dag, i) => (
+                  <button key={i} onClick={() => setNieuwA({ ...nieuwA, dag_van_week: i })}
+                    className={cn('py-1.5 rounded-xl text-xs font-medium border-2 transition-all',
+                      nieuwA.dag_van_week === i
+                        ? 'border-[#f97316] bg-[#f97316]/10 text-[#f97316]'
+                        : 'border-[#e8e3dc] text-[#6b6560]'
+                    )}>
+                    {dag.slice(0, 2)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-[#6b6560] mb-1.5">Tijdstip</p>
+              <div className="flex gap-2">
+                {TIJDSTIPPEN.map(t => (
+                  <button key={t.value} onClick={() => setNieuwA({ ...nieuwA, tijdstip: t.value as NieuweActiviteit['tijdstip'] })}
+                    className={cn('flex-1 py-2 rounded-xl text-xs font-medium border-2 transition-all',
+                      nieuwA.tijdstip === t.value
+                        ? 'border-[#f97316] bg-[#f97316]/10 text-[#f97316]'
+                        : 'border-[#e8e3dc] text-[#6b6560]'
+                    )}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-[#6b6560] mb-1.5">Blokkeert</p>
+              <div className="flex gap-2">
+                <button onClick={() => setNieuwA({ ...nieuwA, blokkeert_hardlopen: !nieuwA.blokkeert_hardlopen })}
+                  className={cn('flex-1 py-2 rounded-xl text-xs font-medium border-2 transition-all',
+                    nieuwA.blokkeert_hardlopen
+                      ? 'border-orange-500 bg-orange-500/10 text-orange-600'
+                      : 'border-[#e8e3dc] text-[#6b6560]'
+                  )}>
+                  🏃 Hardlopen
+                </button>
+                <button onClick={() => setNieuwA({ ...nieuwA, blokkeert_fysio: !nieuwA.blokkeert_fysio })}
+                  className={cn('flex-1 py-2 rounded-xl text-xs font-medium border-2 transition-all',
+                    nieuwA.blokkeert_fysio
+                      ? 'border-blue-500 bg-blue-500/10 text-blue-600'
+                      : 'border-[#e8e3dc] text-[#6b6560]'
+                  )}>
+                  💪 Fysio
+                </button>
+              </div>
+            </div>
+
+            <Button variant="secondary" onClick={activiteitToevoegen} disabled={!nieuwA.naam}>
+              <Plus size={16} className="mr-2" /> Toevoegen
+            </Button>
+          </div>
+        </Card>
+      </section>
+
       {/* Vakanties */}
       <section>
         <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Vakanties</h2>
@@ -113,13 +240,13 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties }
                 <h3 className="font-semibold text-[#1a1612]">{v.naam}</h3>
                 <p className="text-sm text-[#6b6560]">{v.start_datum} → {v.eind_datum}</p>
                 <span className={cn('text-xs px-2 py-0.5 rounded-full',
-                  v.kan_trainen === 'ja' ? 'bg-green-900/50 text-green-300' :
-                  v.kan_trainen === 'beperkt' ? 'bg-yellow-900/50 text-yellow-300' : 'bg-red-900/50 text-red-300'
+                  v.kan_trainen === 'ja' ? 'bg-green-100 text-green-700' :
+                  v.kan_trainen === 'beperkt' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
                 )}>
                   {v.kan_trainen === 'ja' ? 'Kan trainen' : v.kan_trainen === 'beperkt' ? 'Beperkt' : 'Niet trainen'}
                 </span>
               </div>
-              <button onClick={() => vakantieVerwijderen(v.id)} className="text-[#6b6560]">
+              <button onClick={() => vakantieVerwijderen(v.id)} className="text-[#a09990]">
                 <Trash2 size={18} />
               </button>
             </div>
@@ -139,8 +266,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties }
                 <button key={o.value}
                   onClick={() => setNieuwV({ ...nieuwV, kan_trainen: o.value as 'ja' | 'nee' | 'beperkt' })}
                   className={cn('flex-1 py-2 rounded-xl text-xs font-medium border-2 transition-all',
-                    nieuwV.kan_trainen === o.value ? o.kleur : 'border-[#e8e3dc] text-[#6b6560]'
-                  )}>
+                    nieuwV.kan_trainen === o.value ? o.kleur : 'border-[#e8e3dc] text-[#6b6560]')}>
                   {o.label}
                 </button>
               ))}

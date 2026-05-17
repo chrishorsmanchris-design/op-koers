@@ -9,11 +9,12 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
 
-  const [{ data: profiel }, { data: doel }, { data: vakanties }, { data: resultaten }] = await Promise.all([
+  const [{ data: profiel }, { data: doel }, { data: vakanties }, { data: resultaten }, { data: activiteiten }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('goals').select('*').eq('user_id', user.id).eq('actief', true).single(),
     supabase.from('vacations').select('*').eq('user_id', user.id),
     supabase.from('previous_results').select('*').eq('user_id', user.id),
+    supabase.from('recurring_activities').select('*').eq('user_id', user.id),
   ])
 
   if (!doel) return NextResponse.json({ error: 'Geen actief doel gevonden' }, { status: 400 })
@@ -33,6 +34,13 @@ GEBRUIKERSPROFIEL:
 
 VAKANTIES (periodes aanpassen):
 ${vakanties?.map(v => `- ${v.naam}: ${v.start_datum} t/m ${v.eind_datum}, kan trainen: ${v.kan_trainen}`).join('\n') || 'Geen'}
+
+VASTE ACTIVITEITEN (wekelijks terugkerend — plan GEEN hardloopsessies op geblokkeerde dagen):
+${activiteiten?.map(a => {
+  const dagen = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag']
+  const blok = [a.blokkeert_hardlopen && 'hardlopen', a.blokkeert_fysio && 'fysio'].filter(Boolean).join(' en ')
+  return `- ${a.naam}: elke ${dagen[a.dag_van_week]}${a.tijdstip ? ` ${a.tijdstip}` : ''} — blokkeert: ${blok}`
+}).join('\n') || 'Geen'}
 
 Genereer een trainingsschema van ${wekenTotDoel} weken. Geef het terug als JSON array van sessies met deze structuur:
 {
