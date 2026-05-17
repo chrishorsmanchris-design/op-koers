@@ -27,3 +27,10 @@ export function korteDatum(datum: Date | string): string {
   const d = typeof datum === 'string' ? new Date(datum) : datum
   return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
 }
+
+export function dagKorteDatum(datum: Date | string): string {
+  const d = typeof datum === 'string' ? new Date(datum + 'T12:00:00') : datum
+  const dag = d.toLocaleDateString('nl-NL', { weekday: 'short' })
+  const datumStr = d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  return `${dag.charAt(0).toUpperCase() + dag.slice(1)} ${datumStr}`
+}

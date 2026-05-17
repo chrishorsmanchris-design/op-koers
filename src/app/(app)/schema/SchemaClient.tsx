@@ -2,9 +2,9 @@
 import { useState, useMemo } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { cn, formatDuur, korteDatum } from '@/lib/utils'
+import { cn, formatDuur, dagKorteDatum } from '@/lib/utils'
 import type { Goal, TrainingSession } from '@/types/database'
-import { Loader2, RefreshCw, GripVertical, MapPin, Timer, CheckCircle2 } from 'lucide-react'
+import { Loader2, RefreshCw, GripVertical, MapPin, Timer, CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -29,11 +29,11 @@ interface Props {
 }
 
 const INTENSITEIT_KLEUR: Record<string, string> = {
-  herstel: 'bg-blue-500/20 text-blue-300',
-  makkelijk: 'bg-green-500/20 text-green-300',
-  gemiddeld: 'bg-yellow-500/20 text-yellow-300',
-  zwaar: 'bg-orange-500/20 text-orange-300',
-  interval: 'bg-red-500/20 text-red-300',
+  herstel: 'bg-blue-100 text-blue-700',
+  makkelijk: 'bg-green-100 text-green-700',
+  gemiddeld: 'bg-yellow-100 text-yellow-700',
+  zwaar: 'bg-orange-100 text-orange-700',
+  interval: 'bg-red-100 text-red-700',
 }
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -43,46 +43,99 @@ const TYPE_EMOJI: Record<string, string> = {
   cross: '🚴',
 }
 
-function SortableSessie({ sessie }: { sessie: TrainingSession }) {
+interface SortableSessieProps {
+  sessie: TrainingSession
+  onGedaan: (id: string) => void
+  onOvergeslagen: (id: string) => void
+}
+
+function SortableSessie({ sessie, onGedaan, onOvergeslagen }: SortableSessieProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sessie.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
+  const [open, setOpen] = useState(false)
+
+  const isOvergeslagen = sessie.overgeslagen
+  const isGedaan = sessie.voltooid
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={cn('flex gap-3 items-start', isDragging && 'opacity-50 z-50')}
+      className={cn('flex gap-2 items-start', isDragging && 'opacity-50 z-50')}
     >
-      <button {...attributes} {...listeners} className="mt-4 text-[#6b6560] touch-none">
-        <GripVertical size={18} />
-      </button>
-      <Card className={cn('flex-1', sessie.voltooid && 'opacity-60')}>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span className="text-sm font-medium text-[#6b6560]">
-                {TYPE_EMOJI[sessie.type]} {korteDatum(sessie.datum)}
-              </span>
-              {sessie.intensiteit && (
-                <span className={cn('text-xs px-2 py-0.5 rounded-full', INTENSITEIT_KLEUR[sessie.intensiteit])}>
-                  {sessie.intensiteit}
+      {/* Drag handle — alleen tonen als niet afgerond/overgeslagen */}
+      {!isGedaan && !isOvergeslagen ? (
+        <button {...attributes} {...listeners} className="mt-5 text-[#c8c3bc] touch-none shrink-0">
+          <GripVertical size={18} />
+        </button>
+      ) : (
+        <div className="w-[18px] mt-5 shrink-0" />
+      )}
+
+      <Card className={cn(
+        'flex-1 transition-all',
+        isGedaan && 'opacity-50',
+        isOvergeslagen && 'opacity-40',
+      )}>
+        {/* Header — altijd zichtbaar */}
+        <button
+          onClick={() => !isGedaan && !isOvergeslagen && setOpen(o => !o)}
+          className="w-full text-left"
+          disabled={isGedaan || isOvergeslagen}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                <span className="text-xs font-semibold text-[#a09990]">
+                  {TYPE_EMOJI[sessie.type]} {dagKorteDatum(sessie.datum)}
                 </span>
-              )}
-              {sessie.voltooid && <CheckCircle2 size={14} className="text-green-400" />}
+                {sessie.intensiteit && (
+                  <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', INTENSITEIT_KLEUR[sessie.intensiteit])}>
+                    {sessie.intensiteit}
+                  </span>
+                )}
+                {isGedaan && <CheckCircle2 size={14} className="text-green-500" />}
+                {isOvergeslagen && <XCircle size={14} className="text-[#a09990]" />}
+              </div>
+              <p className={cn('text-sm font-semibold', isOvergeslagen ? 'line-through text-[#a09990]' : 'text-[#1a1612]')}>
+                {sessie.beschrijving}
+              </p>
+              <div className="flex gap-3 mt-1 text-xs text-[#a09990]">
+                {sessie.duur_minuten != null && <span className="flex items-center gap-1"><Timer size={11} />{formatDuur(sessie.duur_minuten)}</span>}
+                {sessie.afstand_km != null && sessie.afstand_km > 0 && <span className="flex items-center gap-1"><MapPin size={11} />{sessie.afstand_km} km</span>}
+              </div>
             </div>
-            <p className="text-sm font-semibold text-[#1a1612]">{sessie.beschrijving}</p>
-            <div className="flex gap-3 mt-1 text-xs text-[#6b6560]">
-              {sessie.duur_minuten && <span className="flex items-center gap-1"><Timer size={12} />{formatDuur(sessie.duur_minuten)}</span>}
-              {sessie.afstand_km && <span className="flex items-center gap-1"><MapPin size={12} />{sessie.afstand_km} km</span>}
-            </div>
+            {!isGedaan && !isOvergeslagen && (
+              <div className="text-[#c8c3bc] shrink-0 mt-1">
+                {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </div>
+            )}
           </div>
-        </div>
+        </button>
+
+        {/* Acties — uitklapbaar */}
+        {open && !isGedaan && !isOvergeslagen && (
+          <div className="flex gap-2 mt-3 pt-3 border-t border-[#f0ede8]">
+            <button
+              onClick={() => { onGedaan(sessie.id); setOpen(false) }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-green-50 text-green-700 text-sm font-medium border-2 border-green-200 transition-all active:scale-95"
+            >
+              <CheckCircle2 size={16} /> Gedaan
+            </button>
+            <button
+              onClick={() => { onOvergeslagen(sessie.id); setOpen(false) }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-[#f5f3f0] text-[#6b6560] text-sm font-medium border-2 border-[#e8e3dc] transition-all active:scale-95"
+            >
+              <XCircle size={16} /> Overgeslagen
+            </button>
+          </div>
+        )}
       </Card>
     </div>
   )
 }
 
-export function SchemaClient({ sessies: initSessies, doel, userId }: Props) {
+export function SchemaClient({ sessies: initSessies, doel }: Props) {
   const supabase = createClient()
   const [sessies, setSessies] = useState(initSessies)
   const [genereert, setGenereert] = useState(false)
@@ -102,11 +155,21 @@ export function SchemaClient({ sessies: initSessies, doel, userId }: Props) {
   }, [sessies])
 
   const huidigWeek = weken[0]?.[0]
-  const defaultWeek = geselecteerdeWeek ?? huidigWeek
+  const actieveWeek = geselecteerdeWeek ?? huidigWeek
 
   const weekSessies = sessies
-    .filter(s => s.week_nummer === defaultWeek)
+    .filter(s => s.week_nummer === actieveWeek)
     .sort((a, b) => new Date(a.datum).getTime() - new Date(b.datum).getTime())
+
+  async function markeerGedaan(id: string) {
+    setSessies(prev => prev.map(s => s.id === id ? { ...s, voltooid: true } : s))
+    await supabase.from('training_sessions').update({ voltooid: true } as never).eq('id', id)
+  }
+
+  async function markeerOvergeslagen(id: string) {
+    setSessies(prev => prev.map(s => s.id === id ? { ...s, overgeslagen: true } : s))
+    await supabase.from('training_sessions').update({ overgeslagen: true } as never).eq('id', id)
+  }
 
   async function genereerSchema() {
     setGenereert(true)
@@ -124,16 +187,15 @@ export function SchemaClient({ sessies: initSessies, doel, userId }: Props) {
     const nieuwIndex = weekSessies.findIndex(s => s.id === over.id)
     const nieuwVolgorde = arrayMove(weekSessies, oudIndex, nieuwIndex)
 
-    // Datums wisselen
-    const oudeData = weekSessies.map(s => ({ id: s.id, datum: s.datum }))
-    const nieuweVolgorde = nieuwVolgorde.map((s, i) => ({ ...s, datum: oudeData[i].datum }))
+    // Datums rouleren zodat de trainingen op andere dagen vallen maar in dezelfde week blijven
+    const oudeData = weekSessies.map(s => s.datum)
+    const nieuweVolgorde = nieuwVolgorde.map((s, i) => ({ ...s, datum: oudeData[i] }))
 
     setSessies(prev => prev.map(s => {
       const update = nieuweVolgorde.find(n => n.id === s.id)
       return update ? { ...s, datum: update.datum } : s
     }))
 
-    // Opslaan
     await Promise.all(
       nieuweVolgorde.map(s =>
         supabase.from('training_sessions').update({ datum: s.datum } as never).eq('id', s.id)
@@ -141,8 +203,13 @@ export function SchemaClient({ sessies: initSessies, doel, userId }: Props) {
     )
   }
 
+  // Weekvoortgang
+  const gedaanInWeek = weekSessies.filter(s => s.voltooid).length
+  const overgeslagenInWeek = weekSessies.filter(s => s.overgeslagen).length
+  const openInWeek = weekSessies.filter(s => !s.voltooid && !s.overgeslagen).length
+
   return (
-    <div className="flex flex-col gap-5 p-4 pt-8">
+    <div className="flex flex-col gap-5 p-4 pt-8 pb-24">
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-bold text-[#1a1612]">Trainingsschema</h1>
@@ -177,7 +244,7 @@ export function SchemaClient({ sessies: initSessies, doel, userId }: Props) {
                 onClick={() => setGeselecteerdeWeek(week)}
                 className={cn(
                   'px-4 py-2 rounded-2xl text-sm font-medium whitespace-nowrap transition-all shrink-0',
-                  (geselecteerdeWeek ?? huidigWeek) === week
+                  actieveWeek === week
                     ? 'bg-[#f97316] text-white'
                     : 'bg-[#f0ede8] text-[#a09990]'
                 )}
@@ -187,12 +254,31 @@ export function SchemaClient({ sessies: initSessies, doel, userId }: Props) {
             ))}
           </div>
 
+          {/* Weekvoortgang */}
+          {weekSessies.length > 0 && (
+            <div className="flex gap-3 text-xs text-[#6b6560]">
+              <span className="flex items-center gap-1"><CheckCircle2 size={12} className="text-green-500" /> {gedaanInWeek} gedaan</span>
+              {overgeslagenInWeek > 0 && <span className="flex items-center gap-1"><XCircle size={12} className="text-[#a09990]" /> {overgeslagenInWeek} overgeslagen</span>}
+              {openInWeek > 0 && <span>{openInWeek} nog te doen</span>}
+            </div>
+          )}
+
+          {/* Hint */}
+          {openInWeek > 1 && (
+            <p className="text-xs text-[#a09990]">Versleep trainingen binnen de week om ze op een andere dag te doen.</p>
+          )}
+
           {/* Sessies met drag-drop */}
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={weekSessies.map(s => s.id)} strategy={verticalListSortingStrategy}>
               <div className="flex flex-col gap-2">
                 {weekSessies.map(sessie => (
-                  <SortableSessie key={sessie.id} sessie={sessie} />
+                  <SortableSessie
+                    key={sessie.id}
+                    sessie={sessie}
+                    onGedaan={markeerGedaan}
+                    onOvergeslagen={markeerOvergeslagen}
+                  />
                 ))}
               </div>
             </SortableContext>
