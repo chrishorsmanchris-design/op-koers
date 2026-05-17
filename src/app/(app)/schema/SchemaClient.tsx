@@ -142,6 +142,8 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
   const [genereert, setGenereert] = useState(false)
   const [geselecteerdeWeek, setGeselecteerdeWeek] = useState<number | null>(null)
   const [uitleg, setUitleg] = useState('')
+  const [fout, setFout] = useState('')
+  const [foutTekst, setFoutTekst] = useState('')
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -174,10 +176,22 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
 
   async function genereerSchema() {
     setGenereert(true)
-    const res = await fetch('/api/training/genereer', { method: 'POST' })
-    const data = await res.json()
-    if (data.uitleg) setUitleg(data.uitleg)
-    window.location.reload()
+    setFout('')
+    try {
+      const res = await fetch('/api/training/genereer', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setFout(data.error ?? 'Onbekende fout')
+        setFoutTekst(data.tekst ?? '')
+        setGenereert(false)
+        return
+      }
+      if (data.uitleg) setUitleg(data.uitleg)
+      window.location.reload()
+    } catch (e) {
+      setFout(String(e))
+      setGenereert(false)
+    }
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -225,6 +239,13 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
       {uitleg && (
         <Card className="bg-[#f97316]/10 border border-[#f97316]/20">
           <p className="text-sm text-[#f97316]">💡 {uitleg}</p>
+        </Card>
+      )}
+      {fout && (
+        <Card className="bg-red-50 border border-red-200">
+          <p className="text-sm font-medium text-red-700 mb-1">Schema genereren mislukt</p>
+          <p className="text-xs text-red-500 font-mono break-all">{fout}</p>
+          {foutTekst && <p className="text-xs text-red-400 font-mono break-all mt-1 border-t border-red-100 pt-1">{foutTekst}</p>}
         </Card>
       )}
 

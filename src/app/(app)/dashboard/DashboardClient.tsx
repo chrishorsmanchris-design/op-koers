@@ -1,9 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { datumNaarNederlands, formatDuur, cn } from '@/lib/utils'
-import { CheckCircle2, ChevronRight, Dumbbell, Timer, MapPin, Flame } from 'lucide-react'
+import { formatDuur, cn } from '@/lib/utils'
+import { CheckCircle2, ChevronRight, ChevronLeft, Dumbbell, Timer, MapPin, XCircle, Sparkles, Bell } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Goal, PhysioExercise, TrainingSession, Profile, RecurringActivity } from '@/types/database'
 import { FeedbackModal } from '@/components/training/FeedbackModal'
@@ -11,13 +11,39 @@ import { FeedbackModal } from '@/components/training/FeedbackModal'
 interface Props {
   profiel: Profile | null
   sessies: (TrainingSession & { session_feedback: unknown[] })[]
+  alleSessies: { voltooid: boolean; overgeslagen: boolean; datum: string }[]
   fysioOefeningen: PhysioExercise[]
   doel: Goal | null
   vandaag: string
+  weekStart: string
   activiteiten: RecurringActivity[]
 }
 
-const INTENSITEIT_KLEUR = {
+const TYPE_KLEUR: Record<string, string> = {
+  hardlopen: '#f97316',
+  krachttraining: '#8b5cf6',
+  core: '#06b6d4',
+  cross: '#10b981',
+  rust: '#e5e7eb',
+}
+
+const TYPE_LABEL: Record<string, string> = {
+  hardlopen: '🏃',
+  krachttraining: '💪',
+  core: '🧘',
+  cross: '🚴',
+  rust: '😴',
+}
+
+const INTENSITEIT_LABEL: Record<string, string> = {
+  herstel: 'Herstelloop',
+  makkelijk: 'Duurloop',
+  gemiddeld: 'Tempo',
+  zwaar: 'Lange duurloop',
+  interval: 'Interval',
+}
+
+const INTENSITEIT_KLEUR: Record<string, string> = {
   herstel: 'bg-blue-100 text-blue-700',
   makkelijk: 'bg-green-100 text-green-700',
   gemiddeld: 'bg-yellow-100 text-yellow-700',
@@ -25,69 +51,147 @@ const INTENSITEIT_KLEUR = {
   interval: 'bg-red-100 text-red-700',
 }
 
-const TYPE_EMOJI: Record<string, string> = {
-  hardlopen: '🏃',
-  rust: '😴',
-  krachttraining: '💪',
-  cross: '🚴',
-  core: '🧘',
-}
+const DAGEN_KORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
-// dag_van_week: 0=maandag … 6=zondag → JS getDay(): 0=zondag, 1=maandag …
-function dagVanWeekNaarDatum(dagVanWeek: number, vanaf: Date, weken = 3): Date[] {
-  const jsDag = (dagVanWeek + 1) % 7
-  const resultaten: Date[] = []
-  for (let i = 0; i < weken * 7; i++) {
-    const d = new Date(vanaf)
-    d.setDate(vanaf.getDate() + i)
-    if (d.getDay() === jsDag) resultaten.push(d)
+function weekDagen(startDatum: string): string[] {
+  const dagen: string[] = []
+  const start = new Date(startDatum + 'T12:00:00')
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start)
+    d.setDate(start.getDate() + i)
+    dagen.push(d.toISOString().split('T')[0])
   }
-  return resultaten
+  return dagen
 }
 
-type AgendaItem =
-  | { soort: 'training'; datum: string; sessie: TrainingSession & { session_feedback: unknown[] } }
-  | { soort: 'activiteit'; datum: string; activiteit: RecurringActivity }
+// dag_van_week 0=ma..6=zo → JS 1=ma..0=zo
+function dagVanWeekVoorDatum(datum: string, dagVanWeek: number): boolean {
+  const d = new Date(datum + 'T12:00:00')
+  const jsDag = d.getDay() // 0=zo, 1=ma...
+  const onzeDag = jsDag === 0 ? 6 : jsDag - 1 // 0=ma..6=zo
+  return onzeDag === dagVanWeek
+}
 
-export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vandaag, activiteiten }: Props) {
+export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen, doel, vandaag, weekStart, activiteiten }: Props) {
   const supabase = createClient()
   const [feedbackSessie, setFeedbackSessie] = useState<TrainingSession | null>(null)
   const [lokaaleSessies, setLokaaleSessies] = useState(sessies)
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [geselecteerdeDag, setGeselecteerdeDag] = useState(vandaag)
+  const [coachBericht, setCoachBericht] = useState<string | null>(null)
+  const [coachLaden, setCoachLaden] = useState(false)
+  const [pushStatus, setPushStatus] = useState<'unknown' | 'granted' | 'denied' | 'unsupported'>('unknown')
 
-  const vandaagSessie = lokaaleSessies.find(s => s.datum === vandaag && !s.overgeslagen)
-  const komendeSessies = lokaaleSessies.filter(s => s.datum > vandaag && !s.overgeslagen)
-  const heeftFysio = fysioOefeningen.length > 0
+  // Push permission + subscription
+  useEffect(() => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      setPushStatus('unsupported'); return
+    }
+    setPushStatus(Notification.permission === 'granted' ? 'granted' : Notification.permission === 'denied' ? 'denied' : 'unknown')
+  }, [])
+
+  async function pushAanvragen() {
+    if (!('Notification' in window)) return
+    const perm = await Notification.requestPermission()
+    if (perm !== 'granted') { setPushStatus('denied'); return }
+    setPushStatus('granted')
+    const reg = await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    })
+    await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
+  }
+
+  // Coach bericht laden (eenmalig per dag, gecached in sessionStorage)
+  useEffect(() => {
+    const cacheKey = `coach-${vandaag}`
+    const cached = sessionStorage.getItem(cacheKey)
+    if (cached) { setCoachBericht(cached); return }
+    setCoachLaden(true)
+    fetch('/api/coach/bericht')
+      .then(r => r.json())
+      .then(d => {
+        if (d.bericht) { setCoachBericht(d.bericht); sessionStorage.setItem(cacheKey, d.bericht) }
+        setCoachLaden(false)
+      })
+      .catch(() => setCoachLaden(false))
+  }, [vandaag])
+
+  // Voortgang trainingsplan
+  const planVoortgang = (() => {
+    if (!alleSessies.length) return null
+    const voltooid = alleSessies.filter(s => s.voltooid).length
+    const totaal = alleSessies.filter(s => !s.overgeslagen).length || alleSessies.length
+    return { voltooid, totaal, pct: Math.round((voltooid / totaal) * 100) }
+  })()
+
+  // Weekoverzicht (maandag: toon vorige week samenvatting)
+  const isVandaagMaandag = new Date(vandaag + 'T12:00:00').getDay() === 1
+  const vorigeWeekSamenvatting = (() => {
+    if (!isVandaagMaandag) return null
+    const vorigeWeekStart = new Date(weekStart + 'T12:00:00')
+    vorigeWeekStart.setDate(vorigeWeekStart.getDate() - 7)
+    const vwsStr = vorigeWeekStart.toISOString().split('T')[0]
+    const vorigeWeekEind = new Date(weekStart + 'T12:00:00')
+    vorigeWeekEind.setDate(vorigeWeekEind.getDate() - 1)
+    const vweStr = vorigeWeekEind.toISOString().split('T')[0]
+    const vwSessies = alleSessies.filter(s => s.datum >= vwsStr && s.datum <= vweStr)
+    const vwVoltooid = vwSessies.filter(s => s.voltooid).length
+    const vwTotaal = vwSessies.length
+    if (!vwTotaal) return null
+    return { voltooid: vwVoltooid, totaal: vwTotaal }
+  })()
+
+  const displayWeekStart = (() => {
+    const d = new Date(weekStart + 'T12:00:00')
+    d.setDate(d.getDate() + weekOffset * 7)
+    return d.toISOString().split('T')[0]
+  })()
+
+  const dagen = weekDagen(displayWeekStart)
+  const naam = profiel?.naam?.split(' ')[0] ?? 'atleet'
+  const uur = new Date().getHours()
+  const begroeting = uur < 12 ? 'Goedemorgen' : uur < 18 ? 'Goedemiddag' : 'Goedenavond'
 
   const dagenTotDoel = doel
     ? Math.ceil((new Date(doel.datum).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : null
 
-  // Vandaag's activiteiten
-  const vandaagDag = new Date(vandaag + 'T12:00:00').getDay() // 0=zondag
-  const vandaagActiviteiten = activiteiten.filter(a => (a.dag_van_week + 1) % 7 === vandaagDag)
+  // Verdeel activiteiten over de week op basis van frequentie (0=ma..6=zo)
+  const FREQ_NAAR_DAGEN: Record<number, number[]> = {
+    1: [2], 2: [1, 5], 3: [0, 2, 5], 4: [0, 1, 3, 5], 5: [0, 1, 2, 4, 5]
+  }
+  function heeftActiviteitOpDag(datum: string, freq: number): boolean {
+    const d = new Date(datum + 'T12:00:00')
+    const jsDag = d.getDay()
+    const onzeDag = jsDag === 0 ? 6 : jsDag - 1
+    const dagen = FREQ_NAAR_DAGEN[freq] ?? FREQ_NAAR_DAGEN[3]
+    return dagen.includes(onzeDag)
+  }
+  function heeftCoreDag(datum: string): boolean {
+    if (!profiel?.wil_core) return false
+    return heeftActiviteitOpDag(datum, profiel?.core_per_week ?? 2)
+  }
+  function heeftFysioDag(datum: string): boolean {
+    if (!fysioOefeningen.length) return false
+    return heeftActiviteitOpDag(datum, profiel?.fysio_per_week ?? 3)
+  }
 
-  // Bouw gecombineerde agenda voor komende week (trainingen + activiteiten)
-  const vandaagDate = new Date(vandaag + 'T12:00:00')
-  const morgen = new Date(vandaagDate)
-  morgen.setDate(vandaagDate.getDate() + 1)
+  // Geselecteerde dag info
+  const [verplaatsenSessieId, setVerplaatsenSessieId] = useState<string | null>(null)
 
-  const activiteitItems: AgendaItem[] = activiteiten.flatMap(a =>
-    dagVanWeekNaarDatum(a.dag_van_week, morgen, 2).map(d => ({
-      soort: 'activiteit' as const,
-      datum: d.toISOString().split('T')[0],
-      activiteit: a,
-    }))
-  )
+  const geselecteerdeSessie = lokaaleSessies.find(s => s.datum === geselecteerdeDag && !s.overgeslagen)
+  const geselecteerdeActiviteiten = activiteiten.filter(a => dagVanWeekVoorDatum(geselecteerdeDag, a.dag_van_week))
+  const heeftCoreVandaag = heeftCoreDag(geselecteerdeDag)
+  const heeftFysioVandaag = heeftFysioDag(geselecteerdeDag)
 
-  const trainingItems: AgendaItem[] = komendeSessies.map(s => ({
-    soort: 'training' as const,
-    datum: s.datum,
-    sessie: s,
-  }))
-
-  const agenda = [...trainingItems, ...activiteitItems]
-    .sort((a, b) => a.datum.localeCompare(b.datum))
-    .slice(0, 6)
+  async function verplaatsSessie(sessieId: string, nieuweDatum: string) {
+    await supabase.from('training_sessions').update({ datum: nieuweDatum } as never).eq('id', sessieId)
+    setLokaaleSessies(prev => prev.map(s => s.id === sessieId ? { ...s, datum: nieuweDatum } : s))
+    setGeselecteerdeDag(nieuweDatum)
+    setVerplaatsenSessieId(null)
+  }
 
   async function sessieAfronden(sessieId: string) {
     await supabase.from('training_sessions').update({ voltooid: true } as never).eq('id', sessieId)
@@ -101,10 +205,6 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
     setLokaaleSessies(prev => prev.map(s => s.id === sessieId ? { ...s, overgeslagen: true } : s))
   }
 
-  const naam = profiel?.naam?.split(' ')[0] ?? 'atleet'
-  const uur = new Date().getHours()
-  const begroeting = uur < 12 ? 'Goedemorgen' : uur < 18 ? 'Goedemiddag' : 'Goedenavond'
-
   return (
     <div className="flex flex-col gap-5 p-4 pt-8 pb-24">
       {/* Header */}
@@ -113,7 +213,30 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
         <h1 className="text-2xl font-bold text-[#1a1612]">{naam} 👋</h1>
       </div>
 
-      {/* Doel teller */}
+      {/* Weekoverzicht — alleen maandag */}
+      {vorigeWeekSamenvatting && (
+        <Card className={cn('border-2', vorigeWeekSamenvatting.voltooid >= vorigeWeekSamenvatting.totaal * 0.8 ? 'border-green-200 bg-green-50' : 'border-[#f97316]/20 bg-[#f97316]/5')}>
+          <p className="text-xs font-semibold text-[#6b6560] uppercase tracking-wider mb-1">Vorige week</p>
+          <p className="text-base font-bold text-[#1a1612]">
+            {vorigeWeekSamenvatting.voltooid}/{vorigeWeekSamenvatting.totaal} trainingen voltooid
+            {vorigeWeekSamenvatting.voltooid >= vorigeWeekSamenvatting.totaal ? ' 🔥' : vorigeWeekSamenvatting.voltooid >= vorigeWeekSamenvatting.totaal * 0.8 ? ' 💪' : ' — blijf gaan!'}
+          </p>
+        </Card>
+      )}
+
+      {/* Push notificaties banner */}
+      {pushStatus === 'unknown' && (
+        <button onClick={pushAanvragen} className="w-full flex items-center gap-3 bg-[#1a1612] text-white rounded-2xl px-4 py-3 text-left">
+          <Bell size={18} className="shrink-0 text-[#f97316]" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold">Ochtendmeldingen aanzetten</p>
+            <p className="text-xs text-white/60">Dagelijkse reminder met je training van vandaag</p>
+          </div>
+          <ChevronRight size={16} className="text-white/40 shrink-0" />
+        </button>
+      )}
+
+      {/* Doel countdown + voortgang */}
       {doel ? (
         <Card className="bg-gradient-to-br from-[#f97316] to-[#ea6c0a] shadow-md">
           <div className="flex justify-between items-center">
@@ -130,149 +253,349 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
               Tijdsdoel: <span className="text-white font-medium">{doel.tijdsdoel}</span>
             </p>
           )}
+          {planVoortgang && planVoortgang.totaal > 0 && (
+            <div className="mt-3">
+              <div className="flex justify-between text-xs text-white/70 mb-1">
+                <span>Trainingsplan voortgang</span>
+                <span>{planVoortgang.voltooid}/{planVoortgang.totaal} sessies · {planVoortgang.pct}%</span>
+              </div>
+              <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                <div className="h-full bg-white rounded-full transition-all" style={{ width: `${planVoortgang.pct}%` }} />
+              </div>
+            </div>
+          )}
         </Card>
       ) : (
-        <Card onClick={() => window.location.href = '/doel'} className="border-2 border-dashed border-[#e8e3dc] text-center py-6 cursor-pointer">
-          <div className="text-4xl mb-2">🎯</div>
+        <Card onClick={() => window.location.href = '/doel'} className="border-2 border-dashed border-[#e8e3dc] text-center py-5 cursor-pointer">
+          <p className="text-3xl mb-1">🎯</p>
           <p className="font-semibold text-[#1a1612]">Stel een doel in</p>
-          <p className="text-sm text-[#6b6560] mt-1">Marathon, triathlon of alleen fysio</p>
-          <div className="mt-4">
-            <Button size="sm">Doel toevoegen</Button>
-          </div>
+          <p className="text-sm text-[#6b6560] mt-0.5">Marathon, triathlon of alleen fysio</p>
         </Card>
       )}
 
-      {/* Vandaag */}
-      <div>
-        <h2 className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Vandaag</h2>
+      {/* Week strip */}
+      <div className="bg-white rounded-3xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={() => { setWeekOffset(o => Math.max(0, o - 1)); setGeselecteerdeDag(vandaag) }}
+            disabled={weekOffset === 0}
+            className={cn('w-7 h-7 rounded-full flex items-center justify-center', weekOffset === 0 ? 'text-[#d0cbc4]' : 'text-[#6b6560] bg-[#f5f3f0]')}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">
+            {weekOffset === 0 ? 'Deze week' : weekOffset === 1 ? 'Volgende week' : `Over ${weekOffset} weken`}
+          </p>
+          <button
+            onClick={() => {
+              const nieuweOffset = Math.min(2, weekOffset + 1)
+              const d = new Date(weekStart + 'T12:00:00')
+              d.setDate(d.getDate() + nieuweOffset * 7)
+              setGeselecteerdeDag(d.toISOString().split('T')[0])
+              setWeekOffset(nieuweOffset)
+            }}
+            disabled={weekOffset === 2}
+            className={cn('w-7 h-7 rounded-full flex items-center justify-center', weekOffset === 2 ? 'text-[#d0cbc4]' : 'text-[#6b6560] bg-[#f5f3f0]')}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {dagen.map((datum, i) => {
+            const sessie = lokaaleSessies.find(s => s.datum === datum && !s.overgeslagen)
+            const heeftActiviteit = activiteiten.some(a => dagVanWeekVoorDatum(datum, a.dag_van_week))
+            const heeftCore = heeftCoreDag(datum)
+            const isVandaag = datum === vandaag
+            const isGeselecteerd = datum === geselecteerdeDag
+            const isVerleden = datum < vandaag
+            const heeftFysio = heeftFysioDag(datum)
+            const kleur = sessie ? TYPE_KLEUR[sessie.type] ?? '#f97316' : heeftCore ? '#06b6d4' : heeftFysio ? '#f97316' : null
 
-        {vandaagSessie ? (
-          <Card className={cn(vandaagSessie.voltooid && 'opacity-60')}>
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm">{TYPE_EMOJI[vandaagSessie.type] ?? '🏃'}</span>
-                  {vandaagSessie.intensiteit && (
-                    <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', INTENSITEIT_KLEUR[vandaagSessie.intensiteit as keyof typeof INTENSITEIT_KLEUR])}>
-                      {vandaagSessie.intensiteit}
-                    </span>
+            return (
+              <button
+                key={datum}
+                onClick={() => setGeselecteerdeDag(datum)}
+                className="flex flex-col items-center gap-1.5"
+              >
+                <span className={cn(
+                  'text-xs font-medium',
+                  isVandaag ? 'text-[#f97316]' : isVerleden ? 'text-[#c8c3bc]' : 'text-[#6b6560]'
+                )}>
+                  {DAGEN_KORT[i]}
+                </span>
+
+                <div className={cn(
+                  'w-9 h-9 rounded-full flex items-center justify-center relative transition-all',
+                  isGeselecteerd ? 'ring-2 ring-[#f97316] ring-offset-1' : '',
+                  isVandaag && !isGeselecteerd ? 'ring-1 ring-[#f97316]/40 ring-offset-1' : '',
+                )}
+                  style={{ backgroundColor: kleur ? (isVerleden ? kleur + '60' : kleur) : '#f5f3f0' }}
+                >
+                  {sessie ? (
+                    <span className="text-sm">{TYPE_LABEL[sessie.type]}</span>
+                  ) : heeftActiviteit ? (
+                    <span className="text-sm">🏑</span>
+                  ) : heeftCore ? (
+                    <span className="text-sm">🧘</span>
+                  ) : heeftFysio ? (
+                    <span className="text-sm">🩺</span>
+                  ) : (
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#d0cbc4]" />
                   )}
-                  {vandaagSessie.voltooid && <CheckCircle2 size={16} className="text-green-500" />}
+                  {sessie?.voltooid && (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center">
+                      <CheckCircle2 size={9} className="text-white" />
+                    </div>
+                  )}
                 </div>
-                <h3 className="font-semibold text-[#1a1612]">{vandaagSessie.beschrijving}</h3>
-              </div>
-              <Flame size={22} className="text-[#f97316] mt-1 shrink-0" />
-            </div>
-            <div className="flex gap-4 text-sm text-[#a09990] mb-4">
-              {vandaagSessie.duur_minuten && (
-                <span className="flex items-center gap-1"><Timer size={14} /> {formatDuur(vandaagSessie.duur_minuten)}</span>
-              )}
-              {vandaagSessie.afstand_km != null && vandaagSessie.afstand_km > 0 && (
-                <span className="flex items-center gap-1"><MapPin size={14} /> {vandaagSessie.afstand_km} km</span>
-              )}
-            </div>
-            {!vandaagSessie.voltooid && !vandaagSessie.overgeslagen && (
-              <div className="flex gap-2">
-                <Button onClick={() => sessieAfronden(vandaagSessie.id)} className="flex-1">Afgerond</Button>
-                <Button variant="ghost" onClick={() => sessieOvergeslagen(vandaagSessie.id)} size="sm">Sla over</Button>
-              </div>
-            )}
-            {vandaagSessie.voltooid && (
-              <p className="text-green-600 text-sm font-medium flex items-center gap-1">
-                <CheckCircle2 size={14} /> Gelukt!
-              </p>
-            )}
-          </Card>
-        ) : (
-          <Card>
-            <p className="text-[#6b6560]">Geen training gepland vandaag. Rust en herstel!</p>
-          </Card>
-        )}
 
-        {/* Vaste activiteiten vandaag */}
-        {vandaagActiviteiten.map(a => (
-          <Card key={a.id} className="mt-2 border border-[#e8e3dc] bg-[#f5f3f0]">
+                <span className={cn(
+                  'text-xs',
+                  isVandaag ? 'text-[#f97316] font-semibold' : 'text-[#a09990]'
+                )}>
+                  {new Date(datum + 'T12:00:00').getDate()}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Legenda */}
+        <div className="flex gap-3 mt-3 flex-wrap">
+          {[
+            { kleur: '#f97316', label: 'Hardlopen' },
+            { kleur: '#8b5cf6', label: 'Kracht' },
+            { kleur: '#06b6d4', label: 'Core' },
+            { kleur: '#10b981', label: 'Cross' },
+          ].map(l => (
+            <div key={l.label} className="flex items-center gap-1">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: l.kleur }} />
+              <span className="text-xs text-[#a09990]">{l.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* AI Coach bericht */}
+      {(coachBericht || coachLaden) && (
+        <div className="bg-[#1a1612] rounded-3xl p-4 flex gap-3">
+          <div className="w-8 h-8 bg-[#f97316] rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+            <Sparkles size={15} className="text-white" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-[#f97316] mb-1">Coach</p>
+            {coachLaden ? (
+              <div className="flex gap-1">
+                {[0,1,2].map(i => <div key={i} className="w-1.5 h-1.5 bg-white/30 rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />)}
+              </div>
+            ) : (
+              <p className="text-sm text-white/90 leading-relaxed">{coachBericht}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Geselecteerde dag detail */}
+      <div>
+        <h2 className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">
+          {geselecteerdeDag === vandaag ? 'Vandaag' : new Date(geselecteerdeDag + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
+        </h2>
+
+        {geselecteerdeSessie ? (
+          <>
+            <TrainingsKaart
+              sessie={geselecteerdeSessie}
+              onAfronden={sessieAfronden}
+              onOvergeslagen={sessieOvergeslagen}
+              onVerplaatsen={() => setVerplaatsenSessieId(
+                verplaatsenSessieId === geselecteerdeSessie.id ? null : geselecteerdeSessie.id
+              )}
+              isVerleden={geselecteerdeDag < vandaag}
+            />
+            {verplaatsenSessieId === geselecteerdeSessie.id && (
+              <div className="bg-white rounded-2xl p-4 mt-2 shadow-sm">
+                <p className="text-xs font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Verplaatsen naar</p>
+                <div className="grid grid-cols-7 gap-1">
+                  {dagen.map((datum, i) => {
+                    const bezet = lokaaleSessies.some(s => s.datum === datum && s.id !== geselecteerdeSessie.id && !s.overgeslagen)
+                    const isHuidige = datum === geselecteerdeDag
+                    return (
+                      <button key={datum} onClick={() => !bezet && !isHuidige && verplaatsSessie(geselecteerdeSessie.id, datum)}
+                        disabled={bezet || isHuidige}
+                        className={cn('flex flex-col items-center gap-1 py-2 rounded-xl text-xs transition-all',
+                          isHuidige ? 'bg-[#f97316]/10 text-[#f97316] font-semibold' :
+                          bezet ? 'opacity-30 cursor-not-allowed' :
+                          'hover:bg-[#f5f3f0] text-[#1a1612] font-medium cursor-pointer border border-[#e8e3dc]'
+                        )}>
+                        <span className="text-[10px] text-[#a09990]">{DAGEN_KORT[i]}</span>
+                        <span>{new Date(datum + 'T12:00:00').getDate()}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        ) : geselecteerdeActiviteiten.length === 0 ? (
+          <Card>
+            <p className="text-[#6b6560] text-sm">Geen training gepland. Rust en herstel!</p>
+          </Card>
+        ) : null}
+
+        {/* Vaste activiteiten op deze dag */}
+        {geselecteerdeActiviteiten.map(a => (
+          <Card key={a.id} className="mt-2 bg-[#f5f3f0] border border-[#e8e3dc]">
             <div className="flex items-center gap-3">
               <span className="text-xl">🏑</span>
               <div>
                 <p className="font-medium text-sm text-[#1a1612]">{a.naam}</p>
                 <p className="text-xs text-[#a09990]">
-                  {a.tijdstip ? `${a.tijdstip.charAt(0).toUpperCase() + a.tijdstip.slice(1)} · ` : ''}
-                  {a.blokkeert_hardlopen ? 'geen hardlopen vandaag' : 'geen invloed op training'}
+                  {a.tijdstip ? `${a.tijdstip.charAt(0).toUpperCase() + a.tijdstip.slice(1)}` : 'Vaste activiteit'}
+                  {a.blokkeert_hardlopen ? ' · geen hardlopen' : ''}
                 </p>
               </div>
             </div>
           </Card>
         ))}
 
-        {heeftFysio && (
-          <Card className="mt-3 cursor-pointer" onClick={() => window.location.href = '/fysio'}>
+        {/* Core stability kaart — toon altijd als wil_core aan staat */}
+        {profiel?.wil_core && (
+          <Card className="mt-2 cursor-pointer" onClick={() => window.location.href = '/core/sessie'}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#fff3ec] rounded-2xl flex items-center justify-center">
+                <div className={cn(
+                  'w-10 h-10 rounded-2xl flex items-center justify-center text-lg',
+                  heeftCoreVandaag ? 'bg-[#06b6d4]/20' : 'bg-[#f5f3f0]'
+                )}>🧘</div>
+                <div>
+                  <h3 className="font-semibold text-[#1a1612]">Core stability</h3>
+                  <p className="text-sm text-[#6b6560]">
+                    {heeftCoreVandaag ? 'Vandaag ingepland · tik om te starten' : 'Tik om nu te doen'}
+                  </p>
+                </div>
+              </div>
+              {heeftCoreVandaag && (
+                <div className="w-2 h-2 rounded-full bg-[#06b6d4]" />
+              )}
+              <ChevronRight size={18} className="text-[#a09990]" />
+            </div>
+          </Card>
+        )}
+
+        {/* Fysio kaart */}
+        {fysioOefeningen.length > 0 && (
+          <Card className="mt-2 cursor-pointer" onClick={() => window.location.href = '/fysio/sessie'}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={cn('w-10 h-10 rounded-2xl flex items-center justify-center',
+                  heeftFysioVandaag ? 'bg-[#f97316]/20' : 'bg-[#fff3ec]')}>
                   <Dumbbell size={18} className="text-[#f97316]" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-[#1a1612]">Fysio-oefeningen</h3>
-                  <p className="text-sm text-[#6b6560]">{fysioOefeningen.length} oefeningen</p>
+                  <p className="text-sm text-[#6b6560]">
+                    {heeftFysioVandaag ? `${fysioOefeningen.length} oefeningen · vandaag ingepland` : `${fysioOefeningen.length} oefeningen · tik om te starten`}
+                  </p>
                 </div>
               </div>
-              <ChevronRight size={18} className="text-[#a09990]" />
+              <div className="flex items-center gap-2">
+                {heeftFysioVandaag && <div className="w-2 h-2 rounded-full bg-[#f97316]" />}
+                <ChevronRight size={18} className="text-[#a09990]" />
+              </div>
             </div>
           </Card>
         )}
       </div>
 
-      {/* Komende agenda */}
-      {agenda.length > 0 && (
-        <div>
-          <h2 className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Komende week</h2>
-          <div className="flex flex-col gap-2">
-            {agenda.map((item, i) => {
-              const datumLabel = datumNaarNederlands(item.datum + 'T12:00:00')
-
-              if (item.soort === 'activiteit') {
-                return (
-                  <div key={`act-${item.activiteit.id}-${item.datum}`} className="flex gap-3 items-center px-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#d0cbc4] shrink-0 mt-0.5" />
-                    <div className="flex-1 flex items-center justify-between py-2 border-b border-[#f0ede8]">
-                      <div>
-                        <p className="text-xs text-[#a09990] capitalize">{datumLabel}</p>
-                        <p className="text-sm text-[#6b6560]">
-                          {item.activiteit.naam}
-                          {item.activiteit.tijdstip ? ` · ${item.activiteit.tijdstip}` : ''}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )
-              }
-
-              const s = item.sessie
-              return (
-                <Card key={`tr-${s.id}-${i}`} className="py-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="text-xs text-[#a09990] capitalize">
-                        {TYPE_EMOJI[s.type] ?? '🏃'} {datumLabel}
-                      </p>
-                      <p className="text-sm font-medium text-[#1a1612] mt-0.5">{s.beschrijving}</p>
-                    </div>
-                    <div className="text-right text-xs text-[#a09990] shrink-0 ml-3">
-                      {s.duur_minuten ? <p>{formatDuur(s.duur_minuten)}</p> : null}
-                      {s.afstand_km && s.afstand_km > 0 ? <p>{s.afstand_km} km</p> : null}
-                    </div>
-                  </div>
-                </Card>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {feedbackSessie && (
         <FeedbackModal sessie={feedbackSessie} onSluit={() => setFeedbackSessie(null)} />
       )}
     </div>
+  )
+}
+
+function TrainingsKaart({ sessie, onAfronden, onOvergeslagen, onVerplaatsen, isVerleden }: {
+  sessie: TrainingSession
+  onAfronden: (id: string) => void
+  onOvergeslagen: (id: string) => void
+  onVerplaatsen: () => void
+  isVerleden: boolean
+}) {
+  const typeLabel = sessie.type === 'hardlopen' && sessie.intensiteit
+    ? INTENSITEIT_LABEL[sessie.intensiteit] ?? 'Duurloop'
+    : sessie.type === 'krachttraining' ? 'Krachttraining'
+    : sessie.type === 'core' ? 'Core stability'
+    : sessie.type === 'cross' ? 'Cross-training'
+    : 'Rust'
+
+  return (
+    <Card className={cn(sessie.voltooid && 'opacity-60')}>
+      {/* Type + intensiteit header */}
+      <div className="flex items-center gap-2 mb-2">
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
+          style={{ backgroundColor: (TYPE_KLEUR[sessie.type] ?? '#f97316') + '20' }}
+        >
+          {TYPE_LABEL[sessie.type]}
+        </div>
+        <div>
+          <p className="font-bold text-[#1a1612] leading-tight">{typeLabel}</p>
+          {sessie.intensiteit && (
+            <span className={cn('text-xs px-1.5 py-0.5 rounded-full font-medium', INTENSITEIT_KLEUR[sessie.intensiteit])}>
+              {sessie.intensiteit}
+            </span>
+          )}
+        </div>
+        {sessie.voltooid && <CheckCircle2 size={16} className="text-green-500 ml-auto" />}
+        {sessie.overgeslagen && <XCircle size={16} className="text-[#a09990] ml-auto" />}
+      </div>
+
+      {/* Beschrijving */}
+      <p className="text-sm text-[#6b6560] mb-3 leading-relaxed">{sessie.beschrijving}</p>
+
+      {/* Stats */}
+      <div className="flex gap-4 mb-4">
+        {sessie.duur_minuten != null && (
+          <div className="flex items-center gap-1.5 bg-[#f5f3f0] rounded-xl px-3 py-2">
+            <Timer size={14} className="text-[#f97316]" />
+            <span className="text-sm font-semibold text-[#1a1612]">{formatDuur(sessie.duur_minuten)}</span>
+          </div>
+        )}
+        {sessie.afstand_km != null && sessie.afstand_km > 0 && (
+          <div className="flex items-center gap-1.5 bg-[#f5f3f0] rounded-xl px-3 py-2">
+            <MapPin size={14} className="text-[#f97316]" />
+            <span className="text-sm font-semibold text-[#1a1612]">{sessie.afstand_km} km</span>
+          </div>
+        )}
+      </div>
+
+      {/* Acties */}
+      {!sessie.voltooid && !sessie.overgeslagen && (
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <Button onClick={() => onAfronden(sessie.id)} className="flex-1">
+              <CheckCircle2 size={15} className="mr-1.5" /> Afgerond
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => onOvergeslagen(sessie.id)}>
+              Sla over
+            </Button>
+          </div>
+          <button onClick={onVerplaatsen}
+            className="text-xs text-[#a09990] text-center py-1 hover:text-[#6b6560] transition-colors">
+            ↕ Verplaatsen naar andere dag
+          </button>
+        </div>
+      )}
+      {sessie.voltooid && (
+        <p className="text-green-600 text-sm font-medium flex items-center gap-1">
+          <CheckCircle2 size={14} /> Gelukt!
+        </p>
+      )}
+      {sessie.overgeslagen && (
+        <p className="text-[#a09990] text-sm flex items-center gap-1">
+          <XCircle size={14} /> Overgeslagen
+        </p>
+      )}
+    </Card>
   )
 }

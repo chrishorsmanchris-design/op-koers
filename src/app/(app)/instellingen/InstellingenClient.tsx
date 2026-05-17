@@ -48,6 +48,9 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   const [naam, setNaam] = useState(profiel?.naam ?? '')
   const [kmPerWeek, setKmPerWeek] = useState(String(profiel?.km_per_week ?? ''))
   const [wilCore, setWilCore] = useState(profiel?.wil_core ?? false)
+  const [corePerWeek, setCorePerWeek] = useState(profiel?.core_per_week ?? 2)
+  const [fysioPerWeek, setFysioPerWeek] = useState(profiel?.fysio_per_week ?? 3)
+  const [wilCross, setWilCross] = useState(profiel?.wil_cross ?? false)
   const [laden, setLaden] = useState(false)
   const [opgeslagen, setOpgeslagen] = useState(false)
 
@@ -60,6 +63,9 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
       naam,
       km_per_week: parseFloat(kmPerWeek) || null,
       wil_core: wilCore,
+      core_per_week: wilCore ? corePerWeek : 0,
+      fysio_per_week: fysioPerWeek,
+      wil_cross: wilCross,
     } as never).eq('id', profiel?.id ?? '')
     setOpgeslagen(true)
     setTimeout(() => setOpgeslagen(false), 2000)
@@ -102,8 +108,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   }
 
   return (
-    <div className="flex flex-col gap-6 p-4 pt-8 pb-24">
-      <h1 className="text-2xl font-bold text-[#1a1612]">Instellingen</h1>
+    <div className="flex flex-col gap-6 p-4 pt-4 pb-24">
 
       {stravaStatus === 'gekoppeld' && (
         <div className="bg-green-50 border border-green-200 rounded-2xl px-4 py-3 text-sm text-green-700">
@@ -125,31 +130,24 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             <Input id="km" type="number" label="Km per week (huidig)" value={kmPerWeek}
               onChange={e => setKmPerWeek(e.target.value)} placeholder="bijv. 25" />
 
+            {/* Cross-training toggle */}
             <button
-              onClick={() => setWilCore(v => !v)}
+              onClick={() => setWilCross(v => !v)}
               className={cn(
                 'flex items-center justify-between p-3 rounded-2xl border-2 transition-all text-left',
-                wilCore
-                  ? 'border-[#f97316] bg-[#f97316]/10'
-                  : 'border-[#e8e3dc] bg-[#f5f3f0]'
+                wilCross ? 'border-[#10b981] bg-[#10b981]/10' : 'border-[#e8e3dc] bg-[#f5f3f0]'
               )}
             >
               <div>
-                <p className={cn('font-medium text-sm', wilCore ? 'text-[#f97316]' : 'text-[#1a1612]')}>
-                  🧘 Core stability training
+                <p className={cn('font-medium text-sm', wilCross ? 'text-[#10b981]' : 'text-[#1a1612]')}>
+                  🚴 Cross-training
                 </p>
                 <p className="text-xs text-[#6b6560] mt-0.5">
-                  Oefeningen voor onderrug, lenigheid en rompkracht worden in je schema opgenomen
+                  Fietsen, zwemmen of andere cardio als aanvulling op je loopschema
                 </p>
               </div>
-              <div className={cn(
-                'w-10 h-6 rounded-full transition-all shrink-0 ml-3 relative',
-                wilCore ? 'bg-[#f97316]' : 'bg-[#d0cbc4]'
-              )}>
-                <div className={cn(
-                  'absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all',
-                  wilCore ? 'left-5' : 'left-1'
-                )} />
+              <div className={cn('w-10 h-6 rounded-full transition-all shrink-0 ml-3 relative', wilCross ? 'bg-[#10b981]' : 'bg-[#d0cbc4]')}>
+                <div className={cn('absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all', wilCross ? 'left-5' : 'left-1')} />
               </div>
             </button>
 
@@ -157,6 +155,76 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               {opgeslagen ? '✓ Opgeslagen' : 'Opslaan'}
             </Button>
           </div>
+        </Card>
+      </section>
+
+      {/* Fysio & Core — los van trainingsschema */}
+      <section>
+        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-1">Fysio & core</h2>
+        <p className="text-xs text-[#a09990] mb-3">Staat los van je trainingsschema — reminders op het dashboard</p>
+        <Card className="mb-3">
+          <p className="text-sm font-medium text-[#1a1612] mb-1">🩺 Fysio-oefeningen</p>
+          <p className="text-xs text-[#6b6560] mb-3">Hoe vaak per week wil je je fysio-oefeningen doen?</p>
+          <div className="flex gap-2">
+            {[2, 3, 4, 5].map(n => (
+              <button key={n} onClick={() => setFysioPerWeek(n)}
+                className={cn('flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-all',
+                  fysioPerWeek === n
+                    ? 'border-[#f97316] bg-[#f97316]/10 text-[#f97316]'
+                    : 'border-[#e8e3dc] text-[#6b6560]')}>
+                {n}×
+              </button>
+            ))}
+          </div>
+          <Button onClick={profielOpslaan} loading={laden} className="mt-3">
+            {opgeslagen ? '✓ Opgeslagen' : 'Opslaan'}
+          </Button>
+        </Card>
+        <Card>
+          <button
+            onClick={() => setWilCore(v => !v)}
+            className={cn(
+              'flex items-center justify-between w-full p-0 mb-3 text-left',
+            )}
+          >
+            <div>
+              <p className={cn('font-medium text-sm', wilCore ? 'text-[#06b6d4]' : 'text-[#1a1612]')}>
+                🧘 Core stability
+              </p>
+              <p className="text-xs text-[#6b6560] mt-0.5">
+                Onderrug, rompkracht en lenigheid — apart van je hardloopschema
+              </p>
+            </div>
+            <div className={cn('w-10 h-6 rounded-full transition-all shrink-0 ml-3 relative', wilCore ? 'bg-[#06b6d4]' : 'bg-[#d0cbc4]')}>
+              <div className={cn('absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all', wilCore ? 'left-5' : 'left-1')} />
+            </div>
+          </button>
+
+          {wilCore && (
+            <div className="border-t border-[#f0ede8] pt-3">
+              <p className="text-xs font-medium text-[#6b6560] mb-2">Hoe vaak per week?</p>
+              <div className="flex gap-2">
+                {[1, 2, 3].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setCorePerWeek(n)}
+                    className={cn(
+                      'flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-all',
+                      corePerWeek === n
+                        ? 'border-[#06b6d4] bg-[#06b6d4]/10 text-[#06b6d4]'
+                        : 'border-[#e8e3dc] text-[#6b6560]'
+                    )}
+                  >
+                    {n}×
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Button onClick={profielOpslaan} loading={laden} className="mt-3">
+            {opgeslagen ? '✓ Opgeslagen' : 'Opslaan'}
+          </Button>
         </Card>
       </section>
 

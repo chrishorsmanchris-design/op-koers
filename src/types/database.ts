@@ -17,6 +17,9 @@ export interface Database {
           push_subscription: Json | null
           physio_klacht: string | null
           wil_core: boolean
+          core_per_week: number | null
+          fysio_per_week: number | null
+          wil_cross: boolean | null
           strava_refresh_token: string | null
           strava_athlete_id: number | null
         }
@@ -70,7 +73,7 @@ export interface Database {
           user_id: string
           goal_id: string | null
           datum: string
-          type: 'hardlopen' | 'rust' | 'krachttraining' | 'cross'
+          type: 'hardlopen' | 'rust' | 'krachttraining' | 'cross' | 'core'
           beschrijving: string
           duur_minuten: number | null
           afstand_km: number | null
