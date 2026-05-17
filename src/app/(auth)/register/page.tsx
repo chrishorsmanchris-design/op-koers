@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const [wachtwoord, setWachtwoord] = useState('')
   const [fout, setFout] = useState('')
   const [laden, setLaden] = useState(false)
+  const [bevestigingNodig, setBevestigingNodig] = useState(false)
   const router = useRouter()
 
   async function registreren(e: React.FormEvent) {
@@ -20,13 +21,19 @@ export default function RegisterPage() {
     setLaden(true)
     setFout('')
     const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password: wachtwoord,
       options: { data: { naam } },
     })
     if (error) {
       setFout(error.message)
+      setLaden(false)
+      return
+    }
+    // Als email bevestiging vereist is (identities leeg = al bestaand account)
+    if (data.user && !data.session) {
+      setBevestigingNodig(true)
       setLaden(false)
     } else {
       router.push('/onboarding')
@@ -42,6 +49,18 @@ export default function RegisterPage() {
           <p className="text-[#6b7280] mt-1">Maak een account aan</p>
         </div>
 
+        {bevestigingNodig ? (
+          <div className="text-center bg-[#1a1a1a] rounded-3xl p-6">
+            <div className="text-4xl mb-3">📬</div>
+            <h2 className="text-lg font-bold text-white mb-2">Check je e-mail</h2>
+            <p className="text-[#6b7280] text-sm mb-4">
+              We hebben een bevestigingslink gestuurd naar <span className="text-white">{email}</span>. Klik op de link om verder te gaan.
+            </p>
+            <p className="text-xs text-[#6b7280]">
+              Of schakel e-mailbevestiging uit in Supabase → Authentication → Email
+            </p>
+          </div>
+        ) : (
         <form onSubmit={registreren} className="flex flex-col gap-4">
           <Input
             id="naam"
@@ -80,6 +99,7 @@ export default function RegisterPage() {
           </Button>
         </form>
 
+        )}
         <p className="text-center text-[#6b7280] mt-6 text-sm">
           Al een account?{' '}
           <Link href="/login" className="text-[#f97316] font-medium">
