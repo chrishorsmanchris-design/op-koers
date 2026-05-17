@@ -3,12 +3,13 @@
 :root {
   --oranje: #f97316;
   --oranje-dark: #ea6c0a;
-  --donker: #0f0f0f;
-  --donker-2: #1a1a1a;
-  --donker-3: #242424;
-  --grijs: #6b7280;
-  --grijs-licht: #9ca3af;
-  --wit: #f9fafb;
+  --achtergrond: #f5f3f0;
+  --kaart: #ffffff;
+  --kaart-2: #f0ede8;
+  --rand: #e8e3dc;
+  --tekst: #1a1612;
+  --tekst-2: #6b6560;
+  --tekst-licht: #a09990;
 }
 
 * {
@@ -16,8 +17,8 @@
 }
 
 body {
-  background-color: var(--donker);
-  color: var(--wit);
+  background-color: var(--achtergrond);
+  color: var(--tekst);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overscroll-behavior: none;
 }

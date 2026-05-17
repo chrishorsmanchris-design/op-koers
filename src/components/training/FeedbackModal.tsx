@@ -51,15 +51,15 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-end z-50" onClick={onSluit}>
       <div
-        className="bg-[#1a1a1a] rounded-t-3xl p-6 w-full max-w-lg mx-auto pb-10"
+        className="bg-white rounded-t-3xl p-6 w-full max-w-lg mx-auto pb-10"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-bold text-white">Hoe ging het?</h3>
-          <button onClick={onSluit} className="text-[#6b7280]"><X size={22} /></button>
+          <h3 className="text-lg font-bold text-[#1a1612]">Hoe ging het?</h3>
+          <button onClick={onSluit} className="text-[#6b6560]"><X size={22} /></button>
         </div>
 
-        <p className="text-sm text-[#6b7280] mb-4">{sessie.beschrijving}</p>
+        <p className="text-sm text-[#6b6560] mb-4">{sessie.beschrijving}</p>
 
         <div className="grid grid-cols-1 gap-2 mb-4">
           {RATINGS.map(r => (
@@ -68,7 +68,7 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
               onClick={() => setRating(r.value)}
               className={cn(
                 'flex items-center gap-3 p-3 rounded-2xl border-2 transition-all text-left',
-                rating === r.value ? r.kleur : 'border-[#333] text-[#9ca3af]'
+                rating === r.value ? r.kleur : 'border-[#e8e3dc] text-[#a09990]'
               )}
             >
               <span className="text-2xl">{r.emoji}</span>
@@ -81,7 +81,7 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
           value={notitie}
           onChange={e => setNotitie(e.target.value)}
           placeholder="Notitie (optioneel)..."
-          className="w-full bg-[#242424] border border-[#333] rounded-2xl px-4 py-3 text-white placeholder:text-[#6b7280] focus:outline-none focus:border-[#f97316] resize-none h-20 mb-4"
+          className="w-full bg-[#f0ede8] border border-[#e8e3dc] rounded-2xl px-4 py-3 text-[#1a1612] placeholder:text-[#6b6560] focus:outline-none focus:border-[#f97316] resize-none h-20 mb-4"
         />
 
         <Button onClick={opslaan} size="lg" loading={laden} disabled={!rating}>

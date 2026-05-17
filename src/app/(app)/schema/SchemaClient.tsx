@@ -53,14 +53,14 @@ function SortableSessie({ sessie }: { sessie: TrainingSession }) {
       style={style}
       className={cn('flex gap-3 items-start', isDragging && 'opacity-50 z-50')}
     >
-      <button {...attributes} {...listeners} className="mt-4 text-[#6b7280] touch-none">
+      <button {...attributes} {...listeners} className="mt-4 text-[#6b6560] touch-none">
         <GripVertical size={18} />
       </button>
       <Card className={cn('flex-1', sessie.voltooid && 'opacity-60')}>
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span className="text-sm font-medium text-[#6b7280]">
+              <span className="text-sm font-medium text-[#6b6560]">
                 {TYPE_EMOJI[sessie.type]} {korteDatum(sessie.datum)}
               </span>
               {sessie.intensiteit && (
@@ -70,8 +70,8 @@ function SortableSessie({ sessie }: { sessie: TrainingSession }) {
               )}
               {sessie.voltooid && <CheckCircle2 size={14} className="text-green-400" />}
             </div>
-            <p className="text-sm font-semibold text-white">{sessie.beschrijving}</p>
-            <div className="flex gap-3 mt-1 text-xs text-[#6b7280]">
+            <p className="text-sm font-semibold text-[#1a1612]">{sessie.beschrijving}</p>
+            <div className="flex gap-3 mt-1 text-xs text-[#6b6560]">
               {sessie.duur_minuten && <span className="flex items-center gap-1"><Timer size={12} />{formatDuur(sessie.duur_minuten)}</span>}
               {sessie.afstand_km && <span className="flex items-center gap-1"><MapPin size={12} />{sessie.afstand_km} km</span>}
             </div>
@@ -145,8 +145,8 @@ export function SchemaClient({ sessies: initSessies, doel, userId }: Props) {
     <div className="flex flex-col gap-5 p-4 pt-8">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-white">Trainingsschema</h1>
-          {doel && <p className="text-sm text-[#6b7280] mt-1">{doel.naam}</p>}
+          <h1 className="text-2xl font-bold text-[#1a1612]">Trainingsschema</h1>
+          {doel && <p className="text-sm text-[#6b6560] mt-1">{doel.naam}</p>}
         </div>
         <Button variant="secondary" size="sm" onClick={genereerSchema} disabled={genereert}>
           {genereert ? <Loader2 size={16} className="animate-spin mr-2" /> : <RefreshCw size={16} className="mr-2" />}
@@ -163,8 +163,8 @@ export function SchemaClient({ sessies: initSessies, doel, userId }: Props) {
       {sessies.length === 0 ? (
         <Card className="text-center py-12">
           <div className="text-5xl mb-3">📅</div>
-          <h3 className="font-semibold text-white mb-1">Geen schema aangemaakt</h3>
-          <p className="text-sm text-[#6b7280] mb-4">Klik op &quot;Genereer&quot; om jouw schema te laten maken</p>
+          <h3 className="font-semibold text-[#1a1612] mb-1">Geen schema aangemaakt</h3>
+          <p className="text-sm text-[#6b6560] mb-4">Klik op &quot;Genereer&quot; om jouw schema te laten maken</p>
           <Button onClick={genereerSchema} loading={genereert}>Schema genereren</Button>
         </Card>
       ) : (
@@ -179,7 +179,7 @@ export function SchemaClient({ sessies: initSessies, doel, userId }: Props) {
                   'px-4 py-2 rounded-2xl text-sm font-medium whitespace-nowrap transition-all shrink-0',
                   (geselecteerdeWeek ?? huidigWeek) === week
                     ? 'bg-[#f97316] text-white'
-                    : 'bg-[#242424] text-[#9ca3af]'
+                    : 'bg-[#f0ede8] text-[#a09990]'
                 )}
               >
                 Week {week}

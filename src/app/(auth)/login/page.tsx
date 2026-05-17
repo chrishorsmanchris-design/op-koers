@@ -30,12 +30,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-[#f5f3f0] flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="text-5xl mb-3">🏃</div>
-          <h1 className="text-3xl font-bold text-white">Op Koers</h1>
-          <p className="text-[#6b7280] mt-1">Log in om verder te gaan</p>
+          <h1 className="text-3xl font-bold text-[#1a1612]">Op Koers</h1>
+          <p className="text-[#6b6560] mt-1">Log in om verder te gaan</p>
         </div>
 
         <form onSubmit={inloggen} className="flex flex-col gap-4">
@@ -65,7 +65,7 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <p className="text-center text-[#6b7280] mt-6 text-sm">
+        <p className="text-center text-[#6b6560] mt-6 text-sm">
           Nog geen account?{' '}
           <Link href="/register" className="text-[#f97316] font-medium">
             Registreer je

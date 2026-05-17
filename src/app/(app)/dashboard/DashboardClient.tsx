@@ -17,11 +17,11 @@ interface Props {
 }
 
 const INTENSITEIT_KLEUR = {
-  herstel: 'bg-blue-900 text-blue-300',
-  makkelijk: 'bg-green-900 text-green-300',
-  gemiddeld: 'bg-yellow-900 text-yellow-300',
-  zwaar: 'bg-orange-900 text-orange-300',
-  interval: 'bg-red-900 text-red-300',
+  herstel: 'bg-blue-100 text-blue-700',
+  makkelijk: 'bg-green-100 text-green-700',
+  gemiddeld: 'bg-yellow-100 text-yellow-700',
+  zwaar: 'bg-orange-100 text-orange-700',
+  interval: 'bg-red-100 text-red-700',
 }
 
 export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vandaag }: Props) {
@@ -57,29 +57,29 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
     <div className="flex flex-col gap-5 p-4 pt-8">
       {/* Header */}
       <div>
-        <p className="text-[#6b7280] text-sm">{begroeting}</p>
-        <h1 className="text-2xl font-bold text-white">{naam} 👋</h1>
+        <p className="text-[#6b6560] text-sm">{begroeting}</p>
+        <h1 className="text-2xl font-bold text-[#1a1612]">{naam} 👋</h1>
       </div>
 
       {/* Doel teller of CTA */}
       {doel ? (
-        <Card className="bg-gradient-to-br from-[#f97316]/20 to-[#1a1a1a] border border-[#f97316]/20">
+        <Card className="bg-gradient-to-br from-[#f97316] to-[#ea6c0a] shadow-md">
           <div className="flex justify-between items-center">
             <div>
-              <p className="text-sm text-[#f97316] font-medium">{doel.naam}</p>
-              <p className="text-3xl font-bold text-white mt-1">{dagenTotDoel} <span className="text-lg font-normal text-[#9ca3af]">dagen</span></p>
+              <p className="text-sm text-white/80 font-medium">{doel.naam}</p>
+              <p className="text-3xl font-bold text-white mt-1">{dagenTotDoel} <span className="text-lg font-normal text-white/70">dagen</span></p>
             </div>
             <div className="text-4xl">🏁</div>
           </div>
           {doel.tijdsdoel && (
-            <p className="text-sm text-[#6b7280] mt-2">Tijdsdoel: <span className="text-white font-medium">{doel.tijdsdoel}</span></p>
+            <p className="text-sm text-white/70 mt-2">Tijdsdoel: <span className="text-white font-medium">{doel.tijdsdoel}</span></p>
           )}
         </Card>
       ) : (
-        <Card onClick={() => window.location.href = '/doel'} className="border border-dashed border-[#333] text-center py-6">
+        <Card onClick={() => window.location.href = '/doel'} className="border-2 border-dashed border-[#e8e3dc] text-center py-6">
           <div className="text-4xl mb-2">🎯</div>
-          <p className="font-semibold text-white">Stel een doel in</p>
-          <p className="text-sm text-[#6b7280] mt-1">Marathon, triathlon of alleen fysio</p>
+          <p className="font-semibold text-[#1a1612]">Stel een doel in</p>
+          <p className="text-sm text-[#6b6560] mt-1">Marathon, triathlon of alleen fysio</p>
           <div className="mt-4">
             <Button size="sm">Doel toevoegen</Button>
           </div>
@@ -88,7 +88,7 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
 
       {/* Vandaag */}
       <div>
-        <h2 className="text-sm font-semibold text-[#6b7280] uppercase tracking-wider mb-3">Vandaag</h2>
+        <h2 className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Vandaag</h2>
         {vandaagSessie ? (
           <Card className={cn(vandaagSessie.voltooid && 'opacity-60')}>
             <div className="flex items-start justify-between mb-3">
@@ -99,14 +99,13 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
                       {vandaagSessie.intensiteit}
                     </span>
                   )}
-                  {vandaagSessie.voltooid && <CheckCircle2 size={16} className="text-green-400" />}
+                  {vandaagSessie.voltooid && <CheckCircle2 size={16} className="text-green-500" />}
                 </div>
-                <h3 className="font-semibold text-white">{vandaagSessie.beschrijving}</h3>
+                <h3 className="font-semibold text-[#1a1612]">{vandaagSessie.beschrijving}</h3>
               </div>
               <Flame size={22} className="text-[#f97316] mt-1" />
             </div>
-
-            <div className="flex gap-4 text-sm text-[#9ca3af] mb-4">
+            <div className="flex gap-4 text-sm text-[#a09990] mb-4">
               {vandaagSessie.duur_minuten && (
                 <span className="flex items-center gap-1"><Timer size={14} /> {formatDuur(vandaagSessie.duur_minuten)}</span>
               )}
@@ -114,61 +113,54 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
                 <span className="flex items-center gap-1"><MapPin size={14} /> {vandaagSessie.afstand_km} km</span>
               )}
             </div>
-
             {!vandaagSessie.voltooid && !vandaagSessie.overgeslagen && (
               <div className="flex gap-2">
-                <Button onClick={() => sessieAfronden(vandaagSessie.id)} className="flex-1">
-                  Afgerond
-                </Button>
-                <Button variant="ghost" onClick={() => sessieOvergeslagen(vandaagSessie.id)} size="sm">
-                  Sla over
-                </Button>
+                <Button onClick={() => sessieAfronden(vandaagSessie.id)} className="flex-1">Afgerond</Button>
+                <Button variant="ghost" onClick={() => sessieOvergeslagen(vandaagSessie.id)} size="sm">Sla over</Button>
               </div>
             )}
             {vandaagSessie.voltooid && (
-              <p className="text-green-400 text-sm font-medium flex items-center gap-1">
+              <p className="text-green-600 text-sm font-medium flex items-center gap-1">
                 <CheckCircle2 size={14} /> Gelukt!
               </p>
             )}
           </Card>
         ) : (
           <Card>
-            <p className="text-[#6b7280]">Geen training gepland vandaag. Rust en herstel!</p>
+            <p className="text-[#6b6560]">Geen training gepland vandaag. Rust en herstel!</p>
           </Card>
         )}
 
-        {/* Fysio */}
         {heeftFysio && (
           <Card className="mt-3" onClick={() => window.location.href = '/fysio'}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#242424] rounded-2xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-[#fff3ec] rounded-2xl flex items-center justify-center">
                   <Dumbbell size={18} className="text-[#f97316]" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white">Fysio-oefeningen</h3>
-                  <p className="text-sm text-[#6b7280]">{fysioOefeningen.length} oefeningen</p>
+                  <h3 className="font-semibold text-[#1a1612]">Fysio-oefeningen</h3>
+                  <p className="text-sm text-[#6b6560]">{fysioOefeningen.length} oefeningen</p>
                 </div>
               </div>
-              <ChevronRight size={18} className="text-[#6b7280]" />
+              <ChevronRight size={18} className="text-[#a09990]" />
             </div>
           </Card>
         )}
       </div>
 
-      {/* Komende trainingen */}
       {komendeSessies.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-[#6b7280] uppercase tracking-wider mb-3">Komende trainingen</h2>
+          <h2 className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Komende trainingen</h2>
           <div className="flex flex-col gap-2">
             {komendeSessies.map(sessie => (
               <Card key={sessie.id} className="py-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-[#6b7280] capitalize">{datumNaarNederlands(sessie.datum)}</p>
-                    <p className="text-sm font-medium text-white mt-0.5">{sessie.beschrijving}</p>
+                    <p className="text-xs text-[#a09990] capitalize">{datumNaarNederlands(sessie.datum)}</p>
+                    <p className="text-sm font-medium text-[#1a1612] mt-0.5">{sessie.beschrijving}</p>
                   </div>
-                  <div className="text-right text-xs text-[#6b7280]">
+                  <div className="text-right text-xs text-[#a09990]">
                     {sessie.duur_minuten && <p>{formatDuur(sessie.duur_minuten)}</p>}
                     {sessie.afstand_km && <p>{sessie.afstand_km} km</p>}
                   </div>
@@ -179,12 +171,8 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
         </div>
       )}
 
-      {/* Feedback modal */}
       {feedbackSessie && (
-        <FeedbackModal
-          sessie={feedbackSessie}
-          onSluit={() => setFeedbackSessie(null)}
-        />
+        <FeedbackModal sessie={feedbackSessie} onSluit={() => setFeedbackSessie(null)} />
       )}
     </div>
   )

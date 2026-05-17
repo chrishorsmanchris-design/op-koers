@@ -67,11 +67,11 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties }
 
   return (
     <div className="flex flex-col gap-6 p-4 pt-8">
-      <h1 className="text-2xl font-bold text-white">Instellingen</h1>
+      <h1 className="text-2xl font-bold text-[#1a1612]">Instellingen</h1>
 
       {/* Profiel */}
       <section>
-        <h2 className="text-sm font-semibold text-[#6b7280] uppercase tracking-wider mb-3">Profiel</h2>
+        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Profiel</h2>
         <Card>
           <div className="flex flex-col gap-4">
             <Input id="naam" label="Naam" value={naam} onChange={e => setNaam(e.target.value)} />
@@ -86,17 +86,17 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties }
 
       {/* Doelen */}
       <section>
-        <h2 className="text-sm font-semibold text-[#6b7280] uppercase tracking-wider mb-3">Doelen</h2>
+        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Doelen</h2>
         {doelen.map(doel => (
           <Card key={doel.id} className="mb-2">
             <div className="flex justify-between items-start">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-white">{doel.naam}</h3>
+                  <h3 className="font-semibold text-[#1a1612]">{doel.naam}</h3>
                   {doel.actief && <span className="text-xs bg-[#f97316]/20 text-[#f97316] px-2 py-0.5 rounded-full">Actief</span>}
                 </div>
-                <p className="text-sm text-[#6b7280]">{doel.datum}</p>
-                {doel.tijdsdoel && <p className="text-sm text-[#9ca3af]">Doel: {doel.tijdsdoel}</p>}
+                <p className="text-sm text-[#6b6560]">{doel.datum}</p>
+                {doel.tijdsdoel && <p className="text-sm text-[#a09990]">Doel: {doel.tijdsdoel}</p>}
               </div>
             </div>
           </Card>
@@ -105,13 +105,13 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties }
 
       {/* Vakanties */}
       <section>
-        <h2 className="text-sm font-semibold text-[#6b7280] uppercase tracking-wider mb-3">Vakanties</h2>
+        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Vakanties</h2>
         {vakanties.map(v => (
           <Card key={v.id} className="mb-2">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="font-semibold text-white">{v.naam}</h3>
-                <p className="text-sm text-[#6b7280]">{v.start_datum} → {v.eind_datum}</p>
+                <h3 className="font-semibold text-[#1a1612]">{v.naam}</h3>
+                <p className="text-sm text-[#6b6560]">{v.start_datum} → {v.eind_datum}</p>
                 <span className={cn('text-xs px-2 py-0.5 rounded-full',
                   v.kan_trainen === 'ja' ? 'bg-green-900/50 text-green-300' :
                   v.kan_trainen === 'beperkt' ? 'bg-yellow-900/50 text-yellow-300' : 'bg-red-900/50 text-red-300'
@@ -119,7 +119,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties }
                   {v.kan_trainen === 'ja' ? 'Kan trainen' : v.kan_trainen === 'beperkt' ? 'Beperkt' : 'Niet trainen'}
                 </span>
               </div>
-              <button onClick={() => vakantieVerwijderen(v.id)} className="text-[#6b7280]">
+              <button onClick={() => vakantieVerwijderen(v.id)} className="text-[#6b6560]">
                 <Trash2 size={18} />
               </button>
             </div>
@@ -139,7 +139,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties }
                 <button key={o.value}
                   onClick={() => setNieuwV({ ...nieuwV, kan_trainen: o.value as 'ja' | 'nee' | 'beperkt' })}
                   className={cn('flex-1 py-2 rounded-xl text-xs font-medium border-2 transition-all',
-                    nieuwV.kan_trainen === o.value ? o.kleur : 'border-[#333] text-[#6b7280]'
+                    nieuwV.kan_trainen === o.value ? o.kleur : 'border-[#e8e3dc] text-[#6b6560]'
                   )}>
                   {o.label}
                 </button>
@@ -154,12 +154,12 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties }
 
       {/* Runkeeper koppelen */}
       <section>
-        <h2 className="text-sm font-semibold text-[#6b7280] uppercase tracking-wider mb-3">Koppelingen</h2>
+        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Koppelingen</h2>
         <Card>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-white">Runkeeper</h3>
-              <p className="text-sm text-[#6b7280]">{profiel?.runkeeper_token ? 'Gekoppeld' : 'Nog niet gekoppeld'}</p>
+              <h3 className="font-semibold text-[#1a1612]">Runkeeper</h3>
+              <p className="text-sm text-[#6b6560]">{profiel?.runkeeper_token ? 'Gekoppeld' : 'Nog niet gekoppeld'}</p>
             </div>
             <Button variant="secondary" size="sm" onClick={() => window.location.href = '/api/runkeeper/auth'}>
               <Link size={14} className="mr-2" />

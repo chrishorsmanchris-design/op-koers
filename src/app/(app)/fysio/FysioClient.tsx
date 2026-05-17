@@ -57,9 +57,9 @@ export function FysioClient({ oefeningen: initOefeningen }: Props) {
     <div className="flex flex-col gap-5 p-4 pt-8">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-white">Fysio-oefeningen</h1>
+          <h1 className="text-2xl font-bold text-[#1a1612]">Fysio-oefeningen</h1>
           {totaal > 0 && (
-            <p className="text-sm text-[#6b7280] mt-1">{aantalGedaan}/{totaal} gedaan</p>
+            <p className="text-sm text-[#6b6560] mt-1">{aantalGedaan}/{totaal} gedaan</p>
           )}
         </div>
         <div>
@@ -84,8 +84,8 @@ export function FysioClient({ oefeningen: initOefeningen }: Props) {
       {oefeningen.length === 0 ? (
         <Card className="text-center py-10">
           <div className="text-5xl mb-3">📋</div>
-          <h3 className="font-semibold text-white mb-1">Nog geen oefeningen</h3>
-          <p className="text-sm text-[#6b7280] mb-4">Upload een PDF van je fysio om te beginnen</p>
+          <h3 className="font-semibold text-[#1a1612] mb-1">Nog geen oefeningen</h3>
+          <p className="text-sm text-[#6b6560] mb-4">Upload een PDF van je fysio om te beginnen</p>
           <Button variant="secondary" onClick={() => fileRef.current?.click()}>
             <Upload size={16} className="mr-2" /> PDF uploaden
           </Button>
@@ -110,25 +110,25 @@ export function FysioClient({ oefeningen: initOefeningen }: Props) {
                       <div className="w-5 h-5 border-2 border-[#6b7280] rounded-full mt-0.5 shrink-0" />
                     )}
                     <div>
-                      <h3 className="font-semibold text-white">{oef.naam}</h3>
-                      <p className="text-sm text-[#6b7280]">
+                      <h3 className="font-semibold text-[#1a1612]">{oef.naam}</h3>
+                      <p className="text-sm text-[#6b6560]">
                         {oef.sets && oef.reps ? `${oef.sets}x ${oef.reps} reps` : ''}
                         {oef.duur_seconden ? `${oef.duur_seconden}s` : ''}
                       </p>
                     </div>
                   </div>
-                  {isOpen ? <ChevronUp size={18} className="text-[#6b7280] shrink-0" /> : <ChevronDown size={18} className="text-[#6b7280] shrink-0" />}
+                  {isOpen ? <ChevronUp size={18} className="text-[#6b6560] shrink-0" /> : <ChevronDown size={18} className="text-[#6b6560] shrink-0" />}
                 </button>
 
                 {isOpen && (
                   <div className="mt-4 flex flex-col gap-4">
                     {oef.beschrijving && (
-                      <p className="text-sm text-[#9ca3af] leading-relaxed">{oef.beschrijving}</p>
+                      <p className="text-sm text-[#a09990] leading-relaxed">{oef.beschrijving}</p>
                     )}
 
                     {/* YouTube embed */}
                     {oef.video_url && (
-                      <div className="rounded-2xl overflow-hidden bg-[#0f0f0f]">
+                      <div className="rounded-2xl overflow-hidden bg-[#f5f3f0]">
                         <div className="aspect-video">
                           <iframe
                             src={`https://www.youtube.com/embed/${extractVideoId(oef.video_url)}?start=${oef.video_start_seconden ?? 0}&autoplay=0&rel=0`}
@@ -138,7 +138,7 @@ export function FysioClient({ oefeningen: initOefeningen }: Props) {
                           />
                         </div>
                         {(oef.video_start_seconden ?? 0) > 0 && (
-                          <p className="text-xs text-[#6b7280] p-2 text-center">
+                          <p className="text-xs text-[#6b6560] p-2 text-center">
                             Start op {formatTijd(oef.video_start_seconden ?? 0)}
                           </p>
                         )}
@@ -147,7 +147,7 @@ export function FysioClient({ oefeningen: initOefeningen }: Props) {
 
                     {/* Pijn feedback */}
                     <div>
-                      <p className="text-sm font-medium text-[#9ca3af] mb-2">Hoe voelt het?</p>
+                      <p className="text-sm font-medium text-[#a09990] mb-2">Hoe voelt het?</p>
                       <div className="flex gap-2">
                         {[0, 1, 2].map(score => (
                           <button
@@ -159,7 +159,7 @@ export function FysioClient({ oefeningen: initOefeningen }: Props) {
                                 ? score === 0 ? 'border-green-500 bg-green-500/10 text-green-400'
                                   : score === 1 ? 'border-yellow-500 bg-yellow-500/10 text-yellow-400'
                                   : 'border-red-500 bg-red-500/10 text-red-400'
-                                : 'border-[#333] text-[#6b7280]'
+                                : 'border-[#e8e3dc] text-[#6b6560]'
                             )}
                           >
                             {score === 0 ? '😊 Geen' : score === 1 ? '😬 Licht' : '😣 Veel'}

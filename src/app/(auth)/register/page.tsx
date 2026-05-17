@@ -41,22 +41,22 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-[#f5f3f0] flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="text-5xl mb-3">🏃</div>
-          <h1 className="text-3xl font-bold text-white">Op Koers</h1>
-          <p className="text-[#6b7280] mt-1">Maak een account aan</p>
+          <h1 className="text-3xl font-bold text-[#1a1612]">Op Koers</h1>
+          <p className="text-[#6b6560] mt-1">Maak een account aan</p>
         </div>
 
         {bevestigingNodig ? (
-          <div className="text-center bg-[#1a1a1a] rounded-3xl p-6">
+          <div className="text-center bg-white rounded-3xl p-6">
             <div className="text-4xl mb-3">📬</div>
-            <h2 className="text-lg font-bold text-white mb-2">Check je e-mail</h2>
-            <p className="text-[#6b7280] text-sm mb-4">
-              We hebben een bevestigingslink gestuurd naar <span className="text-white">{email}</span>. Klik op de link om verder te gaan.
+            <h2 className="text-lg font-bold text-[#1a1612] mb-2">Check je e-mail</h2>
+            <p className="text-[#6b6560] text-sm mb-4">
+              We hebben een bevestigingslink gestuurd naar <span className="text-[#1a1612] font-medium">{email}</span>. Klik op de link om verder te gaan.
             </p>
-            <p className="text-xs text-[#6b7280]">
+            <p className="text-xs text-[#6b6560]">
               Of schakel e-mailbevestiging uit in Supabase → Authentication → Email
             </p>
           </div>
@@ -100,7 +100,7 @@ export default function RegisterPage() {
         </form>
 
         )}
-        <p className="text-center text-[#6b7280] mt-6 text-sm">
+        <p className="text-center text-[#6b6560] mt-6 text-sm">
           Al een account?{' '}
           <Link href="/login" className="text-[#f97316] font-medium">
             Log in

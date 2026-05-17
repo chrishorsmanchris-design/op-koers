@@ -35,12 +35,12 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] flex flex-col p-6">
+    <div className="min-h-screen bg-[#f5f3f0] flex flex-col p-6">
       <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full gap-8">
         <div className="text-center">
           <div className="text-6xl mb-4">🏃</div>
-          <h1 className="text-3xl font-bold text-white">Welkom bij Op Koers</h1>
-          <p className="text-[#6b7280] mt-2">Snel nog een paar basisgegevens, dan ben je klaar.</p>
+          <h1 className="text-3xl font-bold text-[#1a1612]">Welkom bij Op Koers</h1>
+          <p className="text-[#6b6560] mt-2">Snel nog een paar basisgegevens, dan ben je klaar.</p>
         </div>
 
         <div className="flex flex-col gap-5">
@@ -53,7 +53,7 @@ export default function OnboardingPage() {
           />
 
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-[#9ca3af]">Geslacht (optioneel)</label>
+            <label className="text-sm font-medium text-[#a09990]">Geslacht (optioneel)</label>
             <div className="flex gap-2">
               {GESLACHT_OPTIES.map(o => (
                 <button
@@ -63,7 +63,7 @@ export default function OnboardingPage() {
                     'flex-1 py-3 rounded-2xl text-sm font-medium border-2 transition-all',
                     geslacht === o.value
                       ? 'border-[#f97316] bg-[#f97316]/10 text-[#f97316]'
-                      : 'border-[#333] text-[#6b7280]'
+                      : 'border-[#e8e3dc] text-[#6b6560]'
                   )}
                 >
                   {o.label}
@@ -79,7 +79,7 @@ export default function OnboardingPage() {
           </Button>
           <button
             onClick={() => afronden()}
-            className="text-sm text-[#6b7280] text-center py-2"
+            className="text-sm text-[#6b6560] text-center py-2"
           >
             Sla over
           </button>
