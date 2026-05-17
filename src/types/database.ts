@@ -15,6 +15,7 @@ export interface Database {
           updated_at: string
           runkeeper_token: string | null
           push_subscription: Json | null
+          physio_klacht: string | null
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>

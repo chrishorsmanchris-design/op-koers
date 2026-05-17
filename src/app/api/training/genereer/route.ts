@@ -51,7 +51,7 @@ PROFIEL:
 - Tijdsdoel: ${doel.tijdsdoel ?? 'niet bepaald'}
 - Weken: ${wekenTotDoel}
 - Eerdere resultaten: ${resultaten?.map(r => `${r.type}: ${r.tijd}`).join(', ') || 'geen'}
-- Herstellend van kuitblessure — start conservatief
+- Fysio/blessure: ${profiel?.physio_klacht || 'geen bekende klachten'}
 
 VAKANTIES:
 ${vakanties?.map(v => `- ${v.naam}: ${v.start_datum} t/m ${v.eind_datum} (trainen: ${v.kan_trainen})`).join('\n') || 'Geen'}
