@@ -10,9 +10,9 @@ async function InstellingenData() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const zesManenGeleden = new Date()
-  zesManenGeleden.setMonth(zesManenGeleden.getMonth() - 6)
-  const vanafDatum = zesManenGeleden.toISOString().split('T')[0]
+  const zesMandenGeleden = new Date()
+  zesMandenGeleden.setMonth(zesMandenGeleden.getMonth() - 6)
+  const vanafDatum = zesMandenGeleden.toISOString().split('T')[0]
 
   const [
     { data: profiel },
@@ -21,6 +21,7 @@ async function InstellingenData() {
     { data: resultaten },
     { data: activiteiten },
     { data: sessies },
+    { data: fysioSessies },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('goals').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
@@ -32,6 +33,11 @@ async function InstellingenData() {
       .eq('user_id', user.id)
       .gte('datum', vanafDatum)
       .lte('datum', new Date().toISOString().split('T')[0])
+      .order('datum', { ascending: true }),
+    supabase.from('physio_sessions')
+      .select('datum, voltooid')
+      .eq('user_id', user.id)
+      .gte('datum', vanafDatum)
       .order('datum', { ascending: true }),
   ])
 
@@ -49,6 +55,7 @@ async function InstellingenData() {
       analytics={
         <AnalyticsClient
           sessies={sessies ?? []}
+          fysioSessies={fysioSessies ?? []}
           profiel={profiel}
           doel={doelen?.find(d => d.actief) ?? null}
         />

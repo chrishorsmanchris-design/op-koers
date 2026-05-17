@@ -6,7 +6,7 @@ async function getAccessToken(refreshToken: string): Promise<string | null> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      client_id: process.env.STRAVA_CLIENT_ID,
+      client_id: process.env.STRAVA_CLIENT_ID?.trim(),
       client_secret: process.env.STRAVA_CLIENT_SECRET,
       refresh_token: refreshToken,
       grant_type: 'refresh_token',
@@ -44,31 +44,63 @@ export async function POST() {
   if (!activiteitenRes.ok) return NextResponse.json({ error: 'Activiteiten ophalen mislukt' }, { status: 500 })
   const activiteiten = await activiteitenRes.json()
 
-  // Match Strava runs met training_sessions op datum
   const runs = activiteiten.filter((a: Record<string, unknown>) => a.type === 'Run')
 
   let gesynct = 0
   for (const run of runs) {
     const datum = (run.start_date_local as string).split('T')[0]
 
-    // Vind bijpassende training_sessie
     const { data: sessies } = await supabase
       .from('training_sessions')
       .select('id')
       .eq('user_id', user.id)
       .eq('datum', datum)
       .eq('type', 'hardlopen')
-      .is('runkeeper_id', null)
       .limit(1)
 
-    if (sessies && sessies.length > 0) {
-      await supabase.from('training_sessions').update({
-        voltooid: true,
-        runkeeper_id: String(run.id),
-        werkelijke_afstand: Math.round((run.distance as number) / 10) / 100,
-      } as never).eq('id', sessies[0].id)
-      gesynct++
+    if (!sessies?.length) continue
+    const sessieId = sessies[0].id
+
+    // Bereken actuele waarden uit Strava
+    const afstandKm = Math.round((run.distance as number) / 10) / 100
+    const duurMin = Math.round((run.moving_time as number) / 60)
+    const hartslagGem = run.average_heartrate ? Math.round(run.average_heartrate as number) : null
+    const hartslagMax = run.max_heartrate ? Math.round(run.max_heartrate as number) : null
+
+    // Markeer sessie als voltooid + sla Strava ID op
+    await supabase.from('training_sessions').update({
+      voltooid: true,
+      runkeeper_id: String(run.id),
+    } as never).eq('id', sessieId)
+
+    // Upsert session_feedback met Strava data
+    const { data: bestaandeFeedback } = await supabase
+      .from('session_feedback')
+      .select('id')
+      .eq('session_id', sessieId)
+      .maybeSingle()
+
+    if (bestaandeFeedback) {
+      await supabase.from('session_feedback').update({
+        werkelijke_afstand: afstandKm,
+        werkelijke_duur: duurMin,
+        hartslag_gem: hartslagGem,
+        hartslag_max: hartslagMax,
+      } as never).eq('id', bestaandeFeedback.id)
+    } else {
+      await supabase.from('session_feedback').insert({
+        session_id: sessieId,
+        user_id: user.id,
+        rating: 'goed',
+        werkelijke_afstand: afstandKm,
+        werkelijke_duur: duurMin,
+        hartslag_gem: hartslagGem,
+        hartslag_max: hartslagMax,
+        notitie: `Strava sync — ${(run.name as string) ?? ''}`,
+      } as never)
     }
+
+    gesynct++
   }
 
   return NextResponse.json({ gesynct, totaal: runs.length })
