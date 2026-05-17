@@ -1,13 +1,21 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl
+  const publicRoutes = ['/login', '/register', '/offline']
+
+  // Als env vars niet geconfigureerd zijn, stuur door naar login
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    if (publicRoutes.includes(pathname)) return NextResponse.next({ request })
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {
@@ -26,16 +34,11 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { pathname } = request.nextUrl
-
-  // Publieke routes
-  const publicRoutes = ['/login', '/register']
   if (publicRoutes.includes(pathname)) {
     if (user) return NextResponse.redirect(new URL('/dashboard', request.url))
     return supabaseResponse
   }
 
-  // Beschermde routes
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
