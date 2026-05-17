@@ -61,8 +61,8 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
         <h1 className="text-2xl font-bold text-white">{naam} 👋</h1>
       </div>
 
-      {/* Doel teller */}
-      {doel && (
+      {/* Doel teller of CTA */}
+      {doel ? (
         <Card className="bg-gradient-to-br from-[#f97316]/20 to-[#1a1a1a] border border-[#f97316]/20">
           <div className="flex justify-between items-center">
             <div>
@@ -74,6 +74,15 @@ export function DashboardClient({ profiel, sessies, fysioOefeningen, doel, vanda
           {doel.tijdsdoel && (
             <p className="text-sm text-[#6b7280] mt-2">Tijdsdoel: <span className="text-white font-medium">{doel.tijdsdoel}</span></p>
           )}
+        </Card>
+      ) : (
+        <Card onClick={() => window.location.href = '/doel'} className="border border-dashed border-[#333] text-center py-6">
+          <div className="text-4xl mb-2">🎯</div>
+          <p className="font-semibold text-white">Stel een doel in</p>
+          <p className="text-sm text-[#6b7280] mt-1">Marathon, triathlon of alleen fysio</p>
+          <div className="mt-4">
+            <Button size="sm">Doel toevoegen</Button>
+          </div>
         </Card>
       )}
 

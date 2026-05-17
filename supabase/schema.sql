@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   email TEXT NOT NULL,
   naam TEXT NOT NULL,
   geboortedatum DATE,
+  geslacht TEXT CHECK (geslacht IN ('man', 'vrouw', 'anders')),
   km_per_week NUMERIC(5,1),
   runs_per_week INTEGER,
   runkeeper_token TEXT,
