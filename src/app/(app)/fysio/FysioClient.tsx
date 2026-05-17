@@ -85,7 +85,7 @@ export function FysioClient({ oefeningen: initOefeningen, physioKlacht: initKlac
           <input ref={fileRef} type="file" accept=".pdf,image/*" onChange={handleUpload} className="hidden" />
           <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()} disabled={uploaden}>
             {uploaden ? <Loader2 size={16} className="animate-spin mr-2" /> : <Upload size={16} className="mr-2" />}
-            PDF uploaden
+            PDF of foto
           </Button>
         </div>
       </div>

@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Goal, Profile, Vacation, PreviousResult, RecurringActivity } from '@/types/database'
 import { cn } from '@/lib/utils'
 import { Plus, Trash2, LogOut, Link } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface Props {
   profiel: Profile | null
@@ -41,6 +41,8 @@ type NieuweActiviteit = {
 export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, activiteiten: initActiviteiten }: Props) {
   const supabase = createClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const stravaStatus = searchParams.get('strava')
   const [vakanties, setVakanties] = useState(initVakanties)
   const [activiteiten, setActiviteiten] = useState(initActiviteiten)
   const [naam, setNaam] = useState(profiel?.naam ?? '')
@@ -102,6 +104,17 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   return (
     <div className="flex flex-col gap-6 p-4 pt-8 pb-24">
       <h1 className="text-2xl font-bold text-[#1a1612]">Instellingen</h1>
+
+      {stravaStatus === 'gekoppeld' && (
+        <div className="bg-green-50 border border-green-200 rounded-2xl px-4 py-3 text-sm text-green-700">
+          ✓ Strava succesvol gekoppeld! Runs worden automatisch gesynchroniseerd.
+        </div>
+      )}
+      {stravaStatus === 'geweigerd' && (
+        <div className="bg-[#f5f3f0] border border-[#e8e3dc] rounded-2xl px-4 py-3 text-sm text-[#6b6560]">
+          Strava koppeling geannuleerd.
+        </div>
+      )}
 
       {/* Profiel */}
       <section>
@@ -309,19 +322,30 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
         </Card>
       </section>
 
-      {/* Runkeeper koppelen */}
+      {/* Koppelingen */}
       <section>
         <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Koppelingen</h2>
         <Card>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-[#1a1612]">Runkeeper</h3>
-              <p className="text-sm text-[#6b6560]">{profiel?.runkeeper_token ? 'Gekoppeld' : 'Nog niet gekoppeld'}</p>
+              <h3 className="font-semibold text-[#1a1612]">Strava</h3>
+              <p className="text-sm text-[#6b6560]">
+                {profiel?.strava_refresh_token ? '✓ Gekoppeld — looptrainingen worden automatisch gesynchroniseerd' : 'Koppel om runs automatisch te markeren als gedaan'}
+              </p>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => window.location.href = '/api/runkeeper/auth'}>
-              <Link size={14} className="mr-2" />
-              {profiel?.runkeeper_token ? 'Ontkoppelen' : 'Koppelen'}
-            </Button>
+            {profiel?.strava_refresh_token ? (
+              <Button variant="secondary" size="sm" onClick={async () => {
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) await supabase.from('profiles').update({ strava_refresh_token: null, strava_athlete_id: null } as never).eq('id', user.id)
+                window.location.reload()
+              }}>
+                Ontkoppelen
+              </Button>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={() => window.location.href = '/api/strava/auth'}>
+                <Link size={14} className="mr-2" /> Koppelen
+              </Button>
+            )}
           </div>
         </Card>
       </section>

@@ -17,6 +17,8 @@ export interface Database {
           push_subscription: Json | null
           physio_klacht: string | null
           wil_core: boolean
+          strava_refresh_token: string | null
+          strava_athlete_id: number | null
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>

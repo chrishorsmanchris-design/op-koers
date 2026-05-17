@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { InstellingenClient } from './InstellingenClient'
+import { Suspense } from 'react'
 
-export default async function InstellingenPage() {
+async function InstellingenData() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -16,4 +17,12 @@ export default async function InstellingenPage() {
   ])
 
   return <InstellingenClient profiel={profiel} doelen={doelen ?? []} vakanties={vakanties ?? []} resultaten={resultaten ?? []} activiteiten={activiteiten ?? []} />
+}
+
+export default function InstellingenPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-[#6b6560]">Laden...</div>}>
+      <InstellingenData />
+    </Suspense>
+  )
 }
