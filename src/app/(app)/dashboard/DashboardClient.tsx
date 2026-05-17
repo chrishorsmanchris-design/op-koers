@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { formatDuur, cn } from '@/lib/utils'
-import { CheckCircle2, ChevronRight, ChevronLeft, Dumbbell, Timer, MapPin, XCircle, Sparkles, Bell, Trash2 } from 'lucide-react'
+import { CheckCircle2, ChevronRight, ChevronLeft, Dumbbell, Timer, MapPin, XCircle, Sparkles, Bell, Trash2, Plus, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Goal, PhysioExercise, TrainingSession, Profile, RecurringActivity } from '@/types/database'
 import { FeedbackModal } from '@/components/training/FeedbackModal'
@@ -180,12 +180,72 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
 
   // Geselecteerde dag info
   const [verplaatsenSessieId, setVerplaatsenSessieId] = useState<string | null>(null)
+  const [toonRunForm, setToonRunForm] = useState(false)
+  const [runAfstand, setRunAfstand] = useState('')
+  const [runDuur, setRunDuur] = useState('')
+  const [runIntensiteit, setRunIntensiteit] = useState<'herstel' | 'makkelijk' | 'gemiddeld' | 'zwaar' | 'interval'>('makkelijk')
+  const [runOpslaan, setRunOpslaan] = useState(false)
+  const [stravaSync, setStravaSync] = useState<'idle' | 'bezig' | 'klaar'>('idle')
 
   const geselecteerdeSessie = lokaaleSessies.find(s => s.datum === geselecteerdeDag && !s.overgeslagen && s.type !== 'core')
   const coreVandaagVoltooid = lokaaleSessies.some(s => s.datum === geselecteerdeDag && s.type === 'core' && s.voltooid)
   const geselecteerdeActiviteiten = activiteiten.filter(a => dagVanWeekVoorDatum(geselecteerdeDag, a.dag_van_week))
   const heeftCoreVandaag = heeftCoreDag(geselecteerdeDag)
   const heeftFysioVandaag = heeftFysioDag(geselecteerdeDag)
+
+  function isoWeeknummer(datum: string): number {
+    const d = new Date(datum + 'T12:00:00')
+    const dag = d.getDay() || 7
+    d.setDate(d.getDate() + 4 - dag)
+    const jaarStart = new Date(d.getFullYear(), 0, 1)
+    return Math.ceil(((d.getTime() - jaarStart.getTime()) / 86400000 + 1) / 7)
+  }
+
+  async function logSpontaneRun() {
+    const afstand = parseFloat(runAfstand.replace(',', '.'))
+    const duur = parseInt(runDuur)
+    if (!afstand || !duur) return
+    setRunOpslaan(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setRunOpslaan(false); return }
+
+    const { data: nieuw } = await supabase
+      .from('training_sessions')
+      .insert({
+        user_id: user.id,
+        datum: geselecteerdeDag,
+        type: 'hardlopen',
+        beschrijving: `Spontane run — ${afstand} km`,
+        duur_minuten: duur,
+        afstand_km: afstand,
+        intensiteit: runIntensiteit,
+        voltooid: true,
+        overgeslagen: false,
+        week_nummer: isoWeeknummer(geselecteerdeDag),
+        volgorde: 0,
+      } as never)
+      .select('*, session_feedback(*)')
+      .single()
+
+    if (nieuw) {
+      setLokaaleSessies(prev => [...prev, nieuw as TrainingSession & { session_feedback: unknown[] }])
+      setToonRunForm(false)
+      setRunAfstand('')
+      setRunDuur('')
+    }
+    setRunOpslaan(false)
+  }
+
+  async function syncStrava() {
+    setStravaSync('bezig')
+    try {
+      await fetch('/api/strava/sync', { method: 'POST' })
+      setStravaSync('klaar')
+      setTimeout(() => { setStravaSync('idle'); window.location.reload() }, 1500)
+    } catch {
+      setStravaSync('idle')
+    }
+  }
 
   async function verwijderSessie(sessieId: string) {
     await supabase.from('training_sessions').delete().eq('id', sessieId)
@@ -411,6 +471,92 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
         <h2 className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">
           {geselecteerdeDag === vandaag ? 'Vandaag' : new Date(geselecteerdeDag + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
         </h2>
+
+        {/* Log spontane run knop — altijd beschikbaar op verleden/vandaag */}
+        {geselecteerdeDag <= vandaag && !toonRunForm && (
+          <div className="flex gap-2 mb-1">
+            <button
+              onClick={() => setToonRunForm(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-[#e8e3dc] text-[#6b6560] text-sm hover:border-[#f97316] hover:text-[#f97316] transition-all shadow-sm"
+            >
+              <Plus size={15} />
+              Run loggen
+            </button>
+            {!!(profiel as Record<string, unknown>)?.strava_refresh_token && (
+              <button
+                onClick={syncStrava}
+                disabled={stravaSync !== 'idle'}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-all shadow-sm ${
+                  stravaSync === 'klaar'
+                    ? 'bg-green-50 border-green-200 text-green-600'
+                    : 'bg-white border-[#e8e3dc] text-[#6b6560] hover:border-[#f97316] hover:text-[#f97316]'
+                }`}
+              >
+                <RefreshCw size={15} className={stravaSync === 'bezig' ? 'animate-spin' : ''} />
+                {stravaSync === 'bezig' ? 'Syncing…' : stravaSync === 'klaar' ? 'Gesynchroniseerd!' : 'Sync Strava'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Run log form */}
+        {toonRunForm && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm mb-1">
+            <p className="text-sm font-semibold text-[#1a1612] mb-3">🏃 Run loggen</p>
+            <div className="flex gap-3 mb-3">
+              <div className="flex-1">
+                <label className="text-xs text-[#a09990] mb-1 block">Afstand (km)</label>
+                <input
+                  type="number" inputMode="decimal" placeholder="8.5"
+                  value={runAfstand} onChange={e => setRunAfstand(e.target.value)}
+                  className="w-full border border-[#e8e3dc] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#f97316]"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-[#a09990] mb-1 block">Duur (min)</label>
+                <input
+                  type="number" inputMode="numeric" placeholder="45"
+                  value={runDuur} onChange={e => setRunDuur(e.target.value)}
+                  className="w-full border border-[#e8e3dc] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#f97316]"
+                />
+              </div>
+            </div>
+            <div className="flex gap-1.5 mb-4">
+              {([
+                { v: 'herstel', label: 'Rustig' },
+                { v: 'makkelijk', label: 'Makkelijk' },
+                { v: 'gemiddeld', label: 'Tempo' },
+                { v: 'zwaar', label: 'Lang' },
+                { v: 'interval', label: 'Interval' },
+              ] as const).map(opt => (
+                <button key={opt.v} onClick={() => setRunIntensiteit(opt.v)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                    runIntensiteit === opt.v
+                      ? 'bg-[#f97316] text-white border-[#f97316]'
+                      : 'bg-[#f5f3f0] text-[#6b6560] border-[#e8e3dc]'
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setToonRunForm(false); setRunAfstand(''); setRunDuur('') }}
+                className="flex-1 py-2.5 rounded-xl border border-[#e8e3dc] text-sm text-[#6b6560]">
+                Annuleren
+              </button>
+              <button
+                onClick={logSpontaneRun}
+                disabled={!runAfstand || !runDuur || runOpslaan}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  runAfstand && runDuur && !runOpslaan
+                    ? 'bg-[#f97316] text-white'
+                    : 'bg-[#e8e3dc] text-[#9ca3af] cursor-not-allowed'
+                }`}>
+                {runOpslaan ? 'Opslaan…' : 'Opslaan'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {geselecteerdeSessie ? (
           <>

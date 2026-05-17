@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+function isoWeeknummer(datum: string): number {
+  const d = new Date(datum + 'T12:00:00')
+  const dag = d.getDay() || 7
+  d.setDate(d.getDate() + 4 - dag)
+  const jaarStart = new Date(d.getFullYear(), 0, 1)
+  return Math.ceil(((d.getTime() - jaarStart.getTime()) / 86400000 + 1) / 7)
+}
+
 async function getAccessToken(refreshToken: string): Promise<string | null> {
   const res = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',
@@ -50,6 +58,12 @@ export async function POST() {
   for (const run of runs) {
     const datum = (run.start_date_local as string).split('T')[0]
 
+    // Bereken actuele waarden uit Strava
+    const afstandKm = Math.round((run.distance as number) / 10) / 100
+    const duurMin = Math.round((run.moving_time as number) / 60)
+    const hartslagGem = run.average_heartrate ? Math.round(run.average_heartrate as number) : null
+    const hartslagMax = run.max_heartrate ? Math.round(run.max_heartrate as number) : null
+
     const { data: sessies } = await supabase
       .from('training_sessions')
       .select('id')
@@ -58,14 +72,33 @@ export async function POST() {
       .eq('type', 'hardlopen')
       .limit(1)
 
-    if (!sessies?.length) continue
-    const sessieId = sessies[0].id
+    let sessieId: string
 
-    // Bereken actuele waarden uit Strava
-    const afstandKm = Math.round((run.distance as number) / 10) / 100
-    const duurMin = Math.round((run.moving_time as number) / 60)
-    const hartslagGem = run.average_heartrate ? Math.round(run.average_heartrate as number) : null
-    const hartslagMax = run.max_heartrate ? Math.round(run.max_heartrate as number) : null
+    if (!sessies?.length) {
+      // Geen geplande sessie → maak nieuwe aan voor spontane run
+      const { data: nieuw } = await supabase
+        .from('training_sessions')
+        .insert({
+          user_id: user.id,
+          datum,
+          type: 'hardlopen',
+          beschrijving: (run.name as string) ?? `Spontane run — ${afstandKm} km`,
+          duur_minuten: duurMin,
+          afstand_km: afstandKm,
+          intensiteit: 'makkelijk',
+          voltooid: true,
+          overgeslagen: false,
+          runkeeper_id: String(run.id),
+          week_nummer: isoWeeknummer(datum),
+          volgorde: 0,
+        } as never)
+        .select('id')
+        .single()
+      if (!nieuw) continue
+      sessieId = (nieuw as Record<string, string>).id
+    } else {
+      sessieId = sessies[0].id
+    }
 
     // Markeer sessie als voltooid + sla Strava ID op
     await supabase.from('training_sessions').update({
