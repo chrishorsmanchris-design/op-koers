@@ -181,7 +181,8 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
   // Geselecteerde dag info
   const [verplaatsenSessieId, setVerplaatsenSessieId] = useState<string | null>(null)
 
-  const geselecteerdeSessie = lokaaleSessies.find(s => s.datum === geselecteerdeDag && !s.overgeslagen)
+  const geselecteerdeSessie = lokaaleSessies.find(s => s.datum === geselecteerdeDag && !s.overgeslagen && s.type !== 'core')
+  const coreVandaagVoltooid = lokaaleSessies.some(s => s.datum === geselecteerdeDag && s.type === 'core' && s.voltooid)
   const geselecteerdeActiviteiten = activiteiten.filter(a => dagVanWeekVoorDatum(geselecteerdeDag, a.dag_van_week))
   const heeftCoreVandaag = heeftCoreDag(geselecteerdeDag)
   const heeftFysioVandaag = heeftFysioDag(geselecteerdeDag)
@@ -302,14 +303,15 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
         </div>
         <div className="grid grid-cols-7 gap-1">
           {dagen.map((datum, i) => {
-            const sessie = lokaaleSessies.find(s => s.datum === datum && !s.overgeslagen)
+            const sessie = lokaaleSessies.find(s => s.datum === datum && !s.overgeslagen && s.type !== 'core')
+            const coreSessie = lokaaleSessies.find(s => s.datum === datum && s.type === 'core' && s.voltooid)
             const heeftActiviteit = activiteiten.some(a => dagVanWeekVoorDatum(datum, a.dag_van_week))
             const heeftCore = heeftCoreDag(datum)
             const isVandaag = datum === vandaag
             const isGeselecteerd = datum === geselecteerdeDag
             const isVerleden = datum < vandaag
             const heeftFysio = heeftFysioDag(datum)
-            const kleur = sessie ? TYPE_KLEUR[sessie.type] ?? '#f97316' : heeftCore ? '#06b6d4' : heeftFysio ? '#f97316' : null
+            const kleur = sessie ? TYPE_KLEUR[sessie.type] ?? '#f97316' : coreSessie ? '#06b6d4' : heeftCore ? '#06b6d4' : heeftFysio ? '#f97316' : null
 
             return (
               <button
@@ -333,6 +335,8 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
                 >
                   {sessie ? (
                     <span className="text-sm">{TYPE_LABEL[sessie.type]}</span>
+                  ) : coreSessie ? (
+                    <span className="text-sm">🧘</span>
                   ) : heeftActiviteit ? (
                     <span className="text-sm">🏑</span>
                   ) : heeftCore ? (
@@ -342,7 +346,7 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
                   ) : (
                     <div className="w-1.5 h-1.5 rounded-full bg-[#d0cbc4]" />
                   )}
-                  {sessie?.voltooid && (
+                  {(sessie?.voltooid || coreSessie) && (
                     <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center">
                       <CheckCircle2 size={9} className="text-white" />
                     </div>
@@ -460,24 +464,30 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
 
         {/* Core stability kaart — toon altijd als wil_core aan staat */}
         {profiel?.wil_core && (
-          <Card className="mt-2 cursor-pointer" onClick={() => window.location.href = '/core/sessie'}>
+          <Card
+            className={cn('mt-2', coreVandaagVoltooid ? 'opacity-70' : 'cursor-pointer')}
+            onClick={coreVandaagVoltooid ? undefined : () => window.location.href = '/core/sessie'}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={cn(
                   'w-10 h-10 rounded-2xl flex items-center justify-center text-lg',
-                  heeftCoreVandaag ? 'bg-[#06b6d4]/20' : 'bg-[#f5f3f0]'
+                  coreVandaagVoltooid ? 'bg-green-100' : heeftCoreVandaag ? 'bg-[#06b6d4]/20' : 'bg-[#f5f3f0]'
                 )}>🧘</div>
                 <div>
                   <h3 className="font-semibold text-[#1a1612]">Core stability</h3>
                   <p className="text-sm text-[#6b6560]">
-                    {heeftCoreVandaag ? 'Vandaag ingepland · tik om te starten' : 'Tik om nu te doen'}
+                    {coreVandaagVoltooid
+                      ? 'Gedaan vandaag 💪'
+                      : heeftCoreVandaag
+                        ? 'Vandaag ingepland · tik om te starten'
+                        : 'Tik om nu te doen'}
                   </p>
                 </div>
               </div>
-              {heeftCoreVandaag && (
-                <div className="w-2 h-2 rounded-full bg-[#06b6d4]" />
-              )}
-              <ChevronRight size={18} className="text-[#a09990]" />
+              {coreVandaagVoltooid
+                ? <CheckCircle2 size={18} className="text-green-500" />
+                : <ChevronRight size={18} className="text-[#a09990]" />}
             </div>
           </Card>
         )}

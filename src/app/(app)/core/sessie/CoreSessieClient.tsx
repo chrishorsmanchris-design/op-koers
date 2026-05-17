@@ -116,6 +116,8 @@ export function CoreSessieClient() {
   const [gedaan, setGedaan] = useState<Record<number, number>>({})
   const [pijnKeuze, setPijnKeuze] = useState<number | null>(null)
   const [afgerond, setAfgerond] = useState(false)
+  const [opslaan, setOpslaan] = useState(false)
+  const [fout, setFout] = useState<string | null>(null)
 
   const oefening = CORE_OEFENINGEN[huidig]
   const totaal = CORE_OEFENINGEN.length
@@ -126,24 +128,29 @@ export function CoreSessieClient() {
     const nieuwGedaan = { ...gedaan, [huidig]: pijnKeuze }
     setGedaan(nieuwGedaan)
     if (isLaatste) {
-      // Sla core sessie op in training_sessions
+      setOpslaan(true)
+      setFout(null)
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const vandaag = new Date().toISOString().split('T')[0]
-        const gemPijn = Object.values(nieuwGedaan).reduce((a, b) => a + b, 0) / totaal
-        const beschrijving = gemPijn === 0 ? 'Core stability — geen pijn' :
-          gemPijn <= 1 ? 'Core stability — lichte pijn' : 'Core stability — pijn aanwezig'
-        await supabase.from('training_sessions').insert({
-          user_id: user.id,
-          datum: vandaag,
-          type: 'core',
-          beschrijving,
-          duur_minuten: Math.round(totaal * 4), // ~4 min per oefening
-          afstand_km: 0,
-          intensiteit: 'gemiddeld',
-          voltooid: true,
-          overgeslagen: false,
-        } as never)
+      if (!user) { setFout('Niet ingelogd — sessie kon niet worden opgeslagen.'); setOpslaan(false); return }
+      const vandaag = new Date().toISOString().split('T')[0]
+      const gemPijn = Object.values(nieuwGedaan).reduce((a, b) => a + b, 0) / totaal
+      const beschrijving = gemPijn === 0 ? 'Core stability — geen pijn' :
+        gemPijn <= 1 ? 'Core stability — lichte pijn' : 'Core stability — pijn aanwezig'
+      const { error } = await supabase.from('training_sessions').insert({
+        user_id: user.id,
+        datum: vandaag,
+        type: 'core',
+        beschrijving,
+        duur_minuten: Math.round(totaal * 4),
+        afstand_km: 0,
+        intensiteit: 'gemiddeld',
+        voltooid: true,
+        overgeslagen: false,
+      } as never)
+      setOpslaan(false)
+      if (error) {
+        setFout(`Opslaan mislukt: ${error.message}`)
+        return
       }
       setAfgerond(true)
     } else {
@@ -243,6 +250,9 @@ export function CoreSessieClient() {
 
       {/* Bottom */}
       <div className="px-4 pb-8 pt-2 bg-[#f5f3f0] border-t border-[#e8e3dc]">
+        {fout && (
+          <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">{fout}</div>
+        )}
         <div className="flex gap-3">
           {huidig > 0 && (
             <button onClick={() => { setPijnKeuze(null); setHuidig(h => h - 1) }}
@@ -250,11 +260,11 @@ export function CoreSessieClient() {
               <ChevronLeft size={18} />
             </button>
           )}
-          <button onClick={markeerGedaan} disabled={pijnKeuze === null}
+          <button onClick={markeerGedaan} disabled={pijnKeuze === null || opslaan}
             className={cn('flex-1 py-3 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-all',
-              pijnKeuze !== null ? 'bg-[#06b6d4] text-white' : 'bg-[#e8e3dc] text-[#9ca3af] cursor-not-allowed')}>
+              pijnKeuze !== null && !opslaan ? 'bg-[#06b6d4] text-white' : 'bg-[#e8e3dc] text-[#9ca3af] cursor-not-allowed')}>
             <CheckCircle2 size={18} />
-            {isLaatste ? 'Sessie afronden' : 'Volgende oefening'}
+            {opslaan ? 'Opslaan…' : isLaatste ? 'Sessie afronden' : 'Volgende oefening'}
           </button>
           {!isLaatste && (
             <button onClick={() => { setPijnKeuze(null); setHuidig(h => Math.min(h + 1, totaal - 1)) }}
