@@ -1,0 +1,15 @@
+{
+  "name": "Op Koers",
+  "short_name": "Op Koers",
+  "description": "Slimme sport- en herstelapp voor marathon training en fysio",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f0f",
+  "theme_color": "#f97316",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["sports", "health", "fitness"]
+}
