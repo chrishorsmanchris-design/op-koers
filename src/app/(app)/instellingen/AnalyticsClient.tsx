@@ -913,7 +913,18 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
             <WeekVergelijking dezeWeek={dezeWeekData} vorigeWeek={vorigeWeekData} />
 
             {/* ATL/CTL trainingsbelasting */}
-            <ATLCTLChart sessies={sessies} />
+            {voltooid.filter(s => s.type !== 'rust').length < 5 ? (
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-2">Trainingsbelasting</p>
+                <div className="py-6 text-center">
+                  <p className="text-2xl mb-2">📈</p>
+                  <p className="text-sm font-medium text-[#1a1612]">Nog even geduld</p>
+                  <p className="text-xs text-[#6b6560] mt-1">Na 2 weken trainen verschijnt hier je belastingsgrafiek (ATL/CTL)</p>
+                </div>
+              </div>
+            ) : (
+              <ATLCTLChart sessies={sessies} />
+            )}
 
             {/* Type verdeling */}
             {typeVerdeling.length > 0 && (
@@ -1038,6 +1049,25 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                           </div>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Hartslag zones nudge (als max_hartslag niet ingesteld) */}
+                {!maxHartslag && (
+                  <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#f97316]/20">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">❤️</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-[#1a1612]">Hartslag zones instellen</p>
+                        <p className="text-xs text-[#6b6560] mt-0.5">Voeg je max hartslag toe voor persoonlijke zones</p>
+                      </div>
+                      <button
+                        onClick={() => window.location.href = '/instellingen'}
+                        className="text-xs text-[#f97316] font-semibold"
+                      >
+                        Instellen →
+                      </button>
                     </div>
                   </div>
                 )}

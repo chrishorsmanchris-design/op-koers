@@ -53,6 +53,7 @@ export default async function CoachPage() {
       doel={doel ?? null}
       recente_sessies={sessies ?? []}
       weekreview={weekreview}
+      userId={user?.id ?? null}
     />
   )
 }

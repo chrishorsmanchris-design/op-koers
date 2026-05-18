@@ -23,6 +23,7 @@ interface Props {
   doel: { naam: string; datum: string; tijdsdoel: string | null } | null
   recente_sessies: Sessie[]
   weekreview: string | null
+  userId: string | null
 }
 
 const SUGGESTIES = [
@@ -77,22 +78,85 @@ function buildContext(props: Props): string {
   return lines.join('\n')
 }
 
-export function CoachChatClient({ profiel, doel, recente_sessies, weekreview }: Props) {
+function getStorageKeys(userId: string | null) {
+  const id = userId ?? 'anonymous'
+  return {
+    chat: `coach-chat-${id}`,
+    date: `coach-chat-date-${id}`,
+  }
+}
+
+export function CoachChatClient({ profiel, doel, recente_sessies, weekreview, userId }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const initialized = useRef(false)
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    if (initialized.current) return
+    initialized.current = true
+
+    const keys = getStorageKeys(userId)
+    const vandaag = new Date().toISOString().split('T')[0]
+
+    try {
+      const opgeslagenDatum = localStorage.getItem(keys.date)
+      if (opgeslagenDatum && opgeslagenDatum !== vandaag) {
+        // Nieuwe dag — historie wissen
+        localStorage.removeItem(keys.chat)
+        localStorage.removeItem(keys.date)
+        return
+      }
+
+      const raw = localStorage.getItem(keys.chat)
+      if (raw) {
+        const parsed = JSON.parse(raw) as Message[]
+        if (Array.isArray(parsed)) {
+          setMessages(parsed.slice(-50))
+        }
+      }
+    } catch {
+      // localStorage niet beschikbaar of ongeldige JSON — negeer
+    }
+  }, [userId])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  const context = buildContext({ profiel, doel, recente_sessies, weekreview })
+  function slaMessagesOp(bijgewerkt: Message[]) {
+    if (!initialized.current) return
+    const keys = getStorageKeys(userId)
+    const vandaag = new Date().toISOString().split('T')[0]
+    try {
+      localStorage.setItem(keys.chat, JSON.stringify(bijgewerkt))
+      localStorage.setItem(keys.date, vandaag)
+    } catch {
+      // localStorage vol — negeer
+    }
+  }
+
+  function wisGesprek() {
+    const keys = getStorageKeys(userId)
+    try {
+      localStorage.removeItem(keys.chat)
+      localStorage.removeItem(keys.date)
+    } catch {
+      // negeer
+    }
+    setMessages([])
+  }
+
+  const context = buildContext({ profiel, doel, recente_sessies, weekreview, userId })
 
   async function sendMessage(vraag: string) {
     if (!vraag.trim() || loading) return
     const userMsg: Message = { role: 'user', content: vraag.trim() }
-    setMessages(prev => [...prev, userMsg])
+    const bijgewerkt = [...messages, userMsg]
+    setMessages(bijgewerkt)
+    slaMessagesOp(bijgewerkt)
     setInput('')
     setLoading(true)
 
@@ -104,12 +168,16 @@ export function CoachChatClient({ profiel, doel, recente_sessies, weekreview }: 
       })
       const json = await res.json() as { antwoord?: string; error?: string }
       const antwoord = json.antwoord ?? json.error ?? 'Er ging iets mis. Probeer opnieuw.'
-      setMessages(prev => [...prev, { role: 'assistant', content: antwoord }])
+      const metAntwoord = [...bijgewerkt, { role: 'assistant' as const, content: antwoord }]
+      setMessages(metAntwoord)
+      slaMessagesOp(metAntwoord)
     } catch {
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: 'Verbindingsfout. Controleer je internet en probeer opnieuw.' },
-      ])
+      const metFout = [
+        ...bijgewerkt,
+        { role: 'assistant' as const, content: 'Verbindingsfout. Controleer je internet en probeer opnieuw.' },
+      ]
+      setMessages(metFout)
+      slaMessagesOp(metFout)
     } finally {
       setLoading(false)
     }
@@ -123,9 +191,19 @@ export function CoachChatClient({ profiel, doel, recente_sessies, weekreview }: 
   return (
     <div className="flex flex-col h-[100dvh] bg-[#f5f3f0]">
       {/* Header */}
-      <div className="px-4 pt-12 pb-3 bg-[#f5f3f0]">
-        <h1 className="text-2xl font-bold text-[#1a1612]">Coach 🤖</h1>
-        <p className="text-sm text-[#6b6560] mt-0.5">Vraag de coach alles over je training</p>
+      <div className="px-4 pt-12 pb-3 bg-[#f5f3f0] flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#1a1612]">Coach 🤖</h1>
+          <p className="text-sm text-[#6b6560] mt-0.5">Vraag de coach alles over je training</p>
+        </div>
+        {messages.length > 0 && (
+          <button
+            onClick={wisGesprek}
+            className="text-xs text-[#a09990] hover:text-[#6b6560] transition-colors mt-1 pt-12"
+          >
+            Gesprek wissen
+          </button>
+        )}
       </div>
 
       {/* Scrollable messages area */}

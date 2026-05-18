@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { formatDuur, cn } from '@/lib/utils'
@@ -73,8 +74,18 @@ function dagVanWeekVoorDatum(datum: string, dagVanWeek: number): boolean {
   return onzeDag === dagVanWeek
 }
 
+const RACEDAY_CHECKLIST_ITEMS = [
+  { id: 'schoenen', label: 'Schoenen getest' },
+  { id: 'route', label: 'Route bekend' },
+  { id: 'starttijd', label: 'Starttijd genoteerd' },
+  { id: 'outfit', label: 'Outfit klaargelegd' },
+  { id: 'ontbijt', label: 'Ontbijt gepland' },
+  { id: 'wekker', label: 'Slaapwekker gezet' },
+]
+
 export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen, fysioSessies, doel, vandaag, weekStart, activiteiten }: Props) {
   const supabase = createClient()
+  const router = useRouter()
   const [feedbackSessie, setFeedbackSessie] = useState<TrainingSession | null>(null)
   const [lokaaleSessies, setLokaaleSessies] = useState(sessies)
   const [lokaaleFysioSessies, setLokaaleFysioSessies] = useState(fysioSessies)
@@ -83,6 +94,7 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
   const [coachBericht, setCoachBericht] = useState<string | null>(null)
   const [coachLaden, setCoachLaden] = useState(false)
   const [pushStatus, setPushStatus] = useState<'unknown' | 'granted' | 'denied' | 'unsupported'>('unknown')
+  const [racedayChecklist, setRacedayChecklist] = useState<Record<string, boolean>>({})
 
   // Push permission + subscription
   useEffect(() => {
@@ -91,6 +103,22 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
     }
     setPushStatus(Notification.permission === 'granted' ? 'granted' : Notification.permission === 'denied' ? 'denied' : 'unknown')
   }, [])
+
+  // Strava auto-sync bij dashboard laden (eenmalig per dag)
+  useEffect(() => {
+    const vandaagStr = new Date().toISOString().split('T')[0]
+    const heeftStrava = !!(profiel as Record<string, unknown>)?.strava_refresh_token
+    if (!heeftStrava) return
+    const lastSync = localStorage.getItem('strava-last-sync')
+    if (lastSync === vandaagStr) return
+    // Auto sync
+    fetch('/api/strava/sync', { method: 'POST' })
+      .then(() => {
+        localStorage.setItem('strava-last-sync', vandaagStr)
+        router.refresh()
+      })
+      .catch(() => {})
+  }, []) // run once on mount
 
   async function pushAanvragen() {
     if (!('Notification' in window)) return
@@ -103,6 +131,25 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
       applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     })
     await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) })
+  }
+
+  // Raceday checklist laden vanuit localStorage
+  useEffect(() => {
+    if (!doel) return
+    const key = `racedayChecklist-${doel.id}`
+    try {
+      const opgeslagen = localStorage.getItem(key)
+      if (opgeslagen) setRacedayChecklist(JSON.parse(opgeslagen))
+    } catch { /* ignore */ }
+  }, [doel])
+
+  function toggleChecklistItem(itemId: string) {
+    if (!doel) return
+    const nieuw = { ...racedayChecklist, [itemId]: !racedayChecklist[itemId] }
+    setRacedayChecklist(nieuw)
+    try {
+      localStorage.setItem(`racedayChecklist-${doel.id}`, JSON.stringify(nieuw))
+    } catch { /* ignore */ }
   }
 
   // Coach bericht laden (eenmalig per dag, gecached in sessionStorage)
@@ -341,6 +388,75 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
           <p className="font-semibold text-[#1a1612]">Stel een doel in</p>
           <p className="text-sm text-[#6b6560] mt-0.5">Marathon, triathlon of alleen fysio</p>
         </Card>
+      )}
+
+      {/* Tapering / race week / race day kaarten */}
+      {doel && dagenTotDoel !== null && dagenTotDoel >= 8 && dagenTotDoel <= 14 && (
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl p-4 shadow-md text-white">
+          <p className="text-sm font-semibold text-white/80 mb-1">⚡ Tapering fase</p>
+          <p className="text-base font-bold">Nog {dagenTotDoel} dagen — bouw volume af</p>
+          <p className="text-sm text-white/70 mt-1">Behoud intensiteit, verminder km. Jouw benen laden op voor de grote dag.</p>
+          <div className="mt-3 flex gap-2 flex-wrap">
+            {['✓ Slaap 8+ uur', '✓ Hydrateer goed', '✓ Geen nieuwe dingen'].map(tip => (
+              <span key={tip} className="text-xs bg-white/20 rounded-full px-2 py-1">{tip}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {doel && dagenTotDoel !== null && dagenTotDoel >= 1 && dagenTotDoel <= 7 && (
+        <div className="bg-gradient-to-br from-[#f97316] to-[#ea6c0a] rounded-3xl p-4 shadow-md text-white">
+          <p className="text-sm font-semibold text-white/80 mb-1">🏁 Race week!</p>
+          <p className="text-base font-bold">Nog {dagenTotDoel} {dagenTotDoel === 1 ? 'dag' : 'dagen'} tot de {doel.naam}</p>
+          {doel.tijdsdoel && (
+            <p className="text-sm text-white/80 mt-1">
+              Herinner jezelf aan je tijdsdoel: <span className="font-semibold text-white">{doel.tijdsdoel}</span>
+            </p>
+          )}
+          <p className="text-sm font-semibold text-white/80 mt-3 mb-2">Race day checklist</p>
+          <div className="flex flex-col gap-1.5">
+            {RACEDAY_CHECKLIST_ITEMS.map(item => (
+              <button
+                key={item.id}
+                onClick={() => toggleChecklistItem(item.id)}
+                className="flex items-center gap-2.5 text-left"
+              >
+                <div className={cn(
+                  'w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
+                  racedayChecklist[item.id]
+                    ? 'bg-white border-white'
+                    : 'border-white/50 bg-white/10'
+                )}>
+                  {racedayChecklist[item.id] && (
+                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                      <path d="M1 4L3.5 6.5L9 1" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+                <span className={cn(
+                  'text-sm transition-all',
+                  racedayChecklist[item.id] ? 'line-through text-white/50' : 'text-white'
+                )}>
+                  {item.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {doel && dagenTotDoel !== null && dagenTotDoel === 0 && (
+        <div className="bg-gradient-to-br from-[#f97316] to-[#ea6c0a] rounded-3xl p-5 shadow-md text-white text-center">
+          <p className="text-4xl mb-2">🎉</p>
+          <p className="text-xl font-bold">Het is vandaag!</p>
+          <p className="text-base font-semibold mt-1">Veel succes bij de {doel.naam}!</p>
+          {doel.tijdsdoel && (
+            <p className="text-sm text-white/80 mt-2">
+              Tijdsdoel: <span className="font-bold text-white">{doel.tijdsdoel}</span>
+            </p>
+          )}
+          <p className="text-sm text-white/70 mt-3">Je hebt hard gewerkt voor dit moment. Geniet ervan! 💪</p>
+        </div>
       )}
 
       {/* Week strip */}

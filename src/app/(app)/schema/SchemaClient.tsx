@@ -230,10 +230,20 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
           <h1 className="text-2xl font-bold text-[#1a1612]">Trainingsschema</h1>
           {doel && <p className="text-sm text-[#6b6560] mt-1">{doel.naam}</p>}
         </div>
-        <Button variant="secondary" size="sm" onClick={genereerSchema} disabled={genereert}>
-          {genereert ? <Loader2 size={16} className="animate-spin mr-2" /> : <RefreshCw size={16} className="mr-2" />}
-          {sessies.length === 0 ? 'Genereer' : 'Opnieuw'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {sessies.length > 0 && (
+            <button
+              onClick={() => window.open('/api/training/ical', '_blank')}
+              className="text-sm border border-[#e8e3dc] rounded-xl px-3 py-1.5 text-[#6b6560] hover:border-[#c8c3bc] transition-colors"
+            >
+              📅 Exporteer naar agenda
+            </button>
+          )}
+          <Button variant="secondary" size="sm" onClick={genereerSchema} disabled={genereert}>
+            {genereert ? <Loader2 size={16} className="animate-spin mr-2" /> : <RefreshCw size={16} className="mr-2" />}
+            {sessies.length === 0 ? 'Genereer' : 'Opnieuw'}
+          </Button>
+        </div>
       </div>
 
       {uitleg && (

@@ -17,6 +17,7 @@ export default function OnboardingPage() {
   const router = useRouter()
   const [geboortedatum, setGeboortedatum] = useState('')
   const [geslacht, setGeslacht] = useState('')
+  const [maxHartslag, setMaxHartslag] = useState('')
   const [laden, setLaden] = useState(false)
 
   async function afronden() {
@@ -28,6 +29,7 @@ export default function OnboardingPage() {
     await supabase.from('profiles').update({
       geboortedatum: geboortedatum || null,
       geslacht: geslacht || null,
+      max_hartslag: maxHartslag ? parseInt(maxHartslag) : null,
       onboarding_voltooid: true,
     } as never).eq('id', user.id)
 
@@ -70,6 +72,21 @@ export default function OnboardingPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-[#1a1612] mb-2 block">
+              Max hartslag (optioneel)
+            </label>
+            <p className="text-xs text-[#6b6560] mb-2">Staat op je sporthorloge of hartslagmeter. Gemiddeld ~220 min leeftijd.</p>
+            <input
+              type="number"
+              placeholder="bijv. 182"
+              value={maxHartslag}
+              onChange={e => setMaxHartslag(e.target.value)}
+              className="w-full border border-[#e8e3dc] rounded-2xl px-4 py-3 text-[#1a1612] focus:outline-none focus:border-[#f97316]"
+              min="100" max="220"
+            />
           </div>
         </div>
 

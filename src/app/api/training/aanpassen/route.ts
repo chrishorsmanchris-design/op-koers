@@ -181,6 +181,34 @@ Geef ALLEEN geldige JSON terug:
       .eq('user_id', user.id)
   }
 
+  // Stuur push notificatie als er aanpassingen zijn
+  if (valideAanpassingen.length > 0) {
+    const { data: profiel } = await supabase
+      .from('profiles')
+      .select('push_subscription')
+      .eq('id', user.id)
+      .single()
+
+    if (profiel?.push_subscription) {
+      try {
+        const webpush = (await import('web-push')).default
+        webpush.setVapidDetails(
+          process.env.VAPID_EMAIL!,
+          process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+          process.env.VAPID_PRIVATE_KEY!
+        )
+        await webpush.sendNotification(
+          profiel.push_subscription as Parameters<typeof webpush.sendNotification>[0],
+          JSON.stringify({
+            title: '📅 Schema bijgewerkt',
+            body: aanpassingen.uitleg ?? `${valideAanpassingen.length} sessies aangepast op basis van je feedback`,
+            url: '/schema'
+          })
+        )
+      } catch { /* push errors don't fail the request */ }
+    }
+  }
+
   return NextResponse.json({
     aangepast: true,
     aantalSessies: valideAanpassingen.length,
