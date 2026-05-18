@@ -47,6 +47,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   const [activiteiten, setActiviteiten] = useState(initActiviteiten)
   const [naam, setNaam] = useState(profiel?.naam ?? '')
   const [kmPerWeek, setKmPerWeek] = useState(String(profiel?.km_per_week ?? ''))
+  const [maxHartslag, setMaxHartslag] = useState(String((profiel as Record<string, unknown>)?.max_hartslag as number | null ?? ''))
   const [wilCore, setWilCore] = useState(profiel?.wil_core ?? false)
   const [corePerWeek, setCorePerWeek] = useState(profiel?.core_per_week ?? 2)
   const [fysioPerWeek, setFysioPerWeek] = useState(profiel?.fysio_per_week ?? 3)
@@ -62,6 +63,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
     await supabase.from('profiles').update({
       naam,
       km_per_week: parseFloat(kmPerWeek) || null,
+      max_hartslag: parseInt(maxHartslag) || null,
       wil_core: wilCore,
       core_per_week: wilCore ? corePerWeek : 0,
       fysio_per_week: fysioPerWeek,
@@ -129,6 +131,8 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             <Input id="naam" label="Naam" value={naam} onChange={e => setNaam(e.target.value)} />
             <Input id="km" type="number" label="Km per week (huidig)" value={kmPerWeek}
               onChange={e => setKmPerWeek(e.target.value)} placeholder="bijv. 25" />
+            <Input id="max-hartslag" type="number" label="Max hartslag (bpm)" value={maxHartslag}
+              onChange={e => setMaxHartslag(e.target.value)} placeholder="180" />
 
             {/* Cross-training toggle */}
             <button

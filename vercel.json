@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/ochtend?secret=opkoers-cron-2026",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/weekreview?secret=opkoers-cron-2026",
+      "schedule": "0 19 * * 0"
     }
   ]
 }

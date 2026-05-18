@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { Profile, Goal } from '@/types/database'
-import { TrendingUp, TrendingDown, Minus, Activity, Timer, MapPin, Zap, Heart } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, Activity, Timer, MapPin, Zap, Heart, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface SessionFeedback {
   werkelijke_afstand: number | null
@@ -69,6 +69,14 @@ function berekenAfstand(s: Sessie): number {
   return s.session_feedback?.[0]?.werkelijke_afstand ?? s.afstand_km ?? 0
 }
 
+function formatHMS(totalMinuten: number): string {
+  const uren = Math.floor(totalMinuten / 60)
+  const min = Math.floor(totalMinuten % 60)
+  const sec = Math.round((totalMinuten % 1) * 60)
+  if (uren > 0) return `${uren}:${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
+  return `${min}:${sec.toString().padStart(2, '0')}`
+}
+
 const TYPE_KLEUR: Record<string, string> = {
   hardlopen: '#f97316',
   krachttraining: '#8b5cf6',
@@ -83,6 +91,14 @@ const TYPE_LABEL: Record<string, string> = {
   cross: 'Cross',
   rust: 'Rust',
 }
+const TYPE_EMOJI: Record<string, string> = {
+  hardlopen: '🏃',
+  krachttraining: '💪',
+  core: '🧘',
+  cross: '🚴',
+  rust: '😴',
+  fysio: '🩺',
+}
 const INTENSITEIT_KLEUR: Record<string, string> = {
   herstel: '#3b82f6',
   makkelijk: '#22c55e',
@@ -96,6 +112,23 @@ const INTENSITEIT_LABEL: Record<string, string> = {
   gemiddeld: 'Tempo',
   zwaar: 'Lange duurloop',
   interval: 'Interval',
+}
+
+const RATING_KLEUR: Record<string, string> = {
+  te_zwaar: '#ef4444',
+  zwaar: '#f97316',
+  goed: '#22c55e',
+  beter: '#3b82f6',
+  topdag: '#a855f7',
+}
+
+// ATL/CTL helpers
+const INTENSITEIT_FACTOR: Record<string, number> = {
+  herstel: 0.4, makkelijk: 0.55, gemiddeld: 0.7, zwaar: 0.85, interval: 1.0
+}
+function berekenTSS(s: Sessie): number {
+  const factor = INTENSITEIT_FACTOR[s.intensiteit ?? 'makkelijk'] ?? 0.55
+  return (s.duur_minuten ?? 0) / 60 * factor * 100
 }
 
 // ── sub-components ────────────────────────────────────────────────────────────
@@ -207,9 +240,8 @@ function Heatmap({ sessies, fysioSessies }: { sessies: Sessie[]; fysioSessies: F
 }
 
 // Eenvoudige balk-grafiek
-function BarChart({ data, maxLabel, kleur, suffix = '' }: {
+function BarChart({ data, kleur, suffix = '' }: {
   data: { label: string; waarde: number; highlight?: boolean }[]
-  maxLabel?: string
   kleur: string
   suffix?: string
 }) {
@@ -255,7 +287,6 @@ function PaceSparkline({ runs }: { runs: { datum: string; pace: number }[] }) {
         {points.map((p, i) => (
           <circle key={i} cx={p.x} cy={p.y} r="3" fill="#f97316" />
         ))}
-        {/* Min/max labels */}
         <text x={points[points.findIndex(p => p.pace === minPace)].x} y={points.find(p => p.pace === minPace)!.y - 5}
           fontSize="8" fill="#22c55e" textAnchor="middle">{formatPace(minPace)}</text>
         <text x={points[points.findIndex(p => p.pace === maxPace)].x} y={points.find(p => p.pace === maxPace)!.y + 12}
@@ -269,10 +300,394 @@ function PaceSparkline({ runs }: { runs: { datum: string; pace: number }[] }) {
   )
 }
 
+// ATL/CTL/TSB chart — SVG lijn-grafiek over 12 weken
+function ATLCTLChart({ sessies }: { sessies: Sessie[] }) {
+  const data = useMemo(() => {
+    const nu = new Date()
+    const dagMap = new Map<string, number>()
+    sessies.filter(s => s.voltooid).forEach(s => {
+      const tss = berekenTSS(s)
+      dagMap.set(s.datum, (dagMap.get(s.datum) ?? 0) + tss)
+    })
+
+    const lambdaATL = Math.exp(-1 / 7)
+    const lambdaCTL = Math.exp(-1 / 42)
+    let atl = 0, ctl = 0
+    const punten: { datum: string; atl: number; ctl: number; tsb: number }[] = []
+
+    // Start 12 weken terug, loop tot nu
+    const start = new Date(nu)
+    start.setDate(start.getDate() - 84)
+
+    for (let i = 0; i <= 84; i++) {
+      const dag = new Date(start)
+      dag.setDate(start.getDate() + i)
+      const datumStr = dag.toISOString().split('T')[0]
+      const tss = dagMap.get(datumStr) ?? 0
+      atl = atl * lambdaATL + tss * (1 - lambdaATL)
+      ctl = ctl * lambdaCTL + tss * (1 - lambdaCTL)
+      punten.push({ datum: datumStr, atl, ctl, tsb: ctl - atl })
+    }
+    return punten
+  }, [sessies])
+
+  if (data.length === 0) return null
+
+  const W = 320, H = 100, pad = { t: 8, b: 20, l: 8, r: 8 }
+  const innerW = W - pad.l - pad.r
+  const innerH = H - pad.t - pad.b
+
+  const maxVal = Math.max(1, ...data.map(d => Math.max(d.atl, d.ctl)))
+  const minTSB = Math.min(0, ...data.map(d => d.tsb))
+  const maxTSB = Math.max(0, ...data.map(d => d.tsb))
+  const tsbRange = Math.max(1, maxTSB - minTSB)
+
+  const xOf = (i: number) => pad.l + (i / (data.length - 1)) * innerW
+  const yOf = (v: number) => pad.t + (1 - v / maxVal) * innerH * 0.7
+  const yTSB = (v: number) => pad.t + innerH * 0.7 + (1 - (v - minTSB) / tsbRange) * innerH * 0.25
+
+  const atlPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xOf(i)} ${yOf(d.atl)}`).join(' ')
+  const ctlPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xOf(i)} ${yOf(d.ctl)}`).join(' ')
+
+  // Week-tick labels (elke 2 weken)
+  const ticks = [0, 14, 28, 42, 56, 70, 84].map(i => ({ i, datum: data[Math.min(i, data.length - 1)].datum }))
+
+  const huidig = data[data.length - 1]
+
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">Trainingsbelasting (ATL/CTL)</p>
+      </div>
+      <div className="flex gap-4 mb-3 text-xs">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-0.5 rounded bg-[#f97316]" />
+          <span className="text-[#6b6560]">ATL <span className="font-semibold text-[#1a1612]">{huidig.atl.toFixed(0)}</span></span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-0.5 rounded bg-[#3b82f6]" />
+          <span className="text-[#6b6560]">CTL <span className="font-semibold text-[#1a1612]">{huidig.ctl.toFixed(0)}</span></span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-2 rounded" style={{ backgroundColor: huidig.tsb >= 0 ? '#22c55e40' : '#ef444440' }} />
+          <span className="text-[#6b6560]">TSB <span className="font-semibold" style={{ color: huidig.tsb >= 0 ? '#22c55e' : '#ef4444' }}>{huidig.tsb >= 0 ? '+' : ''}{huidig.tsb.toFixed(0)}</span></span>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: H }}>
+        {/* TSB bars */}
+        {data.map((d, i) => {
+          const barX = xOf(i)
+          const zero = yTSB(0)
+          const barY = yTSB(d.tsb)
+          const barH = Math.abs(zero - barY)
+          return (
+            <rect key={i}
+              x={barX - 1} y={Math.min(zero, barY)}
+              width={2} height={Math.max(1, barH)}
+              fill={d.tsb >= 0 ? '#22c55e' : '#ef4444'}
+              opacity={0.35}
+            />
+          )
+        })}
+        {/* Scheidingslijn */}
+        <line x1={pad.l} y1={pad.t + innerH * 0.72} x2={W - pad.r} y2={pad.t + innerH * 0.72}
+          stroke="#e5e0d8" strokeWidth="0.5" strokeDasharray="2,2" />
+        {/* CTL lijn */}
+        <path d={ctlPath} fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {/* ATL lijn */}
+        <path d={atlPath} fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4,2" />
+        {/* Week ticks */}
+        {ticks.map(t => (
+          <text key={t.i} x={xOf(t.i)} y={H - 2} fontSize="7" fill="#c8c3bc" textAnchor="middle">
+            {new Date(t.datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+          </text>
+        ))}
+      </svg>
+      <p className="text-[10px] text-[#a09990] mt-2">
+        TSB &gt; 0 = fris · TSB &lt; 0 = opbouw · ATL = vermoeidheid · CTL = conditie
+      </p>
+    </div>
+  )
+}
+
+// Week vergelijking
+function WeekVergelijking({ dezeWeek, vorigeWeek }: {
+  dezeWeek: { km: number; sessies: number; duur: number; consistentie: number }
+  vorigeWeek: { km: number; sessies: number; duur: number; consistentie: number }
+}) {
+  const rijen = [
+    { label: 'Km gelopen', deze: dezeWeek.km, vorige: vorigeWeek.km, fmt: (v: number) => `${v.toFixed(1)} km`, eenheid: ' km' },
+    { label: 'Sessies', deze: dezeWeek.sessies, vorige: vorigeWeek.sessies, fmt: (v: number) => String(v), eenheid: '' },
+    { label: 'Trainingstijd', deze: dezeWeek.duur, vorige: vorigeWeek.duur, fmt: (v: number) => `${Math.floor(v / 60)}u ${v % 60}m`, eenheid: ' min' },
+    { label: 'Consistentie', deze: dezeWeek.consistentie, vorige: vorigeWeek.consistentie, fmt: (v: number) => `${v}%`, eenheid: '%' },
+  ]
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm">
+      <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Week vergelijking</p>
+      <div className="grid grid-cols-3 gap-1 mb-2 text-[10px] text-[#a09990]">
+        <span>Onderdeel</span>
+        <span className="text-center font-semibold text-[#f97316]">Deze week</span>
+        <span className="text-center">Vorige week</span>
+      </div>
+      <div className="flex flex-col gap-2.5">
+        {rijen.map(r => {
+          const diff = r.deze - r.vorige
+          const pct = r.vorige ? Math.abs(Math.round((diff / r.vorige) * 100)) : 0
+          const toon = pct >= 2
+          return (
+            <div key={r.label} className="grid grid-cols-3 gap-1 items-center">
+              <span className="text-xs text-[#6b6560]">{r.label}</span>
+              <div className="flex flex-col items-center">
+                <span className="text-sm font-bold text-[#1a1612]">{r.fmt(r.deze)}</span>
+                {toon && (
+                  <span className="text-[9px]" style={{ color: diff > 0 ? '#22c55e' : '#ef4444' }}>
+                    {diff > 0 ? '▲' : '▼'} {pct}%
+                  </span>
+                )}
+              </div>
+              <span className="text-sm text-[#a09990] text-center">{r.fmt(r.vorige)}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// Race predictor (Riegel formule)
+function RacePredictor({ loopSessies }: { loopSessies: Sessie[] }) {
+  const predictor = useMemo(() => {
+    const achtWekenGeleden = new Date(); achtWekenGeleden.setDate(achtWekenGeleden.getDate() - 56)
+    const achtWekenStr = achtWekenGeleden.toISOString().split('T')[0]
+
+    // Zoek meest recente run met >= 5km en bekende pace, binnen 8 weken
+    const kandidaten = loopSessies
+      .filter(s => {
+        const afstand = berekenAfstand(s)
+        const pace = berekenPace(s)
+        return afstand >= 5 && pace !== null && s.datum >= achtWekenStr
+      })
+      .sort((a, b) => b.datum.localeCompare(a.datum))
+
+    if (kandidaten.length === 0) return null
+
+    const run = kandidaten[0]
+    const d1 = berekenAfstand(run)
+    const pace = berekenPace(run)!
+    const t1 = pace * d1 // totale minuten
+
+    const predict = (d2: number) => t1 * Math.pow(d2 / d1, 1.06)
+
+    return {
+      datum: run.datum,
+      d1,
+      t1,
+      voorspellingen: [
+        { label: '5 km', afstand: 5 },
+        { label: '10 km', afstand: 10 },
+        { label: 'Halve marathon', afstand: 21.0975 },
+        { label: 'Marathon', afstand: 42.195 },
+      ].filter(v => v.afstand > d1 * 0.5).map(v => ({
+        label: v.label,
+        tijd: predict(v.afstand),
+        relevant: v.afstand >= d1,
+      })),
+    }
+  }, [loopSessies])
+
+  if (!predictor) return null
+
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm">
+      <div className="flex items-center gap-2 mb-1">
+        <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">Race Predictor</p>
+      </div>
+      <p className="text-[10px] text-[#a09990] mb-3">
+        Op basis van je {predictor.d1.toFixed(1)} km run op{' '}
+        {new Date(predictor.datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}
+      </p>
+      <div className="flex flex-col gap-2">
+        {predictor.voorspellingen.map(v => (
+          <div key={v.label} className="flex items-center justify-between">
+            <span className="text-sm text-[#1a1612]" style={{ opacity: v.relevant ? 1 : 0.5 }}>{v.label}</span>
+            <span className="text-sm font-bold" style={{ color: v.relevant ? '#f97316' : '#a09990' }}>
+              {formatHMS(v.tijd)}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-[#c8c3bc] mt-3">Riegel formule · t₂ = t₁ × (d₂/d₁)^1.06</p>
+    </div>
+  )
+}
+
+// Hartslag zones
+function HartslagZones({ loopSessies, maxHR }: { loopSessies: Sessie[]; maxHR: number }) {
+  const zones = [
+    { label: 'Z1 Herstel', min: 0, max: 0.60, kleur: '#3b82f6' },
+    { label: 'Z2 Vetverbranding', min: 0.60, max: 0.70, kleur: '#22c55e' },
+    { label: 'Z3 Aerobisch', min: 0.70, max: 0.80, kleur: '#eab308' },
+    { label: 'Z4 Drempel', min: 0.80, max: 0.90, kleur: '#f97316' },
+    { label: 'Z5 Maximaal', min: 0.90, max: 1.0, kleur: '#ef4444' },
+  ]
+
+  const zoneCounts = useMemo(() => {
+    const counts = new Array(5).fill(0)
+    loopSessies.forEach(s => {
+      const hr = s.session_feedback?.[0]?.hartslag_gem
+      if (!hr) return
+      const pct = hr / maxHR
+      const idx = zones.findIndex(z => pct >= z.min && pct < z.max)
+      if (idx >= 0) counts[idx]++
+      else if (pct >= 0.90) counts[4]++
+    })
+    return counts
+  }, [loopSessies, maxHR])
+
+  const totaal = zoneCounts.reduce((a, b) => a + b, 0)
+  if (totaal === 0) return null
+
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <Heart size={14} className="text-red-400" />
+        <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">Hartslag zones</p>
+        <span className="text-[10px] text-[#a09990] ml-auto">max {maxHR} bpm</span>
+      </div>
+      {/* Verdeling balk */}
+      <div className="flex h-3 rounded-full overflow-hidden gap-px mb-3">
+        {zones.map((z, i) => (
+          zoneCounts[i] > 0 ? (
+            <div key={z.label}
+              style={{ width: `${Math.round((zoneCounts[i] / totaal) * 100)}%`, backgroundColor: z.kleur }}
+            />
+          ) : null
+        ))}
+      </div>
+      <div className="flex flex-col gap-2">
+        {zones.map((z, i) => {
+          const pct = totaal ? Math.round((zoneCounts[i] / totaal) * 100) : 0
+          return (
+            <div key={z.label} className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: z.kleur }} />
+              <span className="text-xs text-[#1a1612] flex-1">{z.label}</span>
+              <span className="text-xs text-[#a09990]">{Math.round(z.min * maxHR)}–{Math.round(z.max * maxHR)} bpm</span>
+              <span className="text-xs font-semibold text-[#1a1612] w-6 text-right">{zoneCounts[i]}</span>
+              <span className="text-[10px] text-[#a09990] w-7 text-right">{pct}%</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// Trainingslog entry
+function LogEntry({ sessie }: { sessie: Sessie }) {
+  const [open, setOpen] = useState(false)
+  const fb = sessie.session_feedback?.[0]
+  const afstand = berekenAfstand(sessie)
+  const pace = berekenPace(sessie)
+  const duur = fb?.werkelijke_duur ?? sessie.duur_minuten
+  const rating = fb?.rating
+
+  return (
+    <div className="border-b border-[#f0ede8] last:border-0 py-2.5">
+      <button className="w-full text-left" onClick={() => setOpen(v => !v)}>
+        <div className="flex items-center gap-2">
+          <span className="text-base">{TYPE_EMOJI[sessie.type] ?? '🏃'}</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-[#1a1612] truncate">
+                {TYPE_LABEL[sessie.type] ?? sessie.type}
+                {sessie.intensiteit ? ` · ${INTENSITEIT_LABEL[sessie.intensiteit] ?? sessie.intensiteit}` : ''}
+              </span>
+              {rating && (
+                <span className="w-2 h-2 rounded-full shrink-0 inline-block"
+                  style={{ backgroundColor: RATING_KLEUR[rating] ?? '#a09990' }}
+                  title={rating}
+                />
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-[#a09990] mt-0.5 flex-wrap">
+              <span>{new Date(sessie.datum + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+              {afstand > 0 && <span>{afstand.toFixed(1)} km</span>}
+              {duur && <span>{Math.floor(duur / 60)}u {duur % 60}m</span>}
+              {pace && <span>{formatPace(pace)} /km</span>}
+            </div>
+          </div>
+          {open ? <ChevronUp size={14} className="text-[#a09990] shrink-0" /> : <ChevronDown size={14} className="text-[#a09990] shrink-0" />}
+        </div>
+      </button>
+      {open && (
+        <div className="mt-2 pl-7 text-xs text-[#6b6560] flex flex-col gap-1">
+          {sessie.beschrijving && <p>{sessie.beschrijving}</p>}
+          {fb?.hartslag_gem && <p>Hartslag: {fb.hartslag_gem} bpm gem{fb.hartslag_max ? `, ${fb.hartslag_max} bpm max` : ''}</p>}
+          {fb?.werkelijke_afstand != null && sessie.afstand_km != null && Math.abs(fb.werkelijke_afstand - sessie.afstand_km) > 0.1 && (
+            <p>Gepland: {sessie.afstand_km.toFixed(1)} km · Werkelijk: {fb.werkelijke_afstand.toFixed(1)} km</p>
+          )}
+          {rating && <p>Gevoel: <span className="font-medium" style={{ color: RATING_KLEUR[rating] }}>{rating.replace('_', ' ')}</span></p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Trainingslog gegroepeerd per week
+function TrainingsLog({ sessies }: { sessies: Sessie[] }) {
+  const gegroepeerd = useMemo(() => {
+    const voltooid = sessies.filter(s => s.voltooid).sort((a, b) => b.datum.localeCompare(a.datum))
+    const map = new Map<string, Sessie[]>()
+    voltooid.forEach(s => {
+      const ma = getMaandag(s.datum)
+      const arr = map.get(ma) ?? []
+      arr.push(s)
+      map.set(ma, arr)
+    })
+    return Array.from(map.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([ma, items]) => ({ maandag: ma, sessies: items }))
+  }, [sessies])
+
+  if (gegroepeerd.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-3xl mb-2">📋</p>
+        <p className="text-[#6b6560]">Nog geen voltooide sessies</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {gegroepeerd.map(({ maandag, sessies: weekSessies }) => {
+        const zo = new Date(maandag + 'T12:00:00'); zo.setDate(zo.getDate() + 6)
+        const weekKm = weekSessies.filter(s => s.type === 'hardlopen').reduce((sum, s) => sum + berekenAfstand(s), 0)
+        return (
+          <div key={maandag} className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-baseline justify-between mb-2">
+              <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">
+                Week van {new Date(maandag + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}
+              </p>
+              <div className="flex items-center gap-3 text-[10px] text-[#a09990]">
+                {weekKm > 0 && <span>{weekKm.toFixed(1)} km</span>}
+                <span>{weekSessies.length} sessies</span>
+              </div>
+            </div>
+            {weekSessies.map(s => <LogEntry key={s.id} sessie={s} />)}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── main component ────────────────────────────────────────────────────────────
 
 export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props) {
-  const [tab, setTab] = useState<'overzicht' | 'hardlopen' | 'herstel'>('overzicht')
+  const [tab, setTab] = useState<'overzicht' | 'hardlopen' | 'log' | 'herstel'>('overzicht')
+
+  const maxHartslag = (profiel as Record<string, unknown>)?.max_hartslag as number | null
 
   const voltooid = sessies.filter(s => s.voltooid)
   const loopSessies = voltooid.filter(s => s.type === 'hardlopen')
@@ -322,6 +737,33 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
       .map(([type, count]) => ({ type, count, pct: Math.round((count / totaal) * 100) }))
   }, [voltooid, fysioVoltooid])
 
+  // ── Week vergelijking data ─────────────────────────────────────────────────
+  const dezeWeekData = useMemo(() => {
+    const sessiesDezeWeek = voltooid.filter(s => s.datum >= huidigeWeekMa)
+    const km = loopSessies.filter(s => s.datum >= huidigeWeekMa).reduce((s, r) => s + berekenAfstand(r), 0)
+    const duur = sessiesDezeWeek.reduce((s, r) => s + (r.duur_minuten ?? 0), 0)
+    const geplande = sessies.filter(s => s.datum >= huidigeWeekMa && !s.overgeslagen).length
+    return {
+      km,
+      sessies: sessiesDezeWeek.length,
+      duur,
+      consistentie: geplande > 0 ? Math.round((sessiesDezeWeek.length / geplande) * 100) : 0,
+    }
+  }, [voltooid, loopSessies, sessies, huidigeWeekMa])
+
+  const vorigeWeekData = useMemo(() => {
+    const sessiesVorigeWeek = voltooid.filter(s => s.datum >= vorigeWeekMa && s.datum <= vorigeWeekZo)
+    const km = loopSessies.filter(s => s.datum >= vorigeWeekMa && s.datum <= vorigeWeekZo).reduce((s, r) => s + berekenAfstand(r), 0)
+    const duur = sessiesVorigeWeek.reduce((s, r) => s + (r.duur_minuten ?? 0), 0)
+    const geplande = sessies.filter(s => s.datum >= vorigeWeekMa && s.datum <= vorigeWeekZo && !s.overgeslagen).length
+    return {
+      km,
+      sessies: sessiesVorigeWeek.length,
+      duur,
+      consistentie: geplande > 0 ? Math.round((sessiesVorigeWeek.length / geplande) * 100) : 0,
+    }
+  }, [voltooid, loopSessies, sessies, vorigeWeekMa, vorigeWeekZo])
+
   // ── Hardlopen stats ────────────────────────────────────────────────────────
   const loopMeetPace = loopSessies.filter(s => berekenPace(s) !== null)
   const paceRuns = loopMeetPace.map(s => ({ datum: s.datum, pace: berekenPace(s)! })).slice(-12)
@@ -330,7 +772,6 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
     ? paceRuns.reduce((s, r) => s + r.pace, 0) / paceRuns.length
     : null
 
-  // Pace deze vs vorige 4 weken
   const vierWekenGeleden = (() => { const d = new Date(); d.setDate(d.getDate() - 28); return d.toISOString().split('T')[0] })()
   const achtWekenGeleden = (() => { const d = new Date(); d.setDate(d.getDate() - 56); return d.toISOString().split('T')[0] })()
   const paceDeze4Weken = paceRuns.filter(r => r.datum >= vierWekenGeleden)
@@ -352,7 +793,6 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
   const kmVorigeWeek = loopSessies.filter(s => s.datum >= vorigeWeekMa && s.datum <= vorigeWeekZo).reduce((s, r) => s + berekenAfstand(r), 0)
   const langsteRun = Math.max(0, ...loopSessies.map(s => berekenAfstand(s)))
 
-  // Pace per intensiteit
   const pacePerIntensiteit = useMemo(() => {
     const map = new Map<string, number[]>()
     loopSessies.forEach(s => {
@@ -371,7 +811,6 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
     })
   }, [loopSessies])
 
-  // Hartslag stats (als beschikbaar)
   const hartslagStats = useMemo(() => {
     const metHartslag = loopSessies.filter(s => s.session_feedback?.[0]?.hartslag_gem)
     if (!metHartslag.length) return null
@@ -426,7 +865,8 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
         <div className="flex gap-1 bg-white rounded-2xl p-1 shadow-sm">
           {([
             { id: 'overzicht', label: 'Overzicht' },
-            { id: 'hardlopen', label: 'Hardlopen' },
+            { id: 'hardlopen', label: 'Lopen' },
+            { id: 'log', label: 'Log' },
             { id: 'herstel', label: 'Herstel' },
           ] as const).map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -468,6 +908,12 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                 <p className="text-xs text-[#a09990] mt-1">in {voltooid.length} sessies de afgelopen 6 maanden</p>
               </div>
             )}
+
+            {/* Week vergelijking */}
+            <WeekVergelijking dezeWeek={dezeWeekData} vorigeWeek={vorigeWeekData} />
+
+            {/* ATL/CTL trainingsbelasting */}
+            <ATLCTLChart sessies={sessies} />
 
             {/* Type verdeling */}
             {typeVerdeling.length > 0 && (
@@ -540,7 +986,6 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                       <p className="text-2xl font-bold text-[#f97316]">{formatPace(gemPace)} <span className="text-sm font-normal text-[#a09990]">/km</span></p>
                       {gemPaceDeze && gemPaceVorige && (
                         <div className="mt-1 text-xs text-[#a09990] flex items-center gap-1">
-                          {/* Voor tempo: lagere waarde = sneller = goed */}
                           {gemPaceDeze < gemPaceVorige
                             ? <><TrendingUp size={11} className="text-green-500" /><span className="text-green-600">{(gemPaceVorige - gemPaceDeze).toFixed(1)} sec sneller</span></>
                             : gemPaceDeze > gemPaceVorige
@@ -552,6 +997,9 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                     </div>
                   )}
                 </div>
+
+                {/* Race predictor */}
+                <RacePredictor loopSessies={loopSessies} />
 
                 {/* Tempo trend */}
                 {paceRuns.length >= 3 && (
@@ -594,12 +1042,17 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                   </div>
                 )}
 
-                {/* Hartslag (Strava) */}
+                {/* Hartslag zones (als max_hartslag ingesteld) */}
+                {maxHartslag && maxHartslag > 0 && (
+                  <HartslagZones loopSessies={loopSessies} maxHR={maxHartslag} />
+                )}
+
+                {/* Hartslag gem/max stats */}
                 {hartslagStats && (
                   <div className="bg-white rounded-2xl p-4 shadow-sm">
                     <div className="flex items-center gap-2 mb-3">
                       <Heart size={14} className="text-red-400" />
-                      <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">Hartslag (Strava)</p>
+                      <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">Hartslag statistieken</p>
                     </div>
                     <div className="flex gap-6">
                       <div>
@@ -649,6 +1102,11 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
               </>
             )}
           </>
+        )}
+
+        {/* ── LOG ─────────────────────────────────────────────────────────── */}
+        {tab === 'log' && (
+          <TrainingsLog sessies={sessies} />
         )}
 
         {/* ── HERSTEL ─────────────────────────────────────────────────────── */}

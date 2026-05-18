@@ -4,8 +4,9 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import type { PhysioExercise } from '@/types/database'
-import { Upload, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, Loader2, Pencil, Check, RefreshCw } from 'lucide-react'
+import { Upload, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, Loader2, Pencil, Check, RefreshCw, BookOpen } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
 interface Props {
   oefeningen: PhysioExercise[]
@@ -81,7 +82,7 @@ export function FysioClient({ oefeningen: initOefeningen, physioKlacht: initKlac
             <p className="text-sm text-[#6b6560] mt-1">{aantalGedaan}/{totaal} oefeningen gedaan</p>
           )}
         </div>
-        <div>
+        <div className="flex items-center gap-2">
           <input ref={fileRef} type="file" accept=".pdf,image/*" onChange={handleUpload} className="hidden" />
           <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()} disabled={uploaden}>
             {uploaden ? <Loader2 size={16} className="animate-spin mr-2" /> : <Upload size={16} className="mr-2" />}
@@ -89,6 +90,23 @@ export function FysioClient({ oefeningen: initOefeningen, physioKlacht: initKlac
           </Button>
         </div>
       </div>
+
+      {/* Bibliotheek link */}
+      <Link
+        href="/fysio/bibliotheek"
+        className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-[#f97316]/10 flex items-center justify-center shrink-0">
+            <BookOpen size={18} className="text-[#f97316]" />
+          </div>
+          <div>
+            <p className="font-semibold text-[#1a1612] text-sm">Oefeningen bibliotheek</p>
+            <p className="text-xs text-[#6b6560]">20 veelgebruikte lopers-oefeningen</p>
+          </div>
+        </div>
+        <ChevronDown size={16} className="text-[#a09990] -rotate-90" />
+      </Link>
 
       {/* Huidige klacht */}
       <Card>
