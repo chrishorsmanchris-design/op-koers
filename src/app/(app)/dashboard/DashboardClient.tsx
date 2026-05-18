@@ -13,6 +13,7 @@ interface Props {
   sessies: (TrainingSession & { session_feedback: unknown[] })[]
   alleSessies: { voltooid: boolean; overgeslagen: boolean; datum: string }[]
   fysioOefeningen: PhysioExercise[]
+  fysioSessies: { id: string; datum: string; voltooid: boolean }[]
   doel: Goal | null
   vandaag: string
   weekStart: string
@@ -72,10 +73,11 @@ function dagVanWeekVoorDatum(datum: string, dagVanWeek: number): boolean {
   return onzeDag === dagVanWeek
 }
 
-export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen, doel, vandaag, weekStart, activiteiten }: Props) {
+export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen, fysioSessies, doel, vandaag, weekStart, activiteiten }: Props) {
   const supabase = createClient()
   const [feedbackSessie, setFeedbackSessie] = useState<TrainingSession | null>(null)
   const [lokaaleSessies, setLokaaleSessies] = useState(sessies)
+  const [lokaaleFysioSessies, setLokaaleFysioSessies] = useState(fysioSessies)
   const [weekOffset, setWeekOffset] = useState(0)
   const [geselecteerdeDag, setGeselecteerdeDag] = useState(vandaag)
   const [coachBericht, setCoachBericht] = useState<string | null>(null)
@@ -372,6 +374,7 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
           {dagen.map((datum, i) => {
             const sessie = lokaaleSessies.find(s => s.datum === datum && !s.overgeslagen && s.type !== 'core')
             const coreSessie = lokaaleSessies.find(s => s.datum === datum && s.type === 'core' && s.voltooid)
+            const fysioSessieDag = lokaaleFysioSessies.find(s => s.datum === datum && s.voltooid)
             const heeftActiviteit = activiteiten.some(a => dagVanWeekVoorDatum(datum, a.dag_van_week))
             const heeftCore = heeftCoreDag(datum)
             const isVandaag = datum === vandaag
@@ -413,7 +416,7 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
                   ) : (
                     <div className="w-1.5 h-1.5 rounded-full bg-[#d0cbc4]" />
                   )}
-                  {(sessie?.voltooid || coreSessie) && (
+                  {(sessie?.voltooid || coreSessie || fysioSessieDag) && (
                     <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full flex items-center justify-center">
                       <CheckCircle2 size={9} className="text-white" />
                     </div>
@@ -660,28 +663,59 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
         })()}
 
         {/* Fysio kaart */}
-        {fysioOefeningen.length > 0 && (
-          <Card className="mt-2 cursor-pointer" onClick={() => window.location.href = '/fysio/sessie'}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={cn('w-10 h-10 rounded-2xl flex items-center justify-center',
-                  heeftFysioVandaag ? 'bg-[#f97316]/20' : 'bg-[#fff3ec]')}>
-                  <Dumbbell size={18} className="text-[#f97316]" />
+        {fysioOefeningen.length > 0 && (() => {
+          const fysioSessieVandaag = lokaaleFysioSessies.find(s => s.datum === geselecteerdeDag && s.voltooid)
+          return (
+            <Card
+              className={cn('mt-2', fysioSessieVandaag ? '' : 'cursor-pointer')}
+              onClick={fysioSessieVandaag ? undefined : () => window.location.href = '/fysio/sessie'}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    'w-10 h-10 rounded-2xl flex items-center justify-center',
+                    fysioSessieVandaag ? 'bg-green-100' : heeftFysioVandaag ? 'bg-[#f97316]/20' : 'bg-[#fff3ec]'
+                  )}>
+                    <Dumbbell size={18} className={fysioSessieVandaag ? 'text-green-600' : 'text-[#f97316]'} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[#1a1612]">Fysio-oefeningen</h3>
+                    <p className="text-sm text-[#6b6560]">
+                      {fysioSessieVandaag
+                        ? `${fysioOefeningen.length} oefeningen gedaan`
+                        : heeftFysioVandaag
+                          ? `${fysioOefeningen.length} oefeningen · vandaag ingepland`
+                          : `${fysioOefeningen.length} oefeningen · tik om te starten`}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-[#1a1612]">Fysio-oefeningen</h3>
-                  <p className="text-sm text-[#6b6560]">
-                    {heeftFysioVandaag ? `${fysioOefeningen.length} oefeningen · vandaag ingepland` : `${fysioOefeningen.length} oefeningen · tik om te starten`}
-                  </p>
+                <div className="flex items-center gap-2">
+                  {fysioSessieVandaag ? (
+                    <>
+                      <CheckCircle2 size={18} className="text-green-500" />
+                      <button
+                        onClick={async e => {
+                          e.stopPropagation()
+                          await supabase.from('physio_sessions').delete().eq('id', fysioSessieVandaag.id)
+                          setLokaaleFysioSessies(prev => prev.filter(s => s.id !== fysioSessieVandaag.id))
+                        }}
+                        className="w-7 h-7 rounded-lg bg-[#f5f3f0] flex items-center justify-center text-[#a09990] hover:text-red-400 hover:bg-red-50 transition-colors"
+                        title="Verwijder sessie"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {heeftFysioVandaag && <div className="w-2 h-2 rounded-full bg-[#f97316]" />}
+                      <ChevronRight size={18} className="text-[#a09990]" />
+                    </>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {heeftFysioVandaag && <div className="w-2 h-2 rounded-full bg-[#f97316]" />}
-                <ChevronRight size={18} className="text-[#a09990]" />
-              </div>
-            </div>
-          </Card>
-        )}
+            </Card>
+          )
+        })()}
       </div>
 
       {feedbackSessie && (
