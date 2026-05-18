@@ -21,15 +21,23 @@ export async function POST(req: NextRequest) {
   const vandaag = new Date().toISOString().split('T')[0]
   const factor = RATING_AANPASSING[rating as keyof typeof RATING_AANPASSING] ?? 0
 
+  // Haal de voltooide sessie op voor context
+  const { data: voltooidesSessie } = await supabase
+    .from('training_sessions')
+    .select('beschrijving, duur_minuten, afstand_km, intensiteit, type')
+    .eq('id', sessie_id)
+    .single()
+
   // Haal komende sessies op
   const { data: komendeSessies } = await supabase
     .from('training_sessions')
-    .select('*')
+    .select('id, datum, beschrijving, duur_minuten, afstand_km, intensiteit, type')
     .eq('user_id', user.id)
     .gt('datum', vandaag)
     .eq('voltooid', false)
+    .eq('type', 'hardlopen') // alleen loopsessies aanpassen
     .order('datum', { ascending: true })
-    .limit(14)
+    .limit(10)
 
   if (!komendeSessies || komendeSessies.length === 0 || factor === 0) {
     return NextResponse.json({ aangepast: false })
@@ -45,25 +53,29 @@ export async function POST(req: NextRequest) {
 
   const feedbackHistorie = recenteFeedback?.map(f => f.rating).join(', ') ?? ''
 
-  const prompt = `Je bent een atletiekcoach. Een atleet heeft zojuist feedback gegeven op een training: "${rating}".
-Recente feedback: ${feedbackHistorie}
+  const aantalAanpassen = rating === 'te_zwaar' ? 5 : rating === 'topdag' ? 3 : 2
 
-Gebaseerd op de volgende komende sessies, pas de intensiteit en/of afstanden aan.
-Aanpassingsfactor: ${factor > 0 ? '+' + Math.round(factor * 100) : Math.round(factor * 100)}%
+  const prompt = `Je bent een atletiekcoach. Pas het trainingsschema aan op basis van feedback.
 
-${rating === 'te_zwaar' ? 'De atleet is overbelast. Verlaag de komende 3-5 sessies significant. Overweeg een extra rustdag toe te voegen.' : ''}
-${rating === 'topdag' ? 'De atleet presteert uitstekend. Je kunt de komende 2-3 sessies licht aanscherpen.' : ''}
+VOLTOOIDE SESSIE: ${voltooidesSessie?.beschrijving ?? ''} (${voltooidesSessie?.duur_minuten}min, ${voltooidesSessie?.afstand_km}km, ${voltooidesSessie?.intensiteit})
+FEEDBACK: "${rating}"
+RECENTE FEEDBACK HISTORIE: ${feedbackHistorie || 'geen'}
 
-Komende sessies:
-${komendeSessies.slice(0, 7).map(s => `- ${s.datum}: ${s.beschrijving} (${s.duur_minuten}min, ${s.afstand_km}km, ${s.intensiteit})`).join('\n')}
+REGELS:
+${rating === 'te_zwaar' ? `- Atleet is overbelast. Verlaag de komende ${aantalAanpassen} sessies: minder km, lagere intensiteit, kortere duur.` : ''}
+${rating === 'zwaar' ? `- Training was pittig. Verlaag de komende ${aantalAanpassen} sessies licht.` : ''}
+${rating === 'beter_dan_verwacht' || rating === 'topdag' ? `- Atleet presteert goed. Verhoog de komende ${aantalAanpassen} sessies licht: iets meer km of hogere intensiteit.` : ''}
+- Bewaar de globale structuur van het schema.
+- Verander ALLEEN de sessies die aanpassing nodig hebben.
+- Beschrijving max 55 tekens.
 
-Geef aanpassingen terug als JSON:
-{
-  "aanpassingen": [
-    { "id": "sessie-id", "duur_minuten": 40, "afstand_km": 7.0, "beschrijving": "aangepaste beschrijving" }
-  ],
-  "uitleg": "Korte uitleg waarom"
-}`
+KOMENDE SESSIES (pas maximaal ${aantalAanpassen} aan):
+${komendeSessies.slice(0, aantalAanpassen + 2).map(s =>
+  `{"id":"${s.id}","datum":"${s.datum}","beschrijving":"${s.beschrijving}","duur_minuten":${s.duur_minuten},"afstand_km":${s.afstand_km},"intensiteit":"${s.intensiteit}"}`
+).join('\n')}
+
+Geef ALLEEN geldige JSON terug:
+{"aanpassingen":[{"id":"<exact id uit bovenstaande lijst>","duur_minuten":40,"afstand_km":7.0,"intensiteit":"makkelijk","beschrijving":"..."}],"uitleg":"Korte uitleg"}`
 
   const response = await claude.messages.create({
     model: 'claude-haiku-4-5-20251001',

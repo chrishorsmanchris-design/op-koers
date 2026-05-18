@@ -37,27 +37,33 @@ export async function POST(req: NextRequest) {
       16
     )
 
-    const geblokkeerdeRegel = activiteiten && activiteiten.length > 0
-      ? activiteiten
-          .filter(a => a.blokkeert_hardlopen)
-          .map(a => `${DAGEN[a.dag_van_week]}${a.tijdstip ? ` ${a.tijdstip}` : ''}`)
+    // Geblokkeerde dagen (0=ma..6=zo in app, maar prompt gebruikt maandag..zondag)
+    const geblokkeerdeActiviteiten = activiteiten?.filter(a => a.blokkeert_hardlopen) ?? []
+    const geblokkeerdeRegel = geblokkeerdeActiviteiten.length > 0
+      ? geblokkeerdeActiviteiten
+          .map(a => `${DAGEN[a.dag_van_week]}${a.tijdstip ? ` (${a.tijdstip})` : ''}`)
           .join(', ')
       : 'geen'
+
+    // Geblokkeerde dag-indices voor post-generatie validatie (0=ma..6=zo)
+    const geblokkeerdeIndices = new Set(geblokkeerdeActiviteiten.map(a => a.dag_van_week))
 
     const toegestaneTypes = ['hardlopen', 'krachttraining', 'rust']
     if (profiel?.wil_cross) toegestaneTypes.push('cross')
 
     const prompt = `Je bent een ervaren atletiekcoach. Maak een professioneel marathon trainingsschema gebaseerd op Hal Higdon / Jack Daniels methode.
 
-VANDAAG: ${vandaag}
+VANDAAG (startdatum schema): ${vandaag}
+EERSTE SESSIE: moet op ${vandaag} of de eerstvolgende dag zijn — begin DIRECT, geen weken overslaan.
 ATLEET: huidig volume ${profiel?.km_per_week ?? '?'} km/week
 DOEL: ${doel.naam} op ${doel.datum} | tijdsdoel: ${doel.tijdsdoel ?? 'finishen'}
-PERIODE: ${wekenTotDoel} weken
+PERIODE: ${wekenTotDoel} weken VANAF VANDAAG (${vandaag} t/m ${new Date(new Date(vandaag).getTime() + wekenTotDoel * 7 * 86400000).toISOString().split('T')[0]})
 BLESSURE: ${profiel?.physio_klacht || 'geen bekende klachten'}
 VAKANTIES: ${vakanties?.map(v => `${v.start_datum} t/m ${v.eind_datum} (kan trainen: ${v.kan_trainen})`).join('; ') || 'geen'}
 
-VRIJE DAGEN — genereer op deze weekdagen GEEN enkele trainingssessie (laat ze volledig weg):
-${geblokkeerdeRegel || 'geen'}
+GEBLOKKEERDE WEEKDAGEN — plaats op deze dagen ABSOLUUT geen hardloopsessie:
+${geblokkeerdeRegel}
+(dit zijn vaste activiteiten die hardlopen blokkeren)
 
 SCHEMA-OPBOUW:
 - Weken 1-4: basisfase (duurlopen, herstel, volume opbouwen)
@@ -97,11 +103,12 @@ Geef ALLEEN geldig JSON, geen markdown, geen extra tekst:
       return NextResponse.json({ error: 'Geen sessies in schema', schema }, { status: 500 })
     }
 
-    // Verwijder bestaande toekomstige sessies voor dit doel
+    // Verwijder alleen NIET-voltooide toekomstige sessies (bewaar voltooide trainingen!)
     await supabase.from('training_sessions')
       .delete()
       .eq('user_id', user.id)
       .eq('goal_id', doel.id)
+      .eq('voltooid', false)
       .gte('datum', vandaag)
 
     const TOEGESTANE_VELDEN = new Set(['datum', 'type', 'beschrijving', 'duur_minuten', 'afstand_km', 'intensiteit', 'week_nummer', 'volgorde'])
@@ -109,7 +116,17 @@ Geef ALLEEN geldig JSON, geen markdown, geen extra tekst:
     const GELDIGE_INTENSITEITEN = new Set(['herstel', 'makkelijk', 'gemiddeld', 'zwaar', 'interval'])
 
     const sessiesOmOpslaan = schema.sessies
-      .filter((s: { datum: string }) => s.datum >= vandaag)
+      .filter((s: { datum: string; type: string }) => {
+        if (s.datum < vandaag) return false
+        // Verwijder hardloopsessies op geblokkeerde weekdagen
+        if (s.type === 'hardlopen' && geblokkeerdeIndices.size > 0) {
+          const d = new Date(s.datum + 'T12:00:00')
+          const jsDag = d.getDay() // 0=zo..6=za
+          const appDag = jsDag === 0 ? 6 : jsDag - 1 // 0=ma..6=zo
+          if (geblokkeerdeIndices.has(appDag)) return false
+        }
+        return true
+      })
       .map((s: Record<string, unknown>) => {
         const schoon: Record<string, unknown> = { user_id: user.id, goal_id: doel.id }
         for (const k of TOEGESTANE_VELDEN) {

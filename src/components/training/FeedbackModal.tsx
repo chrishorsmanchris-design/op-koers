@@ -24,6 +24,7 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
   const [rating, setRating] = useState('')
   const [notitie, setNotitie] = useState('')
   const [laden, setLaden] = useState(false)
+  const [bevestiging, setBevestiging] = useState<string | null>(null)
 
   async function opslaan() {
     if (!rating) return
@@ -38,12 +39,22 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
       notitie: notitie || null,
     })
 
-    // Schema aanpassen via API op basis van feedback
-    await fetch('/api/training/aanpassen', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessie_id: sessie.id, rating, user_id: user.id }),
-    })
+    // Schema aanpassen als er significante afwijking is
+    const needsAdjustment = ['te_zwaar', 'zwaar', 'beter_dan_verwacht', 'topdag'].includes(rating)
+    if (needsAdjustment) {
+      const res = await fetch('/api/training/aanpassen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessie_id: sessie.id, rating }),
+      })
+      const data = await res.json()
+      if (data.aangepast && data.uitleg) {
+        setBevestiging(data.uitleg)
+        setLaden(false)
+        setTimeout(() => onSluit(), 3500)
+        return
+      }
+    }
 
     onSluit()
   }
@@ -84,9 +95,16 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
           className="w-full bg-[#f0ede8] border border-[#e8e3dc] rounded-2xl px-4 py-3 text-[#1a1612] placeholder:text-[#6b6560] focus:outline-none focus:border-[#f97316] resize-none h-20 mb-4"
         />
 
-        <Button onClick={opslaan} size="lg" loading={laden} disabled={!rating}>
-          Opslaan
-        </Button>
+        {bevestiging ? (
+          <div className="rounded-2xl bg-green-50 border border-green-200 p-4 text-sm text-green-700">
+            <p className="font-semibold mb-1">✅ Schema aangepast</p>
+            <p>{bevestiging}</p>
+          </div>
+        ) : (
+          <Button onClick={opslaan} size="lg" loading={laden} disabled={!rating}>
+            Opslaan
+          </Button>
+        )}
       </div>
     </div>
   )

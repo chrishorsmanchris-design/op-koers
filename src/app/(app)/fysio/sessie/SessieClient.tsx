@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { PhysioExercise } from '@/types/database'
 import { ChevronLeft, ChevronRight, CheckCircle2, Timer, Play, Pause, RotateCcw, X } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   oefeningen: PhysioExercise[]
@@ -78,20 +79,45 @@ function CountdownTimer({ seconden, onKlaar }: { seconden: number; onKlaar?: () 
 
 export function SessieClient({ oefeningen }: Props) {
   const router = useRouter()
+  const supabase = createClient()
   const [huidig, setHuidig] = useState(0)
   const [gedaan, setGedaan] = useState<Record<number, { pijn: number }>>({})
   const [pijnKeuze, setPijnKeuze] = useState<number | null>(null)
   const [afgerond, setAfgerond] = useState(false)
+  const [opslaan, setOpslaan] = useState(false)
 
   const oefening = oefeningen[huidig]
   const totaal = oefeningen.length
   const isLaatste = huidig === totaal - 1
   const alGedaan = huidig in gedaan
 
-  function markeerGedaan() {
+  async function markeerGedaan() {
     if (pijnKeuze === null) return
-    setGedaan(prev => ({ ...prev, [huidig]: { pijn: pijnKeuze } }))
+    const nieuwGedaan = { ...gedaan, [huidig]: { pijn: pijnKeuze } }
+    setGedaan(nieuwGedaan)
     if (isLaatste) {
+      setOpslaan(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const vandaag = new Date().toISOString().split('T')[0]
+        // Sla fysio sessie op
+        const { data: sessieRecord } = await supabase
+          .from('physio_sessions')
+          .insert({ user_id: user.id, datum: vandaag, voltooid: true } as never)
+          .select('id')
+          .single()
+        // Sla feedback per oefening op
+        if (sessieRecord) {
+          const feedbackRows = Object.entries(nieuwGedaan).map(([idx, { pijn }]) => ({
+            physio_session_id: (sessieRecord as Record<string, string>).id,
+            exercise_id: oefeningen[parseInt(idx)].id,
+            user_id: user.id,
+            pijn_score: pijn,
+          }))
+          await supabase.from('physio_feedback').insert(feedbackRows as never)
+        }
+      }
+      setOpslaan(false)
       setAfgerond(true)
     } else {
       setPijnKeuze(null)
@@ -281,7 +307,7 @@ export function SessieClient({ oefeningen }: Props) {
             )}
           >
             <CheckCircle2 size={18} />
-            {isLaatste ? 'Sessie afronden' : 'Volgende oefening'}
+            {opslaan ? 'Opslaan…' : isLaatste ? 'Sessie afronden' : 'Volgende oefening'}
           </button>
           {!isLaatste && huidig < totaal - 1 && (
             <button
