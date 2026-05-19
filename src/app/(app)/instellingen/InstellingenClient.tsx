@@ -161,7 +161,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               </div>
             </button>
 
-            <Button onClick={profielOpslaan} loading={laden}>
+            <Button onClick={profielOpslaan} loading={laden} variant={opgeslagen ? 'success' : 'primary'}>
               {opgeslagen ? '✓ Opgeslagen' : 'Opslaan'}
             </Button>
           </div>
@@ -186,7 +186,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               </button>
             ))}
           </div>
-          <Button onClick={profielOpslaan} loading={laden} className="mt-3">
+          <Button onClick={profielOpslaan} loading={laden} className="mt-3" variant={opgeslagen ? 'success' : 'primary'}>
             {opgeslagen ? '✓ Opgeslagen' : 'Opslaan'}
           </Button>
         </Card>
@@ -232,7 +232,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             </div>
           )}
 
-          <Button onClick={profielOpslaan} loading={laden} className="mt-3">
+          <Button onClick={profielOpslaan} loading={laden} className="mt-3" variant={opgeslagen ? 'success' : 'primary'}>
             {opgeslagen ? '✓ Opgeslagen' : 'Opslaan'}
           </Button>
         </Card>
