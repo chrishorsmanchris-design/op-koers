@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   geslacht TEXT CHECK (geslacht IN ('man', 'vrouw', 'anders')),
   km_per_week NUMERIC(5,1),
   runs_per_week INTEGER,
+  max_hartslag INTEGER,
   runkeeper_token TEXT,
   push_subscription JSONB,
   onboarding_voltooid BOOLEAN DEFAULT FALSE,

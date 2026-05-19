@@ -837,7 +837,7 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
                 verplaatsenSessieId === geselecteerdeSessie.id ? null : geselecteerdeSessie.id
               )}
               isVerleden={geselecteerdeDag < vandaag}
-              maxHR={(profiel as Record<string, unknown>)?.max_hartslag as number | null}
+              maxHR={profiel?.max_hartslag ?? null}
             />
             {verplaatsenSessieId === geselecteerdeSessie.id && (
               <div className="bg-white rounded-2xl p-4 mt-2 shadow-sm">
