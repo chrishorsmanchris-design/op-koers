@@ -993,18 +993,15 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
 }
 
 function ZoneBadge({ sessie, maxHR }: { sessie: TrainingSession; maxHR: number | null | undefined }) {
-  if (sessie.type !== 'hardlopen') return null
-  const target = maxHR ? getZoneTarget(sessie.intensiteit ?? '', maxHR) : null
+  if (sessie.type !== 'hardlopen' || !sessie.intensiteit || !maxHR) return null
+  const target = getZoneTarget(sessie.intensiteit, maxHR)
+  if (!target) return null
   return (
-    <div className="flex items-center gap-1.5 rounded-xl px-3 py-2 bg-[#f5f3f0]">
+    <div className="flex items-center gap-1.5 rounded-xl px-3 py-2" style={{ backgroundColor: target.zone.kleur + '20' }}>
       <span className="text-sm">🫀</span>
-      {target ? (
-        <span className="text-sm font-semibold" style={{ color: target.zone.kleur }}>
-          {target.zone.kortNaam} · {target.minBpm}–{target.maxBpm} bpm
-        </span>
-      ) : (
-        <span className="text-xs text-[#a09990]">max HF: {String(maxHR ?? 'niet ingesteld')}</span>
-      )}
+      <span className="text-sm font-semibold" style={{ color: target.zone.kleur }}>
+        {target.zone.kortNaam} · {target.minBpm}–{target.maxBpm} bpm
+      </span>
     </div>
   )
 }
