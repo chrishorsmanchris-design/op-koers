@@ -992,6 +992,20 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
   )
 }
 
+function ZoneBadge({ sessie, maxHR }: { sessie: TrainingSession; maxHR: number | null | undefined }) {
+  if (sessie.type !== 'hardlopen' || !sessie.intensiteit || !maxHR) return null
+  const target = getZoneTarget(sessie.intensiteit, maxHR)
+  if (!target) return null
+  return (
+    <div className="flex items-center gap-1.5 rounded-xl px-3 py-2" style={{ backgroundColor: target.zone.kleur + '20' }}>
+      <span className="text-sm">🫀</span>
+      <span className="text-sm font-semibold" style={{ color: target.zone.kleur }}>
+        {target.zone.kortNaam} · {target.minBpm}–{target.maxBpm} bpm
+      </span>
+    </div>
+  )
+}
+
 function TrainingsKaart({ sessie, onAfronden, onOvergeslagen, onVerplaatsen, isVerleden, maxHR }: {
   sessie: TrainingSession
   onAfronden: (id: string) => void
@@ -1033,7 +1047,7 @@ function TrainingsKaart({ sessie, onAfronden, onOvergeslagen, onVerplaatsen, isV
       <p className="text-sm text-[#6b6560] mb-3 leading-relaxed">{sessie.beschrijving}</p>
 
       {/* Stats */}
-      <div className="flex gap-4 mb-4">
+      <div className="flex gap-2 mb-4 flex-wrap">
         {sessie.duur_minuten != null && (
           <div className="flex items-center gap-1.5 bg-[#f5f3f0] rounded-xl px-3 py-2">
             <Timer size={14} className="text-[#f97316]" />
@@ -1046,18 +1060,7 @@ function TrainingsKaart({ sessie, onAfronden, onOvergeslagen, onVerplaatsen, isV
             <span className="text-sm font-semibold text-[#1a1612]">{sessie.afstand_km} km</span>
           </div>
         )}
-        {sessie.type === 'hardlopen' && sessie.intensiteit && maxHR && (() => {
-          const target = getZoneTarget(sessie.intensiteit, maxHR)
-          if (!target) return null
-          return (
-            <div className="flex items-center gap-1.5 rounded-xl px-3 py-2" style={{ backgroundColor: target.zone.kleur + '20' }}>
-              <span className="text-sm">🫀</span>
-              <span className="text-sm font-semibold" style={{ color: target.zone.kleur }}>
-                {target.zone.kortNaam} · {target.minBpm}–{target.maxBpm} bpm
-              </span>
-            </div>
-          )
-        })()}
+        <ZoneBadge sessie={sessie} maxHR={maxHR} />
       </div>
 
       {/* Acties */}
