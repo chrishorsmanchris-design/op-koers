@@ -685,7 +685,7 @@ function TrainingsLog({ sessies }: { sessies: Sessie[] }) {
 // ── main component ────────────────────────────────────────────────────────────
 
 export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props) {
-  const [tab, setTab] = useState<'overzicht' | 'hardlopen' | 'log' | 'herstel'>('overzicht')
+  const [tab, setTab] = useState<'overzicht' | 'hardlopen' | 'log' | 'herstel' | 'prestaties'>('overzicht')
 
   const maxHartslag = (profiel as Record<string, unknown>)?.max_hartslag as number | null
 
@@ -847,6 +847,152 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
     ? (fysioPerWeek.reduce((s, d) => s + d.waarde, 0) / fysioPerWeek.length).toFixed(1)
     : '0'
 
+  // ── Prestaties / badges ────────────────────────────────────────────────────
+  const badges = useMemo(() => {
+    // Consecutive weeks with runs (5 op rij)
+    const runWeeks = new Set(loopSessies.map(s => getMaandag(s.datum)))
+    let maxConsecutiveRunWeeks = 0
+    let curConsecutive = 0
+    const sortedRunWeeks = Array.from(runWeeks).sort()
+    for (let i = 0; i < sortedRunWeeks.length; i++) {
+      if (i === 0) { curConsecutive = 1; continue }
+      const prev = new Date(sortedRunWeeks[i - 1] + 'T12:00:00')
+      prev.setDate(prev.getDate() + 7)
+      if (prev.toISOString().split('T')[0] === sortedRunWeeks[i]) {
+        curConsecutive++
+      } else {
+        curConsecutive = 1
+      }
+      maxConsecutiveRunWeeks = Math.max(maxConsecutiveRunWeeks, curConsecutive)
+    }
+    if (sortedRunWeeks.length === 1) maxConsecutiveRunWeeks = 1
+
+    // Consistente week: any week where 100% of planned sessions were completed
+    const weekGeplande = new Map<string, number>()
+    const weekVoltooid = new Map<string, number>()
+    sessies.filter(s => !s.overgeslagen && s.week_nummer !== null).forEach(s => {
+      const ma = getMaandag(s.datum)
+      weekGeplande.set(ma, (weekGeplande.get(ma) ?? 0) + 1)
+    })
+    voltooid.forEach(s => {
+      const ma = getMaandag(s.datum)
+      weekVoltooid.set(ma, (weekVoltooid.get(ma) ?? 0) + 1)
+    })
+    const heeftConsistentieWeek = Array.from(weekGeplande.entries()).some(([ma, gepland]) => {
+      const gedaan = weekVoltooid.get(ma) ?? 0
+      return gepland > 0 && gedaan >= gepland
+    })
+
+    // Beste 5K pace
+    const runs5k = loopSessies.filter(s => berekenAfstand(s) >= 5)
+    let beste5kPace: number | null = null
+    if (runs5k.length > 0) {
+      const paces = runs5k.map(s => berekenPace(s)).filter((p): p is number => p !== null)
+      if (paces.length > 0) beste5kPace = Math.min(...paces)
+    }
+
+    return [
+      {
+        id: 'eerste_run',
+        naam: 'Eerste run',
+        beschrijving: 'Eerste hardloopsessie voltooid',
+        emoji: '🏃',
+        kleur: '#f97316',
+        behaald: loopSessies.length > 0,
+      },
+      {
+        id: '10km',
+        naam: '10 km bereikt',
+        beschrijving: 'Eén run van ≥ 10 km',
+        emoji: '🎯',
+        kleur: '#10b981',
+        behaald: loopSessies.some(s => berekenAfstand(s) >= 10),
+      },
+      {
+        id: 'halve_marathon',
+        naam: 'Halve marathon',
+        beschrijving: 'Eén run van ≥ 21,1 km',
+        emoji: '🥈',
+        kleur: '#6366f1',
+        behaald: loopSessies.some(s => berekenAfstand(s) >= 21.1),
+      },
+      {
+        id: 'marathon',
+        naam: 'Marathon',
+        beschrijving: 'Eén run van ≥ 42,2 km',
+        emoji: '🏆',
+        kleur: '#f59e0b',
+        behaald: loopSessies.some(s => berekenAfstand(s) >= 42.2),
+      },
+      {
+        id: '5_runs_op_rij',
+        naam: '5 runs op rij',
+        beschrijving: '5 weken op rij gelopen',
+        emoji: '🔥',
+        kleur: '#ef4444',
+        behaald: maxConsecutiveRunWeeks >= 5,
+      },
+      {
+        id: '50km_totaal',
+        naam: '50 km totaal',
+        beschrijving: 'In totaal ≥ 50 km gelopen',
+        emoji: '💪',
+        kleur: '#8b5cf6',
+        behaald: totaalKm >= 50,
+      },
+      {
+        id: '100km_totaal',
+        naam: '100 km totaal',
+        beschrijving: 'In totaal ≥ 100 km gelopen',
+        emoji: '🌟',
+        kleur: '#06b6d4',
+        behaald: totaalKm >= 100,
+      },
+      {
+        id: '500km_totaal',
+        naam: '500 km totaal',
+        beschrijving: 'In totaal ≥ 500 km gelopen',
+        emoji: '🦄',
+        kleur: '#ec4899',
+        behaald: totaalKm >= 500,
+      },
+      {
+        id: 'consistente_week',
+        naam: 'Consistente week',
+        beschrijving: '100% geplande sessies voltooid in één week',
+        emoji: '✅',
+        kleur: '#10b981',
+        behaald: heeftConsistentieWeek,
+      },
+      {
+        id: 'eerste_fysio',
+        naam: 'Eerste fysio',
+        beschrijving: 'Eerste fysio sessie voltooid',
+        emoji: '💆',
+        kleur: '#f59e0b',
+        behaald: fysioVoltooid.length > 0,
+      },
+      {
+        id: 'snelste_5k',
+        naam: 'Snelste 5K',
+        beschrijving: beste5kPace ? `Beste pace: ${formatPace(beste5kPace)} /km` : 'Voltooi een run van ≥ 5 km',
+        emoji: '⚡',
+        kleur: '#f97316',
+        behaald: beste5kPace !== null,
+      },
+      {
+        id: 'marathon_doel',
+        naam: 'Doel gezet',
+        beschrijving: 'Een actief trainingsdoel ingesteld',
+        emoji: '🎯',
+        kleur: '#6366f1',
+        behaald: doel !== null,
+      },
+    ]
+  }, [loopSessies, sessies, voltooid, fysioVoltooid, totaalKm, doel])
+
+  const aantalBehaald = badges.filter(b => b.behaald).length
+
   // ── leeg scherm ────────────────────────────────────────────────────────────
   if (voltooid.length === 0 && fysioVoltooid.length === 0) {
     return (
@@ -868,9 +1014,10 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
             { id: 'hardlopen', label: 'Lopen' },
             { id: 'log', label: 'Log' },
             { id: 'herstel', label: 'Herstel' },
+            { id: 'prestaties', label: 'Badges' },
           ] as const).map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={cn('flex-1 py-2 rounded-xl text-sm font-medium transition-all',
+              className={cn('flex-1 py-2 rounded-xl text-xs font-medium transition-all',
                 tab === t.id ? 'bg-[#f97316] text-white shadow-sm' : 'text-[#6b6560]')}>
               {t.label}
             </button>
@@ -1278,6 +1425,57 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
               </>
             )}
           </>
+        )}
+
+        {/* ── PRESTATIES ──────────────────────────────────────────────────── */}
+        {tab === 'prestaties' && (
+          <div className="bg-white rounded-3xl p-5 shadow-sm">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">Prestaties</p>
+                <p className="text-2xl font-bold text-[#1a1612] mt-0.5">{aantalBehaald} / {badges.length}</p>
+              </div>
+              <div className="relative w-14 h-14">
+                <svg viewBox="0 0 56 56" className="w-full h-full -rotate-90">
+                  <circle cx="28" cy="28" r="22" fill="none" stroke="#f0ede8" strokeWidth="5" />
+                  <circle cx="28" cy="28" r="22" fill="none" stroke="#f97316" strokeWidth="5"
+                    strokeDasharray={`${(aantalBehaald / badges.length) * 138.2} 138.2`}
+                    strokeLinecap="round" />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-[#f97316]">
+                  {Math.round((aantalBehaald / badges.length) * 100)}%
+                </span>
+              </div>
+            </div>
+
+            {/* Badge grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {badges.map(badge => (
+                <div key={badge.id}
+                  className={cn(
+                    'rounded-2xl p-3 flex flex-col items-center text-center gap-2 transition-all',
+                    badge.behaald ? 'bg-[#fff8f3]' : 'bg-[#f5f3f0]'
+                  )}>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl transition-all"
+                    style={badge.behaald
+                      ? { backgroundColor: badge.kleur + '20', outline: `2px solid ${badge.kleur}`, outlineOffset: '2px' }
+                      : { backgroundColor: '#e5e2de', opacity: 0.35 }}>
+                    <span style={badge.behaald ? {} : { filter: 'grayscale(1)' }}>{badge.emoji}</span>
+                  </div>
+                  <div>
+                    <p className={cn('text-xs font-semibold leading-tight', badge.behaald ? 'text-[#1a1612]' : 'text-[#a09990]')}>
+                      {badge.naam}
+                    </p>
+                    <p className="text-[10px] text-[#a09990] mt-0.5 leading-tight">{badge.beschrijving}</p>
+                  </div>
+                  {badge.behaald && (
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: badge.kleur }} />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

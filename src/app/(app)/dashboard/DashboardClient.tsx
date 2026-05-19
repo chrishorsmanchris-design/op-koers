@@ -1,13 +1,15 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { formatDuur, cn } from '@/lib/utils'
-import { CheckCircle2, ChevronRight, ChevronLeft, Dumbbell, Timer, MapPin, XCircle, Sparkles, Bell, Trash2, Plus, RefreshCw } from 'lucide-react'
+import { CheckCircle2, ChevronRight, ChevronLeft, Dumbbell, Timer, MapPin, XCircle, Sparkles, Bell, Trash2, Plus, RefreshCw, AlertTriangle, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Goal, PhysioExercise, TrainingSession, Profile, RecurringActivity } from '@/types/database'
 import { FeedbackModal } from '@/components/training/FeedbackModal'
+import { WeerWidget } from '@/components/dashboard/WeerWidget'
+import { getZoneTarget } from '@/lib/hartslagzones'
 
 interface Props {
   profiel: Profile | null
@@ -95,6 +97,7 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
   const [coachLaden, setCoachLaden] = useState(false)
   const [pushStatus, setPushStatus] = useState<'unknown' | 'granted' | 'denied' | 'unsupported'>('unknown')
   const [racedayChecklist, setRacedayChecklist] = useState<Record<string, boolean>>({})
+  const [alertDismissed, setAlertDismissed] = useState<string | null>(null)
 
   // Push permission + subscription
   useEffect(() => {
@@ -203,9 +206,120 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
   const uur = new Date().getHours()
   const begroeting = uur < 12 ? 'Goedemorgen' : uur < 18 ? 'Goedemiddag' : 'Goedenavond'
 
+  const morgenDatum = (() => {
+    const d = new Date(vandaag + 'T12:00:00')
+    d.setDate(d.getDate() + 1)
+    return d.toISOString().split('T')[0]
+  })()
+  const morgenSessie = lokaaleSessies.find(
+    s => s.datum === morgenDatum && !s.overgeslagen && s.type === 'hardlopen'
+  ) ?? null
+
   const dagenTotDoel = doel
     ? Math.ceil((new Date(doel.datum).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : null
+
+  // Coach alerts — berekend uit bestaande state
+  const coachAlert = useMemo(() => {
+    // Prioriteit 1: Lange duurloop gemist (alleen op maandag)
+    if (isVandaagMaandag) {
+      const vorigeWeekStartD = new Date(weekStart + 'T12:00:00')
+      vorigeWeekStartD.setDate(vorigeWeekStartD.getDate() - 7)
+      const vwsStr = vorigeWeekStartD.toISOString().split('T')[0]
+      const vorigeWeekEindD = new Date(weekStart + 'T12:00:00')
+      vorigeWeekEindD.setDate(vorigeWeekEindD.getDate() - 1)
+      const vweStr = vorigeWeekEindD.toISOString().split('T')[0]
+      const gemisteLangeDuurloop = lokaaleSessies.find(s =>
+        s.datum >= vwsStr && s.datum <= vweStr &&
+        s.type === 'hardlopen' &&
+        s.intensiteit === 'zwaar' &&
+        !s.voltooid &&
+        !s.overgeslagen
+      )
+      if (gemisteLangeDuurloop) {
+        return {
+          id: 'lange-duurloop',
+          titel: 'Lange duurloop gemist',
+          tekst: 'Je hebt vorige week je lange duurloop gemist. Je coach heeft je schema bijgesteld.',
+          actie: null,
+        }
+      }
+    }
+
+    // Prioriteit 2: 3+ trainingen gemist in de laatste 7 dagen
+    const zevenDagenGeleden = new Date(vandaag + 'T12:00:00')
+    zevenDagenGeleden.setDate(zevenDagenGeleden.getDate() - 7)
+    const zgStr = zevenDagenGeleden.toISOString().split('T')[0]
+    const gemisteSessies = lokaaleSessies.filter(s =>
+      s.datum >= zgStr && s.datum < vandaag &&
+      !s.voltooid && !s.overgeslagen
+    )
+    if (gemisteSessies.length >= 3) {
+      return {
+        id: 'drie-gemist',
+        titel: '3+ trainingen gemist',
+        tekst: 'Je hebt de afgelopen week 3+ trainingen gemist. Wil je je schema bijstellen?',
+        actie: { label: 'Schema aanpassen', href: '/schema' },
+      }
+    }
+
+    // Prioriteit 3: Race nadert (8–14 dagen) — apart van de bestaande tapering kaart
+    if (dagenTotDoel !== null && dagenTotDoel >= 8 && dagenTotDoel <= 14) {
+      return {
+        id: 'race-nadert',
+        titel: `Nog ${dagenTotDoel} dagen tot je race!`,
+        tekst: 'Dit is je tapering week — houd je aan de planning.',
+        actie: null,
+      }
+    }
+
+    // Prioriteit 4: Schema bijna klaar
+    if (planVoortgang && planVoortgang.pct >= 90 && planVoortgang.pct < 100) {
+      return {
+        id: 'bijna-klaar',
+        titel: 'Je bent bijna klaar!',
+        tekst: `Nog ${planVoortgang.totaal - planVoortgang.voltooid} sessie${planVoortgang.totaal - planVoortgang.voltooid === 1 ? '' : 's'} te gaan.`,
+        actie: null,
+      }
+    }
+
+    // Prioriteit 5: 4+ dagen achter elkaar getraind zonder rustdag
+    const vijfDagenGeleden = new Date(vandaag + 'T12:00:00')
+    vijfDagenGeleden.setDate(vijfDagenGeleden.getDate() - 5)
+    const vdgStr = vijfDagenGeleden.toISOString().split('T')[0]
+    const recentVoltooid = lokaaleSessies
+      .filter(s => s.datum >= vdgStr && s.datum < vandaag && s.voltooid)
+      .map(s => s.datum)
+    const uniekeDagen = [...new Set(recentVoltooid)].sort()
+    if (uniekeDagen.length >= 4) {
+      // Controleer of er geen rustdag tussen zit (aaneengesloten reeks)
+      let maxReeks = 1
+      let huidigeReeks = 1
+      for (let i = 1; i < uniekeDagen.length; i++) {
+        const prev = new Date(uniekeDagen[i - 1] + 'T12:00:00')
+        const curr = new Date(uniekeDagen[i] + 'T12:00:00')
+        const verschil = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24)
+        if (verschil === 1) {
+          huidigeReeks++
+          maxReeks = Math.max(maxReeks, huidigeReeks)
+        } else {
+          huidigeReeks = 1
+        }
+      }
+      if (maxReeks >= 4) {
+        return {
+          id: 'reeks-zonder-rust',
+          titel: '4 dagen achter elkaar getraind',
+          tekst: 'Je hebt 4 dagen achter elkaar getraind. Neem morgen een rustdag!',
+          actie: null,
+        }
+      }
+    }
+
+    return null
+  }, [lokaaleSessies, vandaag, weekStart, isVandaagMaandag, dagenTotDoel, planVoortgang])
+
+  const toonCoachAlert = coachAlert !== null && alertDismissed !== `${vandaag}-${coachAlert?.id}`
 
   // Verdeel activiteiten over de week op basis van frequentie (0=ma..6=zo)
   const FREQ_NAAR_DAGEN: Record<number, number[]> = {
@@ -459,6 +573,34 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
         </div>
       )}
 
+      {/* Coach alert */}
+      {toonCoachAlert && coachAlert && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-800">{coachAlert.titel}</p>
+              <p className="text-sm text-amber-700 mt-0.5">{coachAlert.tekst}</p>
+              {coachAlert.actie && (
+                <button
+                  onClick={() => router.push(coachAlert.actie!.href)}
+                  className="mt-2 text-xs font-semibold text-amber-800 underline underline-offset-2"
+                >
+                  {coachAlert.actie.label}
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setAlertDismissed(`${vandaag}-${coachAlert.id}`)}
+              className="text-amber-400 hover:text-amber-600 shrink-0"
+              aria-label="Sluiten"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Week strip */}
       <div className="bg-white rounded-3xl p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
@@ -585,6 +727,14 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
         </div>
       )}
 
+      {/* Weer widget — morgen training */}
+      {morgenSessie && (
+        <WeerWidget
+          morgenSessie={morgenSessie}
+          overmorgenSessie={null}
+        />
+      )}
+
       {/* Geselecteerde dag detail */}
       <div>
         <h2 className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">
@@ -687,6 +837,7 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
                 verplaatsenSessieId === geselecteerdeSessie.id ? null : geselecteerdeSessie.id
               )}
               isVerleden={geselecteerdeDag < vandaag}
+              maxHR={(profiel as Record<string, unknown>)?.max_hartslag as number | null}
             />
             {verplaatsenSessieId === geselecteerdeSessie.id && (
               <div className="bg-white rounded-2xl p-4 mt-2 shadow-sm">
@@ -841,12 +992,13 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
   )
 }
 
-function TrainingsKaart({ sessie, onAfronden, onOvergeslagen, onVerplaatsen, isVerleden }: {
+function TrainingsKaart({ sessie, onAfronden, onOvergeslagen, onVerplaatsen, isVerleden, maxHR }: {
   sessie: TrainingSession
   onAfronden: (id: string) => void
   onOvergeslagen: (id: string) => void
   onVerplaatsen: () => void
   isVerleden: boolean
+  maxHR?: number | null
 }) {
   const typeLabel = sessie.type === 'hardlopen' && sessie.intensiteit
     ? INTENSITEIT_LABEL[sessie.intensiteit] ?? 'Duurloop'
@@ -894,6 +1046,18 @@ function TrainingsKaart({ sessie, onAfronden, onOvergeslagen, onVerplaatsen, isV
             <span className="text-sm font-semibold text-[#1a1612]">{sessie.afstand_km} km</span>
           </div>
         )}
+        {sessie.type === 'hardlopen' && sessie.intensiteit && maxHR && (() => {
+          const target = getZoneTarget(sessie.intensiteit, maxHR)
+          if (!target) return null
+          return (
+            <div className="flex items-center gap-1.5 rounded-xl px-3 py-2" style={{ backgroundColor: target.zone.kleur + '20' }}>
+              <span className="text-sm">🫀</span>
+              <span className="text-sm font-semibold" style={{ color: target.zone.kleur }}>
+                {target.zone.kortNaam} · {target.minBpm}–{target.maxBpm} bpm
+              </span>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Acties */}

@@ -51,11 +51,22 @@ export async function POST(req: NextRequest) {
     const toegestaneTypes = ['hardlopen', 'krachttraining', 'rust']
     if (profiel?.wil_cross) toegestaneTypes.push('cross')
 
+    const maxHR = (profiel as Record<string, unknown>)?.max_hartslag as number | null
+    const hartslagInfo = maxHR ? `
+MAX HARTSLAG ATLEET: ${maxHR} bpm
+HARTSLAGZONES (gebruik deze als trainingsrichtlijn):
+- Z1 Herstel (intensiteit: herstel): ${Math.round(maxHR * 0.50)}–${Math.round(maxHR * 0.60)} bpm
+- Z2 Aerobisch (intensiteit: makkelijk): ${Math.round(maxHR * 0.60)}–${Math.round(maxHR * 0.70)} bpm
+- Z3 Tempo (intensiteit: gemiddeld): ${Math.round(maxHR * 0.70)}–${Math.round(maxHR * 0.80)} bpm
+- Z4 Drempel (intensiteit: zwaar): ${Math.round(maxHR * 0.80)}–${Math.round(maxHR * 0.90)} bpm
+- Z5 Interval (intensiteit: interval): ${Math.round(maxHR * 0.90)}–${maxHR} bpm
+80% van het trainingsvolume hoort in Z1-Z2 (herstel + makkelijk).` : ''
+
     const prompt = `Je bent een ervaren atletiekcoach. Maak een professioneel marathon trainingsschema gebaseerd op Hal Higdon / Jack Daniels methode.
 
 VANDAAG (startdatum schema): ${vandaag}
 EERSTE SESSIE: moet op ${vandaag} of de eerstvolgende dag zijn — begin DIRECT, geen weken overslaan.
-ATLEET: huidig volume ${profiel?.km_per_week ?? '?'} km/week
+ATLEET: huidig volume ${profiel?.km_per_week ?? '?'} km/week${hartslagInfo}
 DOEL: ${doel.naam} op ${doel.datum} | tijdsdoel: ${doel.tijdsdoel ?? 'finishen'}
 PERIODE: ${wekenTotDoel} weken VANAF VANDAAG (${vandaag} t/m ${new Date(new Date(vandaag).getTime() + wekenTotDoel * 7 * 86400000).toISOString().split('T')[0]})
 BLESSURE: ${profiel?.physio_klacht || 'geen bekende klachten'}
@@ -72,6 +83,7 @@ SCHEMA-OPBOUW:
 - Laatste 2 weken: tapering (volume afbouwen, intensiteit bewaren)
 - Max 4 sessies/week. Minimaal 1 lange duurloop/week op weekend.
 - Beschrijving max 55 tekens.
+${maxHR ? `- Verwerk de hartslagzone in de beschrijving als het relevant is, bijv. "Z2 duurloop" of "Z4 drempeltraining"` : ''}
 
 TOEGESTANE TYPES: ${toegestaneTypes.join(' | ')}
 TOEGESTANE INTENSITEITEN: herstel | makkelijk | gemiddeld | zwaar | interval

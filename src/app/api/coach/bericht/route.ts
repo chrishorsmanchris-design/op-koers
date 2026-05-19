@@ -93,6 +93,36 @@ export async function GET(req: NextRequest) {
       : '',
   ].filter(Boolean).join('\n')
 
+  // Proactieve alerts (pure berekening, geen extra DB queries)
+  const alerts: string[] = []
+
+  // 1. Geen lange run in 14+ dagen (run > 14km)
+  const langeLopen = recenteSessies?.filter(s => s.voltooid && s.type === 'hardlopen' && (s.afstand_km ?? 0) >= 14) ?? []
+  const dagsSindsCLangeRun = langeLopen.length > 0
+    ? Math.floor((Date.now() - new Date(langeLopen[0].datum + 'T12:00:00').getTime()) / 86400000)
+    : 99
+  if (dagsSindsCLangeRun >= 14 && (doel !== null)) {
+    alerts.push('⚠️ Je hebt al ' + dagsSindsCLangeRun + ' dagen geen lange duurloop gedaan')
+  }
+
+  // 2. >40% sessies overgeslagen in laatste 14 dagen
+  const totaleSessies14d = recenteSessies?.filter(s => s.datum >= veertienDagenGeleden) ?? []
+  const overgeslagen14d = totaleSessies14d.filter(s => s.overgeslagen).length
+  if (totaleSessies14d.length >= 5 && overgeslagen14d / totaleSessies14d.length > 0.4) {
+    alerts.push('📉 Je slaat de laatste 2 weken veel trainingen over (' + overgeslagen14d + '/' + totaleSessies14d.length + ')')
+  }
+
+  // 3. Geen training deze week (woensdag of later, nog niets gedaan)
+  const vandaagDag = new Date(vandaag + 'T12:00:00').getDay()
+  const maandagDezeWeek = getMaandag(vandaag)
+  const sessiesDezeWeek = recenteSessies?.filter(s => s.datum >= maandagDezeWeek && s.voltooid) ?? []
+  if (vandaagDag >= 3 && sessiesDezeWeek.length === 0) {
+    alerts.push('💤 Je hebt deze week nog geen training gedaan')
+  }
+
+  // Max 2 alerts
+  alerts.splice(2)
+
   try {
     const response = await claude.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -109,8 +139,8 @@ Geef ALLEEN het bericht terug, geen aanhalingstekens of uitleg.`
     })
 
     const bericht = response.content[0].type === 'text' ? response.content[0].text.trim() : null
-    return NextResponse.json({ bericht, datum: vandaag })
+    return NextResponse.json({ bericht, datum: vandaag, alerts })
   } catch {
-    return NextResponse.json({ bericht: null })
+    return NextResponse.json({ bericht: null, alerts })
   }
 }
