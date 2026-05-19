@@ -60,7 +60,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
 
   async function profielOpslaan() {
     setLaden(true)
-    await supabase.from('profiles').update({
+    const { error } = await supabase.from('profiles').update({
       naam,
       km_per_week: parseFloat(kmPerWeek) || null,
       max_hartslag: parseInt(maxHartslag) || null,
@@ -69,6 +69,12 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
       fysio_per_week: fysioPerWeek,
       wil_cross: wilCross,
     } as never).eq('id', profiel?.id ?? '')
+    if (error) {
+      console.error('Supabase update error:', error)
+      alert(`Opslaan mislukt: ${error.message}`)
+      setLaden(false)
+      return
+    }
     setOpgeslagen(true)
     setTimeout(() => setOpgeslagen(false), 2000)
     setLaden(false)
