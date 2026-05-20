@@ -128,6 +128,11 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
           Strava koppeling geannuleerd.
         </div>
       )}
+      {stravaStatus === 'fout' && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 text-sm text-red-700">
+          ✗ Strava koppeling mislukt. Controleer of de Strava API-sleutels correct zijn ingesteld.
+        </div>
+      )}
 
       {/* Profiel */}
       <section>
