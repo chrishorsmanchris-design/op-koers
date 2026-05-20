@@ -22,7 +22,9 @@ export async function GET(req: NextRequest) {
   })
 
   if (!tokenRes.ok) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/instellingen?strava=fout`)
+    const errBody = await tokenRes.text()
+    console.error('Strava token exchange failed:', tokenRes.status, errBody)
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/instellingen?strava=fout&detail=${encodeURIComponent(errBody.slice(0, 100))}`)
   }
 
   const tokens = await tokenRes.json()
