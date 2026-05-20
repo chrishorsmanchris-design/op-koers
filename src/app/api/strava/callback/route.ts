@@ -31,9 +31,11 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`)
 
+  const atleet = tokens.athlete
   await supabase.from('profiles').update({
     strava_refresh_token: tokens.refresh_token,
-    strava_athlete_id: tokens.athlete?.id ?? null,
+    strava_athlete_id: atleet?.id ?? null,
+    strava_athlete_naam: atleet ? `${atleet.firstname ?? ''} ${atleet.lastname ?? ''}`.trim() : null,
   } as never).eq('id', user.id)
 
   // Meteen eerste sync draaien

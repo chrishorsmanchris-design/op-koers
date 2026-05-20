@@ -22,6 +22,7 @@ export interface Database {
           wil_cross: boolean | null
           strava_refresh_token: string | null
           strava_athlete_id: number | null
+          strava_athlete_naam: string | null
           max_hartslag: number | null
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>

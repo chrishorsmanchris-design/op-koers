@@ -413,7 +413,9 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             <div>
               <h3 className="font-semibold text-[#1a1612]">Strava</h3>
               <p className="text-sm text-[#6b6560]">
-                {profiel?.strava_refresh_token ? '✓ Gekoppeld — looptrainingen worden automatisch gesynchroniseerd' : 'Koppel om runs automatisch te markeren als gedaan'}
+                {profiel?.strava_refresh_token
+                  ? `✓ Gekoppeld als ${profiel.strava_athlete_naam ?? 'onbekend'}`
+                  : 'Koppel om runs automatisch te markeren als gedaan'}
               </p>
             </div>
             {profiel?.strava_refresh_token ? (
