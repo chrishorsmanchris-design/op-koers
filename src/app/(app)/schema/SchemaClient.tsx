@@ -140,6 +140,7 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
   const supabase = createClient()
   const [sessies, setSessies] = useState(initSessies)
   const [genereert, setGenereert] = useState(false)
+  const [importeert, setImporteert] = useState(false)
   const [geselecteerdeWeek, setGeselecteerdeWeek] = useState<number | null>(null)
   const [uitleg, setUitleg] = useState('')
   const [fout, setFout] = useState('')
@@ -172,6 +173,26 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
   async function markeerOvergeslagen(id: string) {
     setSessies(prev => prev.map(s => s.id === id ? { ...s, overgeslagen: true } : s))
     await supabase.from('training_sessions').update({ overgeslagen: true } as never).eq('id', id)
+  }
+
+  async function importeerPdfSchema() {
+    if (!confirm('Dit vervangt je huidige schema met het 14-weeks PDF-schema van hardloopschema.nl. Doorgaan?')) return
+    setImporteert(true)
+    setFout('')
+    try {
+      const res = await fetch('/api/training/import-pdf', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setFout(data.error ?? 'Import mislukt')
+        setImporteert(false)
+        return
+      }
+      setUitleg(data.bericht ?? 'Schema geïmporteerd!')
+      window.location.reload()
+    } catch (e) {
+      setFout(String(e))
+      setImporteert(false)
+    }
   }
 
   async function genereerSchema() {
@@ -239,7 +260,11 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
               📅 Exporteer naar agenda
             </button>
           )}
-          <Button variant="secondary" size="sm" onClick={genereerSchema} disabled={genereert}>
+          <Button variant="secondary" size="sm" onClick={importeerPdfSchema} disabled={importeert || genereert}>
+            {importeert ? <Loader2 size={16} className="animate-spin mr-2" /> : <span className="mr-2">📄</span>}
+            PDF-schema
+          </Button>
+          <Button variant="secondary" size="sm" onClick={genereerSchema} disabled={genereert || importeert}>
             {genereert ? <Loader2 size={16} className="animate-spin mr-2" /> : <RefreshCw size={16} className="mr-2" />}
             {sessies.length === 0 ? 'Genereer' : 'Opnieuw'}
           </Button>
@@ -263,8 +288,11 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
         <Card className="text-center py-12">
           <div className="text-5xl mb-3">📅</div>
           <h3 className="font-semibold text-[#1a1612] mb-1">Geen schema aangemaakt</h3>
-          <p className="text-sm text-[#6b6560] mb-4">Klik op &quot;Genereer&quot; om jouw schema te laten maken</p>
-          <Button onClick={genereerSchema} loading={genereert}>Schema genereren</Button>
+          <p className="text-sm text-[#6b6560] mb-4">Genereer een AI-schema of importeer het PDF-schema</p>
+          <div className="flex gap-2 justify-center">
+            <Button onClick={importeerPdfSchema} loading={importeert}>📄 PDF-schema importeren</Button>
+            <Button variant="secondary" onClick={genereerSchema} loading={genereert}>AI-schema genereren</Button>
+          </div>
         </Card>
       ) : (
         <>
