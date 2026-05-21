@@ -176,11 +176,11 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
   }
 
   async function importeerPdfSchema() {
-    if (!confirm('Dit vervangt je huidige schema met het 14-weeks PDF-schema van hardloopschema.nl. Doorgaan?')) return
+    if (!confirm('Dit vervangt je huidige schema met het volledige plan (opbouwfase + 14-weeks PDF-schema). Hockey en vakanties worden automatisch verwerkt. Doorgaan?')) return
     setImporteert(true)
     setFout('')
     try {
-      const res = await fetch('/api/training/import-pdf', { method: 'POST' })
+      const res = await fetch('/api/training/import-volledig', { method: 'POST' })
       const data = await res.json()
       if (!res.ok) {
         setFout(data.error ?? 'Import mislukt')
@@ -262,7 +262,7 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
           )}
           <Button variant="secondary" size="sm" onClick={importeerPdfSchema} disabled={importeert || genereert}>
             {importeert ? <Loader2 size={16} className="animate-spin mr-2" /> : <span className="mr-2">📄</span>}
-            PDF-schema
+            {importeert ? 'Importeren...' : 'Slim importeren'}
           </Button>
           <Button variant="secondary" size="sm" onClick={genereerSchema} disabled={genereert || importeert}>
             {genereert ? <Loader2 size={16} className="animate-spin mr-2" /> : <RefreshCw size={16} className="mr-2" />}
@@ -288,9 +288,9 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
         <Card className="text-center py-12">
           <div className="text-5xl mb-3">📅</div>
           <h3 className="font-semibold text-[#1a1612] mb-1">Geen schema aangemaakt</h3>
-          <p className="text-sm text-[#6b6560] mb-4">Genereer een AI-schema of importeer het PDF-schema</p>
-          <div className="flex gap-2 justify-center">
-            <Button onClick={importeerPdfSchema} loading={importeert}>📄 PDF-schema importeren</Button>
+          <p className="text-sm text-[#6b6560] mb-4">Importeer het volledige schema (opbouwfase + PDF-plan, rekening houdend met hockey en vakanties)</p>
+          <div className="flex gap-2 justify-center flex-wrap">
+            <Button onClick={importeerPdfSchema} loading={importeert}>📄 Slim importeren</Button>
             <Button variant="secondary" onClick={genereerSchema} loading={genereert}>AI-schema genereren</Button>
           </div>
         </Card>

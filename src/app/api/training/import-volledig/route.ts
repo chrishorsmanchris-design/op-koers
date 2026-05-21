@@ -1,0 +1,225 @@
+import { NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@/lib/supabase/server'
+import { planWeek, getMaandag, volgendeMaandag, type PlanSessie, type Vakantie } from '@/lib/schema-planning'
+import { PDF_PLAN } from '@/lib/pdf-plan'
+
+export const maxDuration = 300
+
+const claude = new Anthropic()
+
+// ─── Fase 1: AI pre-plan genereren ────────────────────────────────────────────
+
+async function genereerPrePlan(
+  aantalWeken: number,
+  beschikbareDagen: number[],   // 0=ma..6=zo
+  kmPerWeek: number,
+  maxHartslag: number | null,
+): Promise<PlanSessie[][]> {
+  const DAGEN_NAMEN = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag']
+  const dagNamen = beschikbareDagen.map(d => DAGEN_NAMEN[d]).join(', ')
+
+  const hartslagInfo = maxHartslag ? `
+MAX HARTSLAG: ${maxHartslag} bpm
+Zones: H=${Math.round(maxHartslag*0.5)}-${Math.round(maxHartslag*0.6)} | D1=${Math.round(maxHartslag*0.6)}-${Math.round(maxHartslag*0.7)} | D2=${Math.round(maxHartslag*0.7)}-${Math.round(maxHartslag*0.8)} | D3=${Math.round(maxHartslag*0.8)}-${Math.round(maxHartslag*0.9)} | W=${Math.round(maxHartslag*0.9)}-${maxHartslag} bpm` : ''
+
+  const prompt = `Je bent een marathoncoach. Genereer een opbouwfase van ${aantalWeken} weken die aansluit op het PDF-marathonschema.
+
+METHODIEK: 80/20 polarized training (zelfde als het PDF-schema)
+- 80% van volume in lage intensiteit (H en D1)
+- 20% in hoge intensiteit (D2, D3, W/interval)
+- Trainingszones: H (herstel/rustig), D1 (makkelijk/aerobisch), D2 (gemiddeld/pittig), D3 (zwaar), W (interval/maximaal)
+- Looptempos: H=6:41/km, D1=5:51/km, D2=5:12/km, D3=4:41/km, W=4:27/km${hartslagInfo}
+
+HUIDIGE BELASTING: ${kmPerWeek} km/week
+BESCHIKBARE TRAININGSDAGEN: ${dagNamen} (alleen deze dagen gebruiken!)
+
+DOELSTELLING WEEK ${aantalWeken}: aansloten op dit niveau (= PDF-week 1):
+- 1 intervaltraining: 16 × 400m (W-tempo)
+- 1 duurloop D2: 50 min
+- 1 duurloop D1: 45-50 min
+- 1 lange duurloop D1+D2: 80 min
+- Totaal ~48 km/week
+
+PROGRESSIE:
+- Week 1: lager dan huidig niveau, rustig starten
+- Weken 1-3: basisopbouw met D1 en korte intervals (6-8 × 400m)
+- Weken 4-6: volume en intensiteit verhogen (10-14 × 400m of 4-6 × 800m)
+- Week ${aantalWeken}: PDF-week 1 niveau
+
+REGELS:
+- Gebruik ALLEEN de beschikbare dagen (${dagNamen})
+- Wissel zwaar/licht af (nooit 2 zware sessies op aansluitende dagen)
+- 3-5 trainingen per week
+- Elk week heeft rustdagen (type: "rust")
+- Bouw wekelijks volume op met max 10% per week
+
+Geef ALLEEN dit JSON object, geen uitleg:
+{
+  "weken": [
+    {
+      "sessies": [
+        {"dag": 0, "type": "hardlopen", "intensiteit": "makkelijk", "beschrijving": "Duurloop 35 min in D1", "duur_minuten": 35, "afstand_km": 6.0},
+        {"dag": 2, "type": "rust", "intensiteit": "herstel", "beschrijving": "Rust – geen training", "duur_minuten": null, "afstand_km": null}
+      ]
+    }
+  ]
+}`
+
+  const res = await claude.messages.create({
+    model: 'claude-sonnet-4-5',
+    max_tokens: 8000,
+    system: 'Geef ALLEEN een geldig JSON object terug. Geen markdown. Geen tekst buiten de JSON.',
+    messages: [{ role: 'user', content: prompt }],
+  })
+
+  const tekst = res.content[0].type === 'text' ? res.content[0].text : ''
+
+  // Extraheer JSON (Claude geeft soms markdown om)
+  const match = tekst.match(/\{[\s\S]*\}/)
+  if (!match) throw new Error('AI gaf geen geldige JSON terug')
+
+  const parsed = JSON.parse(match[0]) as { weken: Array<{ sessies: PlanSessie[] }> }
+  return parsed.weken.map(w => w.sessies)
+}
+
+// ─── Hoofdroute ───────────────────────────────────────────────────────────────
+
+export async function POST() {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+
+    // Haal alle benodigde data op
+    const [
+      { data: doel },
+      { data: profiel },
+      { data: vakanties },
+      { data: activiteiten },
+    ] = await Promise.all([
+      supabase.from('goals').select('*').eq('user_id', user.id).eq('actief', true).single(),
+      supabase.from('profiles').select('*').eq('user_id', user.id).single(),
+      supabase.from('vacations').select('*').eq('user_id', user.id),
+      supabase.from('recurring_activities').select('*').eq('user_id', user.id).eq('blokkeert_hardlopen', true),
+    ])
+
+    if (!doel) return NextResponse.json({ error: 'Geen actief doel gevonden' }, { status: 400 })
+
+    // Permanent geblokkeerde dagen (hockey etc.)
+    const geblokkeerd = new Set<number>(activiteiten?.map(a => a.dag_van_week) ?? [])
+
+    // Beschikbare dagen (0=ma..6=zo minus geblokkeerd)
+    const beschikbaar = [0, 1, 2, 3, 4, 5, 6].filter(d => !geblokkeerd.has(d))
+
+    // Vakanties als simpele array
+    const vakantieArray: Vakantie[] = (vakanties ?? []).map(v => ({
+      start_datum: v.start_datum,
+      eind_datum: v.eind_datum,
+      kan_trainen: v.kan_trainen,
+    }))
+
+    // Datumberekeningen
+    const vandaag = new Date()
+    const marathonDatum = new Date(doel.datum)
+
+    // Fase 2 start: PDF week 1 maandag = marathonDatum - 97 dagen, afgerond naar maandag
+    const fase2Start = getMaandag(new Date(marathonDatum.getTime() - 97 * 86400000))
+
+    // Fase 1 start: volgende maandag vanaf vandaag
+    const fase1Start = volgendeMaandag(vandaag)
+
+    // Aantal pre-plan weken (fase 1)
+    const prePlanWeken = Math.max(0, Math.round((fase2Start.getTime() - fase1Start.getTime()) / (7 * 86400000)))
+
+    // Verwijder bestaande sessies
+    await supabase.from('training_sessions').delete().eq('user_id', user.id)
+
+    const alleSessies: object[] = []
+    let volgorde = 1
+
+    // ── Fase 1: AI pre-plan ──────────────────────────────────────────────────
+    if (prePlanWeken > 0) {
+      const kmPerWeek = (profiel as Record<string, unknown>)?.km_per_week as number ?? 40
+      const maxHR = (profiel as Record<string, unknown>)?.max_hartslag as number | null ?? null
+
+      const prePlanWeken_data = await genereerPrePlan(prePlanWeken, beschikbaar, kmPerWeek, maxHR)
+
+      for (let i = 0; i < Math.min(prePlanWeken_data.length, prePlanWeken); i++) {
+        const weekNr = i + 1
+        const weekMaandag = new Date(fase1Start)
+        weekMaandag.setDate(weekMaandag.getDate() + i * 7)
+
+        const gepland = planWeek(prePlanWeken_data[i], weekMaandag, geblokkeerd, vakantieArray, weekNr, volgorde)
+        volgorde += gepland.length
+
+        for (const s of gepland) {
+          alleSessies.push({
+            user_id: user.id,
+            goal_id: doel.id,
+            datum: s.datum,
+            type: s.type,
+            beschrijving: s.beschrijving,
+            duur_minuten: s.duur_minuten,
+            afstand_km: s.afstand_km,
+            intensiteit: s.intensiteit,
+            voltooid: false,
+            overgeslagen: false,
+            volgorde: s.volgorde,
+            week_nummer: s.week_nummer,
+          })
+        }
+      }
+    }
+
+    // ── Fase 2: PDF-schema met constraint-aware scheduling ───────────────────
+    for (let i = 0; i < PDF_PLAN.length; i++) {
+      const weekNr = prePlanWeken + i + 1
+      const weekMaandag = new Date(fase2Start)
+      weekMaandag.setDate(weekMaandag.getDate() + i * 7)
+
+      const gepland = planWeek(PDF_PLAN[i], weekMaandag, geblokkeerd, vakantieArray, weekNr, volgorde)
+      volgorde += gepland.length
+
+      for (const s of gepland) {
+        alleSessies.push({
+          user_id: user.id,
+          goal_id: doel.id,
+          datum: s.datum,
+          type: s.type,
+          beschrijving: s.beschrijving,
+          duur_minuten: s.duur_minuten,
+          afstand_km: s.afstand_km,
+          intensiteit: s.intensiteit,
+          voltooid: false,
+          overgeslagen: false,
+          volgorde: s.volgorde,
+          week_nummer: s.week_nummer,
+        })
+      }
+    }
+
+    // Invoegen in batches
+    for (let i = 0; i < alleSessies.length; i += 100) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await supabase.from('training_sessions').insert(alleSessies.slice(i, i + 100) as any)
+      if (error) return NextResponse.json({ error: `Invoegfout: ${error.message}` }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      aantalSessies: alleSessies.length,
+      fase1Weken: prePlanWeken,
+      fase2Weken: 14,
+      startDatum: fase1Start.toISOString().split('T')[0],
+      marathonDatum: doel.datum,
+      bericht: prePlanWeken > 0
+        ? `${alleSessies.length} sessies aangemaakt: ${prePlanWeken} weken opbouwfase + 14 weken PDF-schema (${fase1Start.toISOString().split('T')[0]} t/m ${doel.datum})`
+        : `${alleSessies.length} sessies aangemaakt: 14 weken PDF-schema (${fase2Start.toISOString().split('T')[0]} t/m ${doel.datum})`,
+    })
+
+  } catch (err) {
+    console.error('Import-volledig fout:', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
+}
