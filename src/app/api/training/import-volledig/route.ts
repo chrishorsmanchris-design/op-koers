@@ -8,6 +8,39 @@ export const maxDuration = 300
 
 const claude = new Anthropic()
 
+// ─── Saniteer AI-output: zorg dat alleen geldige DB-waarden worden ingevoegd ──
+
+const GELDIGE_TYPES = new Set(['hardlopen', 'rust', 'cross'])
+const GELDIGE_INTENSITEITEN = new Set(['herstel', 'makkelijk', 'gemiddeld', 'zwaar', 'interval'])
+
+// AI gebruikt soms D1/D2/D3/W of andere varianten — map ze naar DB-waarden
+const INTENSITEIT_MAP: Record<string, PlanSessie['intensiteit']> = {
+  h: 'herstel', herstel: 'herstel', recovery: 'herstel', rustig: 'herstel',
+  d1: 'makkelijk', makkelijk: 'makkelijk', easy: 'makkelijk', aerobisch: 'makkelijk', licht: 'makkelijk',
+  d2: 'gemiddeld', gemiddeld: 'gemiddeld', tempo: 'gemiddeld', moderate: 'gemiddeld', pittig: 'gemiddeld',
+  d3: 'zwaar', zwaar: 'zwaar', hard: 'zwaar', drempel: 'zwaar', threshold: 'zwaar',
+  w: 'interval', interval: 'interval', weerstand: 'interval', maximaal: 'interval', sprint: 'interval',
+}
+
+function sanitizeSessie(s: Record<string, unknown>): PlanSessie {
+  const rawType = String(s.type ?? 'hardlopen').toLowerCase()
+  const rawInt  = String(s.intensiteit ?? 'makkelijk').toLowerCase()
+
+  const type = GELDIGE_TYPES.has(rawType) ? rawType as PlanSessie['type'] : 'hardlopen'
+  const intensiteit = GELDIGE_INTENSITEITEN.has(rawInt)
+    ? rawInt as PlanSessie['intensiteit']
+    : (INTENSITEIT_MAP[rawInt] ?? 'makkelijk')
+
+  return {
+    dag: Math.max(0, Math.min(6, Number(s.dag ?? 0))),
+    type,
+    intensiteit,
+    beschrijving: String(s.beschrijving ?? ''),
+    duur_minuten: s.duur_minuten != null ? Number(s.duur_minuten) || null : null,
+    afstand_km:   s.afstand_km   != null ? Number(s.afstand_km)   || null : null,
+  }
+}
+
 // ─── Fase 1: AI pre-plan genereren ────────────────────────────────────────────
 
 async function genereerPrePlan(
@@ -79,8 +112,8 @@ Geef ALLEEN dit JSON object, geen uitleg:
   const match = tekst.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('AI gaf geen geldige JSON terug')
 
-  const parsed = JSON.parse(match[0]) as { weken: Array<{ sessies: PlanSessie[] }> }
-  return parsed.weken.map(w => w.sessies)
+  const parsed = JSON.parse(match[0]) as { weken: Array<{ sessies: Record<string, unknown>[] }> }
+  return parsed.weken.map(w => w.sessies.map(sanitizeSessie))
 }
 
 // ─── Hoofdroute ───────────────────────────────────────────────────────────────
