@@ -154,6 +154,7 @@ function RoosterModal({ sessie, alleSessies, onVerplaatsen, onLatenVervallen, on
 // ── Hoofdcomponent ─────────────────────────────────────────────────────────────
 export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }: Props) {
   const supabase = createClient()
+  const vandaag = new Date().toISOString().split('T')[0]
   const [sessies, setSessies] = useState(initSessies)
   const [genereert, setGenereert] = useState(false)
   const [importeert, setImporteert] = useState(false)
@@ -215,6 +216,11 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
   async function markeerGedaan(id: string) {
     setSessies(prev => prev.map(s => s.id === id ? { ...s, voltooid: true } : s))
     await supabase.from('training_sessions').update({ voltooid: true } as never).eq('id', id)
+  }
+
+  async function ongedaanMaken(id: string) {
+    setSessies(prev => prev.map(s => s.id === id ? { ...s, voltooid: false } : s))
+    await supabase.from('training_sessions').update({ voltooid: false } as never).eq('id', id)
   }
 
   async function markeerOvergeslagen(id: string) {
@@ -549,7 +555,17 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                       </div>
 
                       {/* Actieknoppen */}
-                      {!isGedaan && !isOvergeslagen && (
+                      {isGedaan && !sessie.runkeeper_id && (
+                        <div className="flex border-t border-[#f5f3f0]">
+                          <button
+                            onClick={() => ongedaanMaken(sessie.id)}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-[#a09990] active:bg-[#f5f3f0] transition-colors"
+                          >
+                            <XCircle size={14} /> Ongedaan maken
+                          </button>
+                        </div>
+                      )}
+                      {!isGedaan && !isOvergeslagen && sessie.datum <= vandaag && (
                         <div className="flex border-t border-[#f5f3f0]">
                           <button
                             onClick={() => markeerGedaan(sessie.id)}
