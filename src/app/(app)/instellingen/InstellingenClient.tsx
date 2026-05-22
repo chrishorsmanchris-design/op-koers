@@ -54,6 +54,8 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   const [wilCross, setWilCross] = useState(profiel?.wil_cross ?? false)
   const [laden, setLaden] = useState(false)
   const [opgeslagen, setOpgeslagen] = useState(false)
+  const [notificatiesAan, setNotificatiesAan] = useState(!!profiel?.push_subscription)
+  const [notificatiesLaden, setNotificatiesLaden] = useState(false)
 
   const [nieuwV, setNieuwV] = useState<{ naam: string; start_datum: string; eind_datum: string; kan_trainen: 'ja' | 'nee' | 'beperkt' }>({ naam: '', start_datum: '', eind_datum: '', kan_trainen: 'ja' })
   const [nieuwA, setNieuwA] = useState<NieuweActiviteit>({ naam: '', dag_van_week: 1, tijdstip: 'avond', blokkeert_hardlopen: true, blokkeert_fysio: false })
@@ -113,6 +115,41 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   async function uitloggen() {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  async function schakelNotificaties() {
+    if (notificatiesAan) {
+      await fetch('/api/push/subscribe', { method: 'DELETE' })
+      setNotificatiesAan(false)
+      return
+    }
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      alert('Push notificaties worden niet ondersteund door je browser.')
+      return
+    }
+    setNotificatiesLaden(true)
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        alert('Notificaties geweigerd. Pas dit aan in je browser-instellingen.')
+        return
+      }
+      const reg = await navigator.serviceWorker.ready
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+      const padding = '='.repeat((4 - vapidKey.length % 4) % 4)
+      const base64 = (vapidKey + padding).replace(/-/g, '+').replace(/_/g, '/')
+      const rawData = window.atob(base64)
+      const key = new Uint8Array([...rawData].map(c => c.charCodeAt(0)))
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key })
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub),
+      })
+      setNotificatiesAan(true)
+    } finally {
+      setNotificatiesLaden(false)
+    }
   }
 
   return (
@@ -401,6 +438,37 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             <Button variant="secondary" onClick={vakantieToevoegen}>
               <Plus size={16} className="mr-2" /> Toevoegen
             </Button>
+          </div>
+        </Card>
+      </section>
+
+      {/* Notificaties */}
+      <section>
+        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Notificaties</h2>
+        <Card>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-[#1a1612]">Ochtend coach bericht</h3>
+              <p className="text-sm text-[#6b6560]">
+                {notificatiesAan
+                  ? '✓ Elke ochtend om 7:00 een bericht van je coach'
+                  : 'Ontvang elke ochtend je training en motivatie'}
+              </p>
+            </div>
+            <button
+              onClick={schakelNotificaties}
+              disabled={notificatiesLaden}
+              className={cn(
+                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none',
+                notificatiesAan ? 'bg-[#f97316]' : 'bg-[#d0cbc4]',
+                notificatiesLaden && 'opacity-50'
+              )}
+            >
+              <span className={cn(
+                'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+                notificatiesAan ? 'translate-x-6' : 'translate-x-1'
+              )} />
+            </button>
           </div>
         </Card>
       </section>

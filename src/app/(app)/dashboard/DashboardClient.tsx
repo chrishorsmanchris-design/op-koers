@@ -343,6 +343,7 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
 
   // Geselecteerde dag info
   const [verplaatsenSessieId, setVerplaatsenSessieId] = useState<string | null>(null)
+  const [verplaatsenWeekOffset, setVerplaatsenWeekOffset] = useState(0)
   const [toonRunForm, setToonRunForm] = useState(false)
   const [runAfstand, setRunAfstand] = useState('')
   const [runDuur, setRunDuur] = useState('')
@@ -420,6 +421,7 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
     setLokaaleSessies(prev => prev.map(s => s.id === sessieId ? { ...s, datum: nieuweDatum } : s))
     setGeselecteerdeDag(nieuweDatum)
     setVerplaatsenSessieId(null)
+    setVerplaatsenWeekOffset(0)
   }
 
   async function sessieAfronden(sessieId: string) {
@@ -839,29 +841,49 @@ export function DashboardClient({ profiel, sessies, alleSessies, fysioOefeningen
               isVerleden={geselecteerdeDag < vandaag}
               maxHR={profiel?.max_hartslag ?? null}
             />
-            {verplaatsenSessieId === geselecteerdeSessie.id && (
-              <div className="bg-white rounded-2xl p-4 mt-2 shadow-sm">
-                <p className="text-xs font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Verplaatsen naar</p>
-                <div className="grid grid-cols-7 gap-1">
-                  {dagen.map((datum, i) => {
-                    const bezet = lokaaleSessies.some(s => s.datum === datum && s.id !== geselecteerdeSessie.id && !s.overgeslagen)
-                    const isHuidige = datum === geselecteerdeDag
-                    return (
-                      <button key={datum} onClick={() => !bezet && !isHuidige && verplaatsSessie(geselecteerdeSessie.id, datum)}
-                        disabled={bezet || isHuidige}
-                        className={cn('flex flex-col items-center gap-1 py-2 rounded-xl text-xs transition-all',
-                          isHuidige ? 'bg-[#f97316]/10 text-[#f97316] font-semibold' :
-                          bezet ? 'opacity-30 cursor-not-allowed' :
-                          'hover:bg-[#f5f3f0] text-[#1a1612] font-medium cursor-pointer border border-[#e8e3dc]'
-                        )}>
-                        <span className="text-[10px] text-[#a09990]">{DAGEN_KORT[i]}</span>
-                        <span>{new Date(datum + 'T12:00:00').getDate()}</span>
-                      </button>
-                    )
-                  })}
+            {verplaatsenSessieId === geselecteerdeSessie.id && (() => {
+              const baseDate = new Date(displayWeekStart + 'T12:00:00')
+              baseDate.setDate(baseDate.getDate() + verplaatsenWeekOffset * 7)
+              const verplaatsDagen = weekDagen(baseDate.toISOString().split('T')[0])
+              const maandNamen = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec']
+              const eersteD = new Date(verplaatsDagen[0] + 'T12:00:00')
+              const laasteD = new Date(verplaatsDagen[6] + 'T12:00:00')
+              const weekLabel = eersteD.getMonth() === laasteD.getMonth()
+                ? `${eersteD.getDate()}–${laasteD.getDate()} ${maandNamen[laasteD.getMonth()]}`
+                : `${eersteD.getDate()} ${maandNamen[eersteD.getMonth()]} – ${laasteD.getDate()} ${maandNamen[laasteD.getMonth()]}`
+              return (
+                <div className="bg-white rounded-2xl p-4 mt-2 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-[#6b6560] uppercase tracking-wider">Verplaatsen naar</p>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setVerplaatsenWeekOffset(o => o - 1)}
+                        className="w-6 h-6 flex items-center justify-center rounded-lg bg-[#f5f3f0] text-[#6b6560] text-sm hover:bg-[#e8e3dc]">‹</button>
+                      <span className="text-xs text-[#6b6560] w-28 text-center">{weekLabel}</span>
+                      <button onClick={() => setVerplaatsenWeekOffset(o => o + 1)}
+                        className="w-6 h-6 flex items-center justify-center rounded-lg bg-[#f5f3f0] text-[#6b6560] text-sm hover:bg-[#e8e3dc]">›</button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {verplaatsDagen.map((datum, i) => {
+                      const bezet = lokaaleSessies.some(s => s.datum === datum && s.id !== geselecteerdeSessie.id && !s.overgeslagen && s.type !== 'core')
+                      const isHuidige = datum === geselecteerdeDag
+                      return (
+                        <button key={datum} onClick={() => !bezet && !isHuidige && verplaatsSessie(geselecteerdeSessie.id, datum)}
+                          disabled={bezet || isHuidige}
+                          className={cn('flex flex-col items-center gap-1 py-2 rounded-xl text-xs transition-all',
+                            isHuidige ? 'bg-[#f97316]/10 text-[#f97316] font-semibold' :
+                            bezet ? 'opacity-30 cursor-not-allowed' :
+                            'hover:bg-[#f5f3f0] text-[#1a1612] font-medium cursor-pointer border border-[#e8e3dc]'
+                          )}>
+                          <span className="text-[10px] text-[#a09990]">{DAGEN_KORT[i]}</span>
+                          <span>{new Date(datum + 'T12:00:00').getDate()}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
           </>
         ) : geselecteerdeActiviteiten.length === 0 ? (
           <Card>

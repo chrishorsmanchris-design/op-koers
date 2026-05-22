@@ -232,6 +232,69 @@ export async function POST() {
       }
     }
 
+    // ── Core & Fysio sessies toevoegen ───────────────────────────────────────
+    const wilCore = (profiel as Record<string, unknown>)?.wil_core as boolean ?? false
+    const corePerWeek = (profiel as Record<string, unknown>)?.core_per_week as number ?? 2
+    const fysioPerWeek = (profiel as Record<string, unknown>)?.fysio_per_week as number ?? 3
+
+    // Groepeer ingeplande sessies per (datum) voor makkelijk opzoeken
+    const datumNaarSessies = new Map<string, typeof alleSessies>()
+    for (const s of alleSessies) {
+      const datum = (s as Record<string, unknown>).datum as string
+      if (!datumNaarSessies.has(datum)) datumNaarSessies.set(datum, [])
+      datumNaarSessies.get(datum)!.push(s)
+    }
+
+    // Voor elke week: voeg core/fysio toe op lichte trainingsdagen (D1/herstel)
+    const totaalWeken = prePlanWeken + 14
+    for (let w = 0; w < totaalWeken; w++) {
+      const weekNr = w + 1
+      const weekMaandag = w < prePlanWeken
+        ? new Date(fase1Start.getTime() + w * 7 * 86400000)
+        : new Date(fase2Start.getTime() + (w - prePlanWeken) * 7 * 86400000)
+
+      // Vind alle loopsessies van deze week gesorteerd op intensiteit (lichtste eerst)
+      const loopDagen: string[] = []
+      for (let d = 0; d < 7; d++) {
+        const datum = new Date(weekMaandag)
+        datum.setDate(datum.getDate() + d)
+        const datumStr = datum.toISOString().split('T')[0]
+        const sessiesOpDag = (datumNaarSessies.get(datumStr) ?? []) as Record<string, unknown>[]
+        const heeftLoop = sessiesOpDag.some(s => s.type === 'hardlopen' && ['herstel', 'makkelijk'].includes(s.intensiteit as string))
+        if (heeftLoop) loopDagen.push(datumStr)
+      }
+
+      // Core: op de eerste N lichte loopsdagen
+      if (wilCore && corePerWeek > 0) {
+        for (let i = 0; i < Math.min(corePerWeek, loopDagen.length); i++) {
+          alleSessies.push({
+            user_id: user.id, goal_id: doel.id,
+            datum: loopDagen[i],
+            type: 'core', intensiteit: 'herstel',
+            beschrijving: 'Core stability – 20-30 min (na je loop)',
+            duur_minuten: 25, afstand_km: null,
+            voltooid: false, overgeslagen: false,
+            volgorde: volgorde++, week_nummer: weekNr,
+          })
+        }
+      }
+
+      // Fysio: op de eerste N lichte loopsdagen (mag overlappen met core)
+      if (fysioPerWeek > 0) {
+        for (let i = 0; i < Math.min(fysioPerWeek, loopDagen.length); i++) {
+          alleSessies.push({
+            user_id: user.id, goal_id: doel.id,
+            datum: loopDagen[i],
+            type: 'core', intensiteit: 'herstel',
+            beschrijving: 'Fysio oefeningen – 15-20 min (na je loop of apart)',
+            duur_minuten: 20, afstand_km: null,
+            voltooid: false, overgeslagen: false,
+            volgorde: volgorde++, week_nummer: weekNr,
+          })
+        }
+      }
+    }
+
     // Invoegen in batches
     for (let i = 0; i < alleSessies.length; i += 100) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
