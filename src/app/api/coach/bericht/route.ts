@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
   const vandaag = new Date().toISOString().split('T')[0]
   const vandaagJsDag = new Date(vandaag + 'T12:00:00').getDay() // 0=zo..6=za
   const veertienDagenGeleden = new Date(Date.now() - 14 * 86400000).toISOString().split('T')[0]
+  const achtentwintigDagenGeleden = new Date(Date.now() - 28 * 86400000).toISOString().split('T')[0]
 
   const [
     { data: profiel },
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
     { data: fysioOefeningen },
     { data: activiteiten },
     { data: recenteFysio },
+    { data: recenteCore },
   ] = await Promise.all([
     supabase.from('profiles').select('naam, wil_core, fysio_per_week, core_per_week').eq('id', user.id).single(),
     supabase.from('goals').select('naam, datum, tijdsdoel').eq('user_id', user.id).eq('actief', true).single(),
@@ -45,7 +47,10 @@ export async function GET(req: NextRequest) {
     supabase.from('physio_exercises').select('id').eq('user_id', user.id).eq('actief', true),
     supabase.from('recurring_activities').select('naam, dag_van_week, tijdstip').eq('user_id', user.id),
     supabase.from('physio_sessions').select('datum').eq('user_id', user.id)
-      .gte('datum', getMaandag(vandaag)).order('datum', { ascending: false }),
+      .gte('datum', achtentwintigDagenGeleden).order('datum', { ascending: false }),
+    supabase.from('training_sessions').select('datum').eq('user_id', user.id)
+      .eq('type', 'core').eq('voltooid', true)
+      .gte('datum', achtentwintigDagenGeleden).order('datum', { ascending: false }),
   ])
 
   const naam = profiel?.naam?.split(' ')[0] ?? 'Atleet'
@@ -58,20 +63,46 @@ export async function GET(req: NextRequest) {
     ? Math.ceil((new Date(doel.datum).getTime() - Date.now()) / 86400000)
     : null
 
-  // Vandaag geplande looptraining
   const vandaagLoop = vandaagSessies?.find(s =>
     ['hardlopen', 'krachttraining', 'cross'].includes(s.type) && !s.voltooid
   )
   const vandaagAlVoltooid = vandaagSessies?.filter(s => s.voltooid) ?? []
 
-  // Vandaag recurring activiteit (hockey etc)
-  // App-dag: ma=0..zo=6; JS: zo=0..za=6
   const appDagVandaag = vandaagJsDag === 0 ? 6 : vandaagJsDag - 1
   const activiteitVandaag = activiteiten?.find(a => a.dag_van_week === appDagVandaag)
 
-  // Heeft vandaag fysio?
-  const heeftFysioVandaag = (fysioOefeningen?.length ?? 0) > 0
-  const fysioDezeWeek = recenteFysio?.length ?? 0
+  // ── Core patroonanalyse ────────────────────────────────────────────────────
+  const dagNamen = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag']
+  function dagIndex(datum: string): number {
+    const js = new Date(datum + 'T12:00:00').getDay()
+    return js === 0 ? 6 : js - 1 // 0=ma..6=zo
+  }
+  function dagsSindsLaatste(data: { datum: string }[]): number {
+    if (!data.length) return 99
+    return Math.floor((Date.now() - new Date(data[0].datum + 'T12:00:00').getTime()) / 86400000)
+  }
+  function gebruikelijkeDagen(data: { datum: string }[]): string[] {
+    const telling = Array(7).fill(0)
+    data.forEach(s => telling[dagIndex(s.datum)]++)
+    const max = Math.max(...telling)
+    if (max < 2) return []
+    return telling
+      .map((n, i) => ({ n, i }))
+      .filter(({ n }) => n >= max - 1 && n >= 2)
+      .map(({ i }) => dagNamen[i])
+  }
+
+  const coreDagsSindslLaatste = dagsSindsLaatste(recenteCore ?? [])
+  const fysioD28 = recenteFysio ?? []
+  const coreD28 = recenteCore ?? []
+  const fysioDagsSindsLaatste = dagsSindsLaatste(fysioD28)
+  const coreGebruikelijkeDagen = gebruikelijkeDagen(coreD28)
+  const fysioGebruikelijkeDagen = gebruikelijkeDagen(fysioD28)
+  const coreAantalD28 = coreD28.length
+  const fysioAantalD28 = fysioD28.length
+  const fysioDezeWeek = fysioD28.filter(s => s.datum >= getMaandag(vandaag)).length
+  const coreDezeWeek = coreD28.filter(s => s.datum >= getMaandag(vandaag)).length
+  const heeftFysio = (fysioOefeningen?.length ?? 0) > 0
 
   const context = [
     `Naam: ${naam}`,
@@ -84,40 +115,63 @@ export async function GET(req: NextRequest) {
     vandaagAlVoltooid.length > 0
       ? `Al voltooid vandaag: ${vandaagAlVoltooid.map(s => s.type).join(', ')}`
       : '',
-    heeftFysioVandaag
-      ? `Heeft ${fysioOefeningen?.length} actieve fysio-oefeningen · ${fysioDezeWeek}× gedaan deze week`
-      : '',
-    profiel?.wil_core ? `Core stability actief (${profiel.core_per_week ?? 2}× per week)` : '',
     activiteitVandaag
-      ? `Vaste activiteit vandaag: ${activiteitVandaag.naam} ${activiteitVandaag.tijdstip ?? ''} — geen hardlopen`
+      ? `Vaste activiteit vandaag: ${activiteitVandaag.naam} ${activiteitVandaag.tijdstip ?? ''}`
       : '',
+    // Core context
+    profiel?.wil_core ? [
+      `Core stability: ${coreAantalD28}× gedaan in afgelopen 28 dagen, ${coreDezeWeek}× deze week`,
+      coreDagsSindslLaatste < 99 ? `Laatste core: ${coreDagsSindslLaatste} dagen geleden` : 'Nog nooit core gedaan',
+      coreGebruikelijkeDagen.length ? `Gebruikelijk core-moment: ${coreGebruikelijkeDagen.join(' en ')}` : '',
+    ].filter(Boolean).join(' · ') : '',
+    // Fysio context
+    heeftFysio ? [
+      `Fysiotherapie: ${fysioAantalD28}× gedaan in afgelopen 28 dagen, ${fysioDezeWeek}× deze week (doel: ${profiel?.fysio_per_week ?? 3}×/week)`,
+      fysioDagsSindsLaatste < 99 ? `Laatste fysio: ${fysioDagsSindsLaatste} dagen geleden` : 'Nog nooit fysio gedaan',
+      fysioGebruikelijkeDagen.length ? `Gebruikelijk fysio-moment: ${fysioGebruikelijkeDagen.join(' en ')}` : '',
+    ].filter(Boolean).join(' · ') : '',
   ].filter(Boolean).join('\n')
 
-  // Proactieve alerts (pure berekening, geen extra DB queries)
   const alerts: string[] = []
 
-  // 1. Geen lange run in 14+ dagen (run > 14km)
+  // 1. Geen lange run in 14+ dagen
   const langeLopen = recenteSessies?.filter(s => s.voltooid && s.type === 'hardlopen' && (s.afstand_km ?? 0) >= 14) ?? []
   const dagsSindsCLangeRun = langeLopen.length > 0
     ? Math.floor((Date.now() - new Date(langeLopen[0].datum + 'T12:00:00').getTime()) / 86400000)
     : 99
-  if (dagsSindsCLangeRun >= 14 && (doel !== null)) {
-    alerts.push('⚠️ Je hebt al ' + dagsSindsCLangeRun + ' dagen geen lange duurloop gedaan')
+  if (dagsSindsCLangeRun >= 14 && doel !== null) {
+    alerts.push('⚠️ Geen lange duurloop in ' + dagsSindsCLangeRun + ' dagen')
   }
 
   // 2. >40% sessies overgeslagen in laatste 14 dagen
   const totaleSessies14d = recenteSessies?.filter(s => s.datum >= veertienDagenGeleden) ?? []
   const overgeslagen14d = totaleSessies14d.filter(s => s.overgeslagen).length
   if (totaleSessies14d.length >= 5 && overgeslagen14d / totaleSessies14d.length > 0.4) {
-    alerts.push('📉 Je slaat de laatste 2 weken veel trainingen over (' + overgeslagen14d + '/' + totaleSessies14d.length + ')')
+    alerts.push('📉 Veel trainingen overgeslagen (' + overgeslagen14d + '/' + totaleSessies14d.length + ' in 2 weken)')
   }
 
-  // 3. Geen training deze week (woensdag of later, nog niets gedaan)
+  // 3. Geen training deze week (woensdag of later)
   const vandaagDag = new Date(vandaag + 'T12:00:00').getDay()
   const maandagDezeWeek = getMaandag(vandaag)
   const sessiesDezeWeek = recenteSessies?.filter(s => s.datum >= maandagDezeWeek && s.voltooid) ?? []
   if (vandaagDag >= 3 && sessiesDezeWeek.length === 0) {
-    alerts.push('💤 Je hebt deze week nog geen training gedaan')
+    alerts.push('💤 Nog geen training gedaan deze week')
+  }
+
+  // 4. Core te lang niet gedaan (drempel = 7 / core_per_week * 1.5 dagen)
+  if (profiel?.wil_core) {
+    const coreDrempel = Math.round(7 / (profiel.core_per_week ?? 2) * 1.5)
+    if (coreDagsSindslLaatste >= coreDrempel) {
+      alerts.push(`🧘 Al ${coreDagsSindslLaatste} dagen geen core stability gedaan`)
+    }
+  }
+
+  // 5. Fysio te lang niet gedaan
+  if (heeftFysio) {
+    const fysioDrempel = Math.round(7 / (profiel?.fysio_per_week ?? 3) * 1.5)
+    if (fysioDagsSindsLaatste >= fysioDrempel) {
+      alerts.push(`💊 Al ${fysioDagsSindsLaatste} dagen geen fysiotherapie gedaan`)
+    }
   }
 
   // Max 2 alerts
@@ -129,7 +183,15 @@ export async function GET(req: NextRequest) {
       max_tokens: 150,
       messages: [{
         role: 'user',
-        content: `Je bent een persoonlijke atletiekcoach. Schrijf een kort, persoonlijk bericht (2-3 zinnen, max 200 tekens) voor vandaag. Wees motiverend maar realistisch en accuraat. Refereer aan WERKELIJKE data — verzin niets. Als er een vaste activiteit is (hockey etc), houd daar rekening mee. Taal: Nederlands. Geen emoji tenzij het echt past.
+        content: `Je bent een persoonlijke atletiekcoach. Schrijf een kort, persoonlijk bericht (2-3 zinnen, max 200 tekens) voor vandaag.
+
+REGELS:
+- Motiverend maar realistisch — refereer aan WERKELIJKE data, verzin niets
+- Als er een alert is: verwerk die in je bericht (herinnering core/fysio, gemiste runs etc.)
+- Als je weet op welke dag de atleet gewoonlijk core of fysio doet, EN vandaag die dag is: herinner er proactief aan
+- Als de atleet core/fysio lang niet gedaan heeft: noem het kort en concreet
+- Als er geen bijzonderheden zijn: focus op de geplande training of motivatie voor de dag
+- Taal: Nederlands. Geen emoji tenzij het echt past.
 
 Atleetinfo:
 ${context}
