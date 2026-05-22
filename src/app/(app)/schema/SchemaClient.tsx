@@ -53,12 +53,11 @@ function dagAfkVanDatum(datum: string): string {
   return DAG_LABELS[dow === 0 ? 6 : dow - 1]
 }
 
-function weekDateRange(sessies: TrainingSession[]): string {
-  if (!sessies.length) return ''
-  const sorted = [...sessies].map(s => s.datum).sort()
-  const fmt = (d: string) =>
-    new Date(d + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-  return `${fmt(sorted[0])} – ${fmt(sorted[sorted.length - 1])}`
+function weekDateRange(maandag: string): string {
+  const ma = new Date(maandag + 'T12:00:00')
+  const zo = new Date(ma); zo.setDate(ma.getDate() + 6)
+  const fmt = (d: Date) => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  return `${fmt(ma)} – ${fmt(zo)}`
 }
 
 // ── Reschedule bottom sheet ────────────────────────────────────────────────────
@@ -170,20 +169,28 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
   const [foutTekst, setFoutTekst] = useState('')
   const [roosterSessie, setRoosterSessie] = useState<TrainingSession | null>(null)
 
-  // Groepeer op weeknummer
+  // Groepeer op kalenderweek (maandag van de week als sleutel) — niet op week_nummer
+  // Zo verschijnen Strava-sessies en plan-sessies altijd in de juiste week
   const weken = useMemo(() => {
-    const map = new Map<number, typeof sessies>()
+    function maandagVan(datum: string): string {
+      const d = new Date(datum + 'T12:00:00')
+      const dag = d.getDay()
+      d.setDate(d.getDate() - (dag === 0 ? 6 : dag - 1))
+      return d.toISOString().split('T')[0]
+    }
+    const map = new Map<string, typeof sessies>()
     sessies.forEach(s => {
-      const w = s.week_nummer ?? 0
-      if (!map.has(w)) map.set(w, [])
-      map.get(w)!.push(s)
+      const ma = maandagVan(s.datum)
+      if (!map.has(ma)) map.set(ma, [])
+      map.get(ma)!.push(s)
     })
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([weekNr, wSessies]) => ({
-        weekNr,
-        sessies: wSessies.sort((a, b) => a.datum.localeCompare(b.datum)),
-      }))
+    // Weeknummer = positie in gesorteerde lijst (1-based) voor weergave
+    const gesorteerd = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b))
+    return gesorteerd.map(([maandag, wSessies], i) => ({
+      weekNr: i + 1,
+      maandag,
+      sessies: wSessies.sort((a, b) => a.datum.localeCompare(b.datum)),
+    }))
   }, [sessies])
 
   // Spring naar de eerste week met openstaande sessies
@@ -392,7 +399,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
 
             <div className="flex-1 text-center">
               <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wide">Week {actieveWeekNr}</p>
-              <p className="text-sm font-bold text-[#1a1612]">{weekDateRange(weekSessies)}</p>
+              <p className="text-sm font-bold text-[#1a1612]">{weekDateRange(actieveWeek?.maandag ?? '')}</p>
             </div>
 
             <button
