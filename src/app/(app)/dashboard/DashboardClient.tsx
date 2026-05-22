@@ -223,14 +223,15 @@ export function DashboardClient({
   const [stravaSync, setStravaSync] = useState<'idle' | 'bezig' | 'klaar'>('idle')
   const [planAangepast, setPlanAangepast] = useState<string | null>(null)
 
-  // Strava auto-sync
+  // Strava auto-sync — elke 30 minuten
   useEffect(() => {
     const heeftStrava = !!(profiel as Record<string, unknown>)?.strava_refresh_token
     if (!heeftStrava) return
-    const vandaagStr = new Date().toISOString().split('T')[0]
-    if (localStorage.getItem('strava-last-sync') === vandaagStr) return
+    const nu = Date.now()
+    const laatste = parseInt(localStorage.getItem('strava-last-sync-ts') ?? '0', 10)
+    if (nu - laatste < 30 * 60 * 1000) return // 30 minuten wachten
     fetch('/api/strava/sync', { method: 'POST' })
-      .then(() => { localStorage.setItem('strava-last-sync', vandaagStr); router.refresh() })
+      .then(() => { localStorage.setItem('strava-last-sync-ts', String(nu)); router.refresh() })
       .catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

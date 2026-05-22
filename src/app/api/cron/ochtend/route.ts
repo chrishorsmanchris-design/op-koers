@@ -22,7 +22,68 @@ export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const vandaag = new Date().toISOString().split('T')[0]
 
-  // Haal alle gebruikers op met een push subscription
+  // ── Strava sync voor alle gekoppelde gebruikers ─────────────────────────────
+  const { data: stravaProfielen } = await supabase
+    .from('profiles')
+    .select('id, strava_refresh_token')
+    .not('strava_refresh_token', 'is', null)
+
+  if (stravaProfielen?.length) {
+    for (const sp of stravaProfielen) {
+      try {
+        const refreshToken = (sp as Record<string, unknown>).strava_refresh_token as string
+        const tokenRes = await fetch('https://www.strava.com/oauth/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: process.env.STRAVA_CLIENT_ID?.trim(),
+            client_secret: process.env.STRAVA_CLIENT_SECRET,
+            refresh_token: refreshToken,
+            grant_type: 'refresh_token',
+          }),
+        })
+        if (!tokenRes.ok) continue
+        const { access_token } = await tokenRes.json()
+
+        const na = Math.floor(Date.now() / 1000) - 2 * 24 * 60 * 60 // afgelopen 2 dagen
+        const actRes = await fetch(
+          `https://www.strava.com/api/v3/athlete/activities?after=${na}&per_page=20`,
+          { headers: { Authorization: `Bearer ${access_token}` } }
+        )
+        if (!actRes.ok) continue
+        const activiteiten = await actRes.json()
+        const userId = (sp as Record<string, unknown>).id as string
+
+        for (const run of activiteiten.filter((a: Record<string, unknown>) => a.type === 'Run')) {
+          const datum = (run.start_date_local as string).split('T')[0]
+          const afstandKm = Math.round((run.distance as number) / 10) / 100
+          const duurMin = Math.round((run.moving_time as number) / 60)
+
+          const { data: sessies } = await supabase.from('training_sessions').select('id')
+            .eq('user_id', userId).eq('datum', datum).eq('type', 'hardlopen').limit(1)
+
+          if (sessies?.length) {
+            await supabase.from('training_sessions').update({ voltooid: true, runkeeper_id: String(run.id) } as never)
+              .eq('id', sessies[0].id).eq('user_id', userId)
+          } else {
+            const d = new Date(datum + 'T12:00:00')
+            const dag = d.getDay() || 7; d.setDate(d.getDate() + 4 - dag)
+            const jaarStart = new Date(d.getFullYear(), 0, 1)
+            const week = Math.ceil(((d.getTime() - jaarStart.getTime()) / 86400000 + 1) / 7)
+            await supabase.from('training_sessions').insert({
+              user_id: userId, datum, type: 'hardlopen',
+              beschrijving: (run.name as string) ?? `Spontane run — ${afstandKm} km`,
+              duur_minuten: duurMin, afstand_km: afstandKm,
+              intensiteit: 'makkelijk', voltooid: true, overgeslagen: false,
+              runkeeper_id: String(run.id), week_nummer: week, volgorde: 0,
+            } as never)
+          }
+        }
+      } catch { /* stille fail per gebruiker */ }
+    }
+  }
+
+  // ── Haal alle gebruikers op met een push subscription ───────────────────────
   const { data: profielen } = await supabase
     .from('profiles')
     .select('id, naam, push_subscription, wil_core, core_per_week, fysio_per_week')
