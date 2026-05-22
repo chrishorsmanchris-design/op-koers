@@ -24,6 +24,9 @@ export interface Database {
           strava_athlete_id: number | null
           strava_athlete_naam: string | null
           max_hartslag: number | null
+          beschikbaarheid: { ma: number; di: number; wo: number; do: number; vr: number; za: number; zo: number } | null
+          opbouwtempo: 'rustig' | 'stabiel' | 'vliegend' | null
+          ziek_geblesseerd: boolean | null
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>

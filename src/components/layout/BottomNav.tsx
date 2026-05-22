@@ -2,21 +2,19 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, CalendarDays, MessageCircle, Dumbbell, Settings } from 'lucide-react'
+import { Clock, CalendarDays, Zap } from 'lucide-react'
 
 const nav = [
-  { href: '/dashboard', label: 'Vandaag', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Vandaag', icon: Clock },
   { href: '/schema', label: 'Schema', icon: CalendarDays },
-  { href: '/coach', label: 'Coach', icon: MessageCircle },
-  { href: '/fysio', label: 'Fysio', icon: Dumbbell },
-  { href: '/instellingen', label: 'Profiel', icon: Settings },
+  { href: '/activiteiten', label: 'Activiteiten', icon: Zap },
 ]
 
 export function BottomNav() {
   const pathname = usePathname()
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e8e3dc] safe-bottom z-50">
-      <div className="flex items-center justify-around px-1 py-2">
+      <div className="flex items-center justify-around px-2 py-2">
         {nav.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href)
           return (
@@ -24,7 +22,7 @@ export function BottomNav() {
               key={href}
               href={href}
               className={cn(
-                'flex flex-col items-center gap-1 px-3 py-1 rounded-2xl transition-colors',
+                'flex flex-col items-center gap-1 px-6 py-1.5 rounded-2xl transition-colors',
                 active ? 'text-[#f97316]' : 'text-[#a09990]'
               )}
             >

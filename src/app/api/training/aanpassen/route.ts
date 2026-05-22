@@ -19,6 +19,41 @@ export async function POST(req: NextRequest) {
     .eq('id', sessie_id)
     .single()
 
+  // Overgeslagen / ziek/geblesseerd: aparte stroom (geen voltooide sessie nodig)
+  if (rating === 'overgeslagen' || rating === 'ziek_geblesseerd') {
+    const { data: doel } = await supabase.from('goals').select('naam, datum, tijdsdoel').eq('user_id', user.id).eq('actief', true).single()
+    if (!doel) return NextResponse.json({ aangepast: false })
+    const { data: komendeSessies } = await supabase.from('training_sessions')
+      .select('id, datum, beschrijving, duur_minuten, afstand_km, intensiteit, type, week_nummer')
+      .eq('user_id', user.id).gt('datum', vandaag).eq('voltooid', false)
+      .in('type', ['hardlopen', 'krachttraining', 'cross']).order('datum', { ascending: true }).limit(8)
+    if (!komendeSessies?.length) return NextResponse.json({ aangepast: false })
+    const instructie = rating === 'ziek_geblesseerd'
+      ? 'De atleet is ziek of geblesseerd. Verlaag de eerstvolgende 3-4 sessies significant (30-50%). Zorg voor herstelruimte. Bewaar de structuur van het plan.'
+      : 'De atleet heeft een training overgeslagen. Verdeel het verloren volume zo goed mogelijk over de komende 1-2 weken zonder de 10%-opbouwregel te overschrijden.'
+    const response = await claude.messages.create({
+      model: 'claude-sonnet-4-5', max_tokens: 1000,
+      system: 'Je bent een atletiekcoach. Geef altijd geldige JSON terug.',
+      messages: [{ role: 'user', content: `${instructie}\n\nDoel: ${doel.naam} op ${doel.datum}\nKomende sessies:\n${komendeSessies.map(s => JSON.stringify({ id: s.id, datum: s.datum, beschrijving: s.beschrijving, duur_minuten: s.duur_minuten, afstand_km: s.afstand_km, intensiteit: s.intensiteit })).join('\n')}\n\nGeef JSON: {"aanpassingen":[{"id":"...","duur_minuten":0,"afstand_km":0,"intensiteit":"makkelijk","beschrijving":"..."}],"uitleg":"..."}` }],
+    })
+    const tekst = response.content[0].type === 'text' ? response.content[0].text : '{}'
+    try {
+      const match = tekst.match(/\{[\s\S]*\}/)
+      const parsed = JSON.parse(match?.[0] ?? '{}')
+      if (!parsed.aanpassingen?.length) return NextResponse.json({ aangepast: false })
+      const geldigeIds = new Set(komendeSessies.map(s => s.id))
+      const GELDIGE_INTENSITEITEN = new Set(['herstel', 'makkelijk', 'gemiddeld', 'zwaar', 'interval'])
+      for (const a of parsed.aanpassingen.filter((a: { id: string }) => geldigeIds.has(a.id))) {
+        await supabase.from('training_sessions').update({
+          duur_minuten: a.duur_minuten, afstand_km: a.afstand_km,
+          beschrijving: a.beschrijving,
+          intensiteit: GELDIGE_INTENSITEITEN.has(a.intensiteit) ? a.intensiteit : undefined,
+        } as never).eq('id', a.id).eq('user_id', user.id)
+      }
+      return NextResponse.json({ aangepast: true, uitleg: parsed.uitleg })
+    } catch { return NextResponse.json({ aangepast: false }) }
+  }
+
   // Alleen hardloopsessies aanpassen; neutrale feedback → geen actie
   if (!voltooide || voltooide.type !== 'hardlopen' || rating === 'goed') {
     return NextResponse.json({ aangepast: false })

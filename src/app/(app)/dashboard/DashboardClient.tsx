@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { cn, formatDuur } from '@/lib/utils'
 import {
   CheckCircle2, XCircle, MapPin, Timer, Sparkles,
-  RefreshCw, Plus, ChevronRight, Dumbbell, MoveRight, X, Zap,
+  RefreshCw, Plus, ChevronRight, Dumbbell, MoveRight, X, Zap, Settings,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Goal, PhysioExercise, TrainingSession, Profile, RecurringActivity } from '@/types/database'
@@ -290,6 +290,17 @@ export function DashboardClient({
   async function sessieOvergeslagen(id: string) {
     await supabase.from('training_sessions').update({ overgeslagen: true } as never).eq('id', id)
     setSessies(prev => prev.map(s => s.id === id ? { ...s, overgeslagen: true } : s))
+    // Plan aanpassen op basis van gemiste training
+    const res = await fetch('/api/training/aanpassen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessie_id: id, rating: 'overgeslagen' }),
+    })
+    const data = await res.json()
+    if (data.aangepast && data.uitleg) {
+      setPlanAangepast(data.uitleg)
+      setTimeout(() => setPlanAangepast(null), 5000)
+    }
   }
 
   async function sessieVerplaatsen(id: string, nieuwDatum: string) {
@@ -365,6 +376,11 @@ export function DashboardClient({
               <RefreshCw size={15} className={stravaSync === 'bezig' ? 'animate-spin' : ''} />
             </button>
           )}
+          <button onClick={() => router.push('/instellingen')}
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-[#e8e3dc] text-[#a09990] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
+            title="Instellingen">
+            <Settings size={16} />
+          </button>
         </div>
       </div>
 
@@ -596,51 +612,68 @@ export function DashboardClient({
         </button>
       )}
 
-      {/* ── Core & Fysio snelkoppelingen ─────────────────────────────────────── */}
-      <div className="flex gap-3">
-        {profiel?.wil_core && (
-          <button onClick={() => router.push('/core/sessie')}
-            className={cn(
-              'flex-1 flex items-center gap-2.5 p-3.5 rounded-2xl border transition-all',
-              coreSessieVandaag
-                ? 'bg-green-50 border-green-200'
-                : 'bg-white border-[#e8e3dc] hover:border-[#06b6d4]/40'
-            )}>
-            <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center text-base',
-              coreSessieVandaag ? 'bg-green-100' : 'bg-[#06b6d4]/10'
-            )}>🧘</div>
-            <div className="text-left min-w-0">
-              <p className="text-xs font-bold text-[#1a1612]">Core</p>
-              <p className="text-[10px] text-[#a09990]">{coreSessieVandaag ? 'Gedaan ✓' : '25 min'}</p>
-            </div>
-            {coreSessieVandaag
-              ? <CheckCircle2 size={14} className="text-green-500 ml-auto shrink-0" />
-              : <ChevronRight size={14} className="text-[#c8c3bc] ml-auto shrink-0" />}
-          </button>
-        )}
-        {fysioOefeningen.length > 0 && (
-          <button onClick={() => router.push('/fysio/sessie')}
-            className={cn(
-              'flex-1 flex items-center gap-2.5 p-3.5 rounded-2xl border transition-all',
-              fysioSessieVandaag
-                ? 'bg-green-50 border-green-200'
-                : 'bg-white border-[#e8e3dc] hover:border-[#f97316]/40'
-            )}>
-            <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center',
-              fysioSessieVandaag ? 'bg-green-100' : 'bg-[#f97316]/10'
-            )}>
-              <Dumbbell size={15} className={fysioSessieVandaag ? 'text-green-600' : 'text-[#f97316]'} />
-            </div>
-            <div className="text-left min-w-0">
-              <p className="text-xs font-bold text-[#1a1612]">Fysio</p>
-              <p className="text-[10px] text-[#a09990]">{fysioSessieVandaag ? 'Gedaan ✓' : `${fysioOefeningen.length} oefen.`}</p>
-            </div>
-            {fysioSessieVandaag
-              ? <CheckCircle2 size={14} className="text-green-500 ml-auto shrink-0" />
-              : <ChevronRight size={14} className="text-[#c8c3bc] ml-auto shrink-0" />}
-          </button>
-        )}
-      </div>
+      {/* ── Vandaag ook: Core & Fysio ────────────────────────────────────────── */}
+      {(profiel?.wil_core || fysioOefeningen.length > 0) && (
+        <div className="bg-white rounded-3xl border border-[#f0ede8] overflow-hidden shadow-sm">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#a09990] px-4 pt-3 pb-2">
+            Vandaag ook
+          </p>
+          <div className="divide-y divide-[#f5f3f0]">
+            {profiel?.wil_core && (
+              <div className="flex items-center gap-3 px-4 py-3">
+                <div className={cn(
+                  'w-9 h-9 rounded-2xl flex items-center justify-center text-base shrink-0',
+                  coreSessieVandaag ? 'bg-green-100' : 'bg-[#06b6d4]/10'
+                )}>🧘</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#1a1612]">Core stability</p>
+                  <p className="text-xs text-[#a09990]">
+                    {coreSessieVandaag ? 'Afgerond vandaag' : '~25 min · kracht & stabiliteit'}
+                  </p>
+                </div>
+                {coreSessieVandaag ? (
+                  <CheckCircle2 size={18} className="text-green-500 shrink-0" />
+                ) : (
+                  <button
+                    onClick={() => router.push('/core/sessie')}
+                    className="shrink-0 px-3 py-1.5 rounded-xl bg-[#06b6d4]/10 text-[#06b6d4] text-xs font-bold active:scale-95 transition-transform"
+                  >
+                    Start
+                  </button>
+                )}
+              </div>
+            )}
+            {fysioOefeningen.length > 0 && (
+              <div className="flex items-center gap-3 px-4 py-3">
+                <div className={cn(
+                  'w-9 h-9 rounded-2xl flex items-center justify-center shrink-0',
+                  fysioSessieVandaag ? 'bg-green-100' : 'bg-[#f97316]/10'
+                )}>
+                  <Dumbbell size={16} className={fysioSessieVandaag ? 'text-green-600' : 'text-[#f97316]'} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#1a1612]">Fysiotherapie</p>
+                  <p className="text-xs text-[#a09990]">
+                    {fysioSessieVandaag
+                      ? 'Afgerond vandaag'
+                      : `${fysioOefeningen.length} oefening${fysioOefeningen.length !== 1 ? 'en' : ''} · blessurepreventie`}
+                  </p>
+                </div>
+                {fysioSessieVandaag ? (
+                  <CheckCircle2 size={18} className="text-green-500 shrink-0" />
+                ) : (
+                  <button
+                    onClick={() => router.push('/fysio/sessie')}
+                    className="shrink-0 px-3 py-1.5 rounded-xl bg-[#f97316]/10 text-[#f97316] text-xs font-bold active:scale-95 transition-transform"
+                  >
+                    Start
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Coach bericht ────────────────────────────────────────────────────── */}
       {(coachBericht || coachLaden) && (

@@ -57,6 +57,19 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   const [notificatiesAan, setNotificatiesAan] = useState(!!profiel?.push_subscription)
   const [notificatiesLaden, setNotificatiesLaden] = useState(false)
 
+  const defaultBeschikbaarheid = { ma: 2, di: 0, wo: 2, do: 3, vr: 2, za: 3, zo: 0 }
+  const [beschikbaarheid, setBeschikbaarheid] = useState<Record<string, number>>(
+    (profiel as Record<string, unknown>)?.beschikbaarheid as Record<string, number> ?? defaultBeschikbaarheid
+  )
+  const [opbouwtempo, setOpbouwtempo] = useState<'rustig' | 'stabiel' | 'vliegend'>(
+    ((profiel as Record<string, unknown>)?.opbouwtempo as 'rustig' | 'stabiel' | 'vliegend') ?? 'stabiel'
+  )
+  const [ziekGeblesseerd, setZiekGeblesseerd] = useState<boolean>(
+    !!((profiel as Record<string, unknown>)?.ziek_geblesseerd)
+  )
+  const [planOpgeslagen, setPlanOpgeslagen] = useState(false)
+  const [planLaden, setPlanLaden] = useState(false)
+
   const [nieuwV, setNieuwV] = useState<{ naam: string; start_datum: string; eind_datum: string; kan_trainen: 'ja' | 'nee' | 'beperkt' }>({ naam: '', start_datum: '', eind_datum: '', kan_trainen: 'ja' })
   const [nieuwA, setNieuwA] = useState<NieuweActiviteit>({ naam: '', dag_van_week: 1, tijdstip: 'avond', blokkeert_hardlopen: true, blokkeert_fysio: false })
 
@@ -80,6 +93,36 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
     setOpgeslagen(true)
     setTimeout(() => setOpgeslagen(false), 2000)
     setLaden(false)
+  }
+
+  async function planInstellingenOpslaan() {
+    setPlanLaden(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setPlanLaden(false); return }
+    await supabase.from('profiles').update({
+      beschikbaarheid,
+      opbouwtempo,
+      ziek_geblesseerd: ziekGeblesseerd,
+    } as never).eq('id', user.id)
+    setPlanOpgeslagen(true)
+    setTimeout(() => setPlanOpgeslagen(false), 2000)
+    setPlanLaden(false)
+  }
+
+  async function toggleZiekGeblesseerd() {
+    const nieuw = !ziekGeblesseerd
+    setZiekGeblesseerd(nieuw)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('profiles').update({ ziek_geblesseerd: nieuw } as never).eq('id', user.id)
+    if (nieuw) {
+      // Plan aanpassen: verlicht komende sessies
+      await fetch('/api/training/aanpassen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessie_id: null, rating: 'ziek_geblesseerd' }),
+      })
+    }
   }
 
   async function vakantieToevoegen() {
@@ -208,6 +251,124 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             </Button>
           </div>
         </Card>
+      </section>
+
+      {/* Trainingsplan instellingen */}
+      <section>
+        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Trainingsplan</h2>
+
+        {/* Ziek / geblesseerd toggle */}
+        <Card className="mb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 pr-3">
+              <p className="font-semibold text-sm text-[#1a1612]">🤒 Ziek / geblesseerd</p>
+              <p className="text-xs text-[#6b6560] mt-0.5">
+                {ziekGeblesseerd
+                  ? 'Schema is verlicht — zet uit als je hersteld bent'
+                  : 'Zet aan om je schema automatisch te verlichten'}
+              </p>
+            </div>
+            <button
+              onClick={toggleZiekGeblesseerd}
+              className={cn(
+                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0',
+                ziekGeblesseerd ? 'bg-amber-500' : 'bg-[#d0cbc4]'
+              )}
+            >
+              <span className={cn(
+                'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+                ziekGeblesseerd ? 'translate-x-6' : 'translate-x-1'
+              )} />
+            </button>
+          </div>
+        </Card>
+
+        {/* Opbouwtempo */}
+        <Card className="mb-3">
+          <p className="text-sm font-semibold text-[#1a1612] mb-1">📈 Opbouwtempo</p>
+          <p className="text-xs text-[#6b6560] mb-3">
+            Elke optie bereikt hetzelfde piekvolume — het verschil is hoe snel je er naartoe werkt.
+          </p>
+          <div className="flex flex-col gap-2">
+            {([
+              { value: 'rustig', label: '🌅 Rustige start', sub: 'Prioriteit voor consistentie en herstel. Laagste blessurerisico.' },
+              { value: 'stabiel', label: '📊 Stabiele opbouw', sub: 'Evenwichtig met kwaliteitstrainingen. Gemiddeld blessurerisico.' },
+              { value: 'vliegend', label: '🚀 Vliegende start', sub: 'Snelste opbouw voor ervaren lopers. Hoogste blessurerisico.' },
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setOpbouwtempo(opt.value)}
+                className={cn(
+                  'flex flex-col items-start p-3 rounded-2xl border-2 text-left transition-all',
+                  opbouwtempo === opt.value
+                    ? 'border-[#f97316] bg-[#f97316]/8'
+                    : 'border-[#e8e3dc]'
+                )}
+              >
+                <p className={cn('text-sm font-semibold', opbouwtempo === opt.value ? 'text-[#f97316]' : 'text-[#1a1612]')}>
+                  {opt.label}
+                </p>
+                <p className="text-xs text-[#6b6560] mt-0.5">{opt.sub}</p>
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        {/* Beschikbaarheid */}
+        <Card className="mb-3">
+          <p className="text-sm font-semibold text-[#1a1612] mb-1">📅 Beschikbaarheid</p>
+          <p className="text-xs text-[#6b6560] mb-4">
+            Hoeveel tijd heb je per dag beschikbaar om te trainen?
+          </p>
+          <div className="flex flex-col gap-3">
+            {([
+              { key: 'ma', label: 'Maandag' },
+              { key: 'di', label: 'Dinsdag' },
+              { key: 'wo', label: 'Woensdag' },
+              { key: 'do', label: 'Donderdag' },
+              { key: 'vr', label: 'Vrijdag' },
+              { key: 'za', label: 'Zaterdag' },
+              { key: 'zo', label: 'Zondag' },
+            ] as const).map(({ key, label }) => {
+              const val = beschikbaarheid[key] ?? 0
+              return (
+                <div key={key} className="flex items-center gap-3">
+                  <span className="text-sm text-[#1a1612] w-20 shrink-0">{label}</span>
+                  <input
+                    type="range" min={0} max={4} step={0.5}
+                    value={val}
+                    onChange={e => setBeschikbaarheid(prev => ({ ...prev, [key]: parseFloat(e.target.value) }))}
+                    className="flex-1 accent-[#f97316]"
+                  />
+                  <span className={cn(
+                    'text-sm font-semibold w-10 text-right shrink-0',
+                    val === 0 ? 'text-[#c8c3bc]' : 'text-[#f97316]'
+                  )}>
+                    {val === 0 ? '—' : `${val}u`}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs text-[#a09990] mt-3 border-t border-[#f0ede8] pt-3">
+            Totaal: <span className="font-semibold text-[#1a1612]">
+              {Object.values(beschikbaarheid).reduce((a, b) => a + b, 0)}u per week
+            </span>
+            {' · '}Voor een marathon raden we 4–6u training per week aan.
+          </p>
+        </Card>
+
+        <button
+          onClick={planInstellingenOpslaan}
+          disabled={planLaden}
+          className={cn(
+            'w-full py-3.5 rounded-2xl text-sm font-bold transition-all',
+            planOpgeslagen ? 'bg-green-500 text-white' : 'bg-[#f97316] text-white active:scale-[0.98]',
+            planLaden && 'opacity-60'
+          )}
+        >
+          {planOpgeslagen ? '✓ Opgeslagen' : planLaden ? 'Opslaan…' : 'Instellingen opslaan'}
+        </button>
       </section>
 
       {/* Fysio & Core — los van trainingsschema */}

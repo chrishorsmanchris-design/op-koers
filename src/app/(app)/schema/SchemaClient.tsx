@@ -14,6 +14,8 @@ interface Props {
   sessies: (TrainingSession & { session_feedback: unknown[] })[]
   doel: Goal | null
   userId: string
+  wilCore: boolean
+  heeftFysio: boolean
 }
 
 // ── Kleuren per intensiteit ────────────────────────────────────────────────────
@@ -150,7 +152,7 @@ function RoosterModal({ sessie, alleSessies, onVerplaatsen, onLatenVervallen, on
 }
 
 // ── Hoofdcomponent ─────────────────────────────────────────────────────────────
-export function SchemaClient({ sessies: initSessies, doel }: Props) {
+export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }: Props) {
   const supabase = createClient()
   const [sessies, setSessies] = useState(initSessies)
   const [genereert, setGenereert] = useState(false)
@@ -218,6 +220,12 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
   async function markeerOvergeslagen(id: string) {
     setSessies(prev => prev.map(s => s.id === id ? { ...s, overgeslagen: true } : s))
     await supabase.from('training_sessions').update({ overgeslagen: true } as never).eq('id', id)
+    // Stille achtergrond-aanpassing — geen blokkerende UI-update nodig op schema
+    fetch('/api/training/aanpassen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessie_id: id, rating: 'overgeslagen' }),
+    }).catch(() => {})
   }
 
   function handleGemist(sessie: TrainingSession) {
@@ -449,6 +457,7 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
 
               // Rustdagen compact tonen
               if (isRust) {
+                const heeftExtra = wilCore || heeftFysio
                 return (
                   <div
                     key={sessie.id}
@@ -458,7 +467,13 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
                       <p className="text-[10px] font-semibold text-[#c8c3bc] uppercase">{dagAfkVanDatum(sessie.datum)}</p>
                       <p className="text-base font-bold text-[#d4cfc8]">{dagNummerVanDatum(sessie.datum)}</p>
                     </div>
-                    <p className="text-sm text-[#c8c3bc]">Rustdag</p>
+                    <p className="text-sm text-[#c8c3bc] flex-1">Rustdag</p>
+                    {heeftExtra && (
+                      <div className="flex gap-1">
+                        {wilCore && <span className="text-xs bg-[#06b6d4]/10 text-[#06b6d4] px-1.5 py-0.5 rounded-lg font-medium">🧘</span>}
+                        {heeftFysio && <span className="text-xs bg-[#f97316]/10 text-[#f97316] px-1.5 py-0.5 rounded-lg font-medium">💊</span>}
+                      </div>
+                    )}
                   </div>
                 )
               }
@@ -506,7 +521,7 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
                         </div>
 
                         {/* Meta info */}
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           {sessie.duur_minuten != null && (
                             <span className="flex items-center gap-1 text-xs text-[#a09990]">
                               <Timer size={10} />{formatDuur(sessie.duur_minuten)}
@@ -517,11 +532,19 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
                               <MapPin size={10} />{sessie.afstand_km} km
                             </span>
                           )}
-                          {sessie.intensiteit && (
-                            <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-semibold ml-auto', kleur.badge)}>
-                              {sessie.intensiteit}
-                            </span>
-                          )}
+                          <div className="flex gap-1 ml-auto">
+                            {sessie.intensiteit && (
+                              <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-semibold', kleur.badge)}>
+                                {sessie.intensiteit}
+                              </span>
+                            )}
+                            {wilCore && sessie.type === 'hardlopen' && (
+                              <span className="text-[10px] bg-[#06b6d4]/10 text-[#06b6d4] px-1.5 py-0.5 rounded-full font-medium">🧘</span>
+                            )}
+                            {heeftFysio && sessie.type === 'hardlopen' && (
+                              <span className="text-[10px] bg-[#f97316]/10 text-[#f97316] px-1.5 py-0.5 rounded-full font-medium">💊</span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
