@@ -1,5 +1,4 @@
 {
-  "nodeVersion": "20.x",
   "crons": [
     {
       "path": "/api/cron/ochtend?secret=opkoers-cron-2026",
