@@ -60,14 +60,14 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-end z-50" onClick={onSluit}>
+    <div className="fixed inset-0 bg-black/70 flex items-end z-50" onClick={() => onSluit()}>
       <div
         className="bg-white rounded-t-3xl p-6 w-full max-w-lg mx-auto pb-10"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-lg font-bold text-[#1a1612]">Hoe ging het?</h3>
-          <button onClick={onSluit} className="text-[#6b6560]"><X size={22} /></button>
+          <button onClick={() => onSluit()} className="text-[#6b6560]"><X size={22} /></button>
         </div>
 
         <p className="text-sm text-[#6b6560] mb-4">{sessie.beschrijving}</p>
