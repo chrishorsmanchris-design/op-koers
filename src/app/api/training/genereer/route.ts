@@ -62,28 +62,57 @@ HARTSLAGZONES (gebruik deze als trainingsrichtlijn):
 - Z5 Interval (intensiteit: interval): ${Math.round(maxHR * 0.90)}–${maxHR} bpm
 80% van het trainingsvolume hoort in Z1-Z2 (herstel + makkelijk).` : ''
 
+    // Beschikbaarheid per dag — bepaal trainbare dagen en aanbevolen sessies/week
+    const beschikbaarheid = (profiel as Record<string, unknown>)?.beschikbaarheid as
+      Record<string, number> | null ?? { ma: 2, di: 0, wo: 2, do: 3, vr: 2, za: 3, zo: 0 }
+    const DAGMAP: Record<string, string> = { ma: 'maandag', di: 'dinsdag', wo: 'woensdag', do: 'donderdag', vr: 'vrijdag', za: 'zaterdag', zo: 'zondag' }
+    const beschikbaarheidRegel = Object.entries(beschikbaarheid)
+      .map(([dag, uur]) => `${DAGMAP[dag]}: ${uur === 0 ? 'niet beschikbaar' : `${uur}u`}`)
+      .join(', ')
+
+    // Trainbare dagen = uur > 0 én niet geblokkeerd
+    const geblokkeerdeNamen = new Set(geblokkeerdeActiviteiten.map(a => DAGEN[a.dag_van_week]))
+    const trainbareDagen = Object.entries(beschikbaarheid)
+      .filter(([dag, uur]) => uur > 0 && !geblokkeerdeNamen.has(DAGMAP[dag]))
+      .map(([dag]) => DAGMAP[dag])
+
+    const kmPerWeek = profiel?.km_per_week ?? 30
+    // Richtlijn: minimale en maximale sessies/week op basis van volume
+    const minSessies = kmPerWeek <= 25 ? 3 : kmPerWeek <= 40 ? 3 : 4
+    const maxSessies = Math.min(trainbareDagen.length, kmPerWeek <= 25 ? 4 : kmPerWeek <= 40 ? 5 : 6)
+
+    const opbouwtempo = (profiel as Record<string, unknown>)?.opbouwtempo as string | null ?? 'stabiel'
+
     const prompt = `Je bent een ervaren atletiekcoach. Maak een professioneel marathon trainingsschema gebaseerd op Hal Higdon / Jack Daniels methode.
 
 VANDAAG (startdatum schema): ${vandaag}
 EERSTE SESSIE: moet op ${vandaag} of de eerstvolgende dag zijn — begin DIRECT, geen weken overslaan.
-ATLEET: huidig volume ${profiel?.km_per_week ?? '?'} km/week${hartslagInfo}
+ATLEET: huidig volume ${kmPerWeek} km/week | opbouwtempo: ${opbouwtempo}${hartslagInfo}
 DOEL: ${doel.naam} op ${doel.datum} | tijdsdoel: ${doel.tijdsdoel ?? 'finishen'}
 PERIODE: ${wekenTotDoel} weken VANAF VANDAAG (${vandaag} t/m ${new Date(new Date(vandaag).getTime() + wekenTotDoel * 7 * 86400000).toISOString().split('T')[0]})
 BLESSURE: ${profiel?.physio_klacht || 'geen bekende klachten'}
 VAKANTIES: ${vakanties?.map(v => `${v.start_datum} t/m ${v.eind_datum} (kan trainen: ${v.kan_trainen})`).join('; ') || 'geen'}
 
-GEBLOKKEERDE WEEKDAGEN — plaats op deze dagen ABSOLUUT geen hardloopsessie:
+BESCHIKBAARHEID PER DAG (verplicht respecteren):
+${beschikbaarheidRegel}
+Trainbare dagen deze week: ${trainbareDagen.join(', ') || 'zie beschikbaarheid'}
+
+GEBLOKKEERDE WEEKDAGEN — absoluut GEEN hardloopsessie:
 ${geblokkeerdeRegel}
-(dit zijn vaste activiteiten die hardlopen blokkeren)
+
+SESSIES PER WEEK: minimaal ${minSessies}, maximaal ${maxSessies}
+Gebruik ALLEEN de trainbare dagen hierboven. Plaats NOOIT een sessie op een dag met 0u beschikbaarheid.
+Spread de sessies goed over de week — nooit 2 zware sessies op opeenvolgende dagen.
 
 SCHEMA-OPBOUW:
 - Weken 1-4: basisfase (duurlopen, herstel, volume opbouwen)
 - Weken 5-10: opbouwfase (langere runs, interval toevoegen)
 - Weken 11-14: specificatiefase (marathon-tempo, peak week)
 - Laatste 2 weken: tapering (volume afbouwen, intensiteit bewaren)
-- Max 4 sessies/week. Minimaal 1 lange duurloop/week op weekend.
+- Minimaal 1 lange duurloop/week (weekend of rustige dag)
+- 80% van trainingen Z1-Z2 (herstel/makkelijk), 20% kwaliteit
 - Beschrijving max 55 tekens.
-${maxHR ? `- Verwerk de hartslagzone in de beschrijving als het relevant is, bijv. "Z2 duurloop" of "Z4 drempeltraining"` : ''}
+${maxHR ? `- Verwerk de hartslagzone in de beschrijving, bijv. "Z2 duurloop" of "Z4 drempeltraining"` : ''}
 
 TOEGESTANE TYPES: ${toegestaneTypes.join(' | ')}
 TOEGESTANE INTENSITEITEN: herstel | makkelijk | gemiddeld | zwaar | interval
