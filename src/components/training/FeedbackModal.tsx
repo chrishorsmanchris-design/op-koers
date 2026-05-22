@@ -16,7 +16,7 @@ const RATINGS = [
 
 interface Props {
   sessie: TrainingSession
-  onSluit: () => void
+  onSluit: (aangepast?: string) => void
 }
 
 export function FeedbackModal({ sessie, onSluit }: Props) {
@@ -51,7 +51,7 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
       if (data.aangepast && data.uitleg) {
         setBevestiging(data.uitleg)
         setLaden(false)
-        setTimeout(() => onSluit(), 3500)
+        setTimeout(() => onSluit(data.uitleg), 3500)
         return
       }
     }
