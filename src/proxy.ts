@@ -3,6 +3,10 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Preview-pagina vereist geen auth of Supabase
+  if (pathname.startsWith('/preview')) return NextResponse.next({ request })
+
   const publicRoutes = ['/login', '/register', '/offline']
 
   // Als env vars niet geconfigureerd zijn, stuur door naar login

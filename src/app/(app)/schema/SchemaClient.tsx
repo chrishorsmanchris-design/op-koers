@@ -1,25 +1,13 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { cn, formatDuur, dagKorteDatum } from '@/lib/utils'
 import type { Goal, TrainingSession } from '@/types/database'
-import { Loader2, RefreshCw, GripVertical, MapPin, Timer, CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-  arrayMove,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+  Loader2, RefreshCw, MapPin, Timer, CheckCircle2, XCircle,
+  ChevronLeft, ChevronRight, Calendar, MoveRight, X,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Props {
@@ -28,126 +16,152 @@ interface Props {
   userId: string
 }
 
-const INTENSITEIT_KLEUR: Record<string, string> = {
-  herstel: 'bg-blue-100 text-blue-700',
-  makkelijk: 'bg-green-100 text-green-700',
-  gemiddeld: 'bg-yellow-100 text-yellow-700',
-  zwaar: 'bg-orange-100 text-orange-700',
-  interval: 'bg-red-100 text-red-700',
+// ── Kleuren per intensiteit ────────────────────────────────────────────────────
+const KLEUR: Record<string, { bar: string; badge: string; dot: string }> = {
+  herstel:   { bar: '#93c5fd', badge: 'bg-blue-50 text-blue-700',     dot: '#93c5fd' },
+  makkelijk: { bar: '#4ade80', badge: 'bg-green-50 text-green-700',   dot: '#4ade80' },
+  gemiddeld: { bar: '#fbbf24', badge: 'bg-amber-50 text-amber-800',   dot: '#fbbf24' },
+  zwaar:     { bar: '#f97316', badge: 'bg-orange-50 text-orange-700', dot: '#f97316' },
+  interval:  { bar: '#f43f5e', badge: 'bg-rose-50 text-rose-700',     dot: '#f43f5e' },
 }
+
+const RUST_KLEUR = { bar: '#e8e3dc', badge: '', dot: '#e8e3dc' }
 
 const TYPE_EMOJI: Record<string, string> = {
-  hardlopen: '🏃',
-  rust: '😴',
+  hardlopen:      '🏃',
+  rust:           '😴',
   krachttraining: '💪',
-  cross: '🚴',
-  core: '🧘',
+  cross:          '🚴',
+  core:           '🧘',
 }
 
-interface SortableSessieProps {
+const DAG_LABELS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+
+function datumToDagIndex(datum: string): number {
+  const dow = new Date(datum + 'T12:00:00').getDay()
+  return dow === 0 ? 6 : dow - 1
+}
+
+function dagNummerVanDatum(datum: string): number {
+  return new Date(datum + 'T12:00:00').getDate()
+}
+
+function dagAfkVanDatum(datum: string): string {
+  const dow = new Date(datum + 'T12:00:00').getDay()
+  return DAG_LABELS[dow === 0 ? 6 : dow - 1]
+}
+
+function weekDateRange(sessies: TrainingSession[]): string {
+  if (!sessies.length) return ''
+  const sorted = [...sessies].map(s => s.datum).sort()
+  const fmt = (d: string) =>
+    new Date(d + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  return `${fmt(sorted[0])} – ${fmt(sorted[sorted.length - 1])}`
+}
+
+// ── Reschedule bottom sheet ────────────────────────────────────────────────────
+interface RoosterModalProps {
   sessie: TrainingSession
-  onGedaan: (id: string) => void
-  onOvergeslagen: (id: string) => void
+  alleSessies: TrainingSession[]
+  onVerplaatsen: (id: string, datum: string) => void
+  onLatenVervallen: (id: string) => void
+  onSluiten: () => void
 }
 
-function SortableSessie({ sessie, onGedaan, onOvergeslagen }: SortableSessieProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sessie.id })
-  const style = { transform: CSS.Transform.toString(transform), transition }
-  const [open, setOpen] = useState(false)
+function RoosterModal({ sessie, alleSessies, onVerplaatsen, onLatenVervallen, onSluiten }: RoosterModalProps) {
+  // Vrije dagen de komende 21 dagen (geen hockey di/zo, geen bestaande training)
+  const bezet = new Set(
+    alleSessies
+      .filter(s => s.id !== sessie.id && s.type !== 'rust' && !s.overgeslagen)
+      .map(s => s.datum)
+  )
 
-  const isOvergeslagen = sessie.overgeslagen
-  const isGedaan = sessie.voltooid
+  const kandidaten: string[] = []
+  const vandaag = new Date()
+  vandaag.setHours(0, 0, 0, 0)
+
+  for (let i = 1; i <= 28; i++) {
+    const d = new Date(vandaag)
+    d.setDate(d.getDate() + i)
+    const dow = d.getDay()
+    if (dow === 2 || dow === 0) continue // di (2) en zo (0) = hockey
+    const datum = d.toISOString().split('T')[0]
+    if (bezet.has(datum)) continue
+    kandidaten.push(datum)
+    if (kandidaten.length >= 6) break
+  }
+
+  const formatDatumLabel = (d: string) =>
+    new Date(d + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn('flex gap-2 items-start', isDragging && 'opacity-50 z-50')}
-    >
-      {/* Drag handle — alleen tonen als niet afgerond/overgeslagen */}
-      {!isGedaan && !isOvergeslagen ? (
-        <button {...attributes} {...listeners} className="mt-5 text-[#c8c3bc] touch-none shrink-0">
-          <GripVertical size={18} />
-        </button>
-      ) : (
-        <div className="w-[18px] mt-5 shrink-0" />
-      )}
+    <div className="fixed inset-0 z-50 flex items-end">
+      <div className="absolute inset-0 bg-black/40" onClick={onSluiten} />
+      <div className="relative w-full bg-white rounded-t-3xl shadow-2xl overflow-hidden">
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-[#e8e3dc] rounded-full" />
+        </div>
 
-      <Card className={cn(
-        'flex-1 transition-all',
-        isGedaan && 'opacity-50',
-        isOvergeslagen && 'opacity-40',
-      )}>
-        {/* Header — altijd zichtbaar */}
-        <button
-          onClick={() => !isGedaan && !isOvergeslagen && setOpen(o => !o)}
-          className="w-full text-left"
-          disabled={isGedaan || isOvergeslagen}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                <span className="text-xs font-semibold text-[#a09990]">
-                  {TYPE_EMOJI[sessie.type]} {dagKorteDatum(sessie.datum)}
-                </span>
-                {sessie.intensiteit && (
-                  <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', INTENSITEIT_KLEUR[sessie.intensiteit])}>
-                    {sessie.intensiteit}
-                  </span>
-                )}
-                {isGedaan && <CheckCircle2 size={14} className="text-green-500" />}
-                {isOvergeslagen && <XCircle size={14} className="text-[#a09990]" />}
-              </div>
-              <p className={cn('text-sm font-semibold', isOvergeslagen ? 'line-through text-[#a09990]' : 'text-[#1a1612]')}>
-                {sessie.beschrijving}
-              </p>
-              <div className="flex gap-3 mt-1 text-xs text-[#a09990]">
-                {sessie.duur_minuten != null && <span className="flex items-center gap-1"><Timer size={11} />{formatDuur(sessie.duur_minuten)}</span>}
-                {sessie.afstand_km != null && sessie.afstand_km > 0 && <span className="flex items-center gap-1"><MapPin size={11} />{sessie.afstand_km} km</span>}
-              </div>
+        <div className="px-5 pb-safe-or-8 pb-8">
+          <div className="flex justify-between items-start mb-4 mt-1">
+            <div>
+              <h3 className="font-bold text-[#1a1612] text-base">Training gemist</h3>
+              <p className="text-sm text-[#6b6560] mt-0.5 leading-snug">{sessie.beschrijving}</p>
             </div>
-            {!isGedaan && !isOvergeslagen && (
-              <div className="text-[#c8c3bc] shrink-0 mt-1">
-                {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </div>
-            )}
+            <button onClick={onSluiten} className="p-1.5 text-[#a09990] -mt-0.5">
+              <X size={18} />
+            </button>
           </div>
-        </button>
 
-        {/* Acties — uitklapbaar */}
-        {open && !isGedaan && !isOvergeslagen && (
-          <div className="flex gap-2 mt-3 pt-3 border-t border-[#f0ede8]">
-            <button
-              onClick={() => { onGedaan(sessie.id); setOpen(false) }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-green-50 text-green-700 text-sm font-medium border-2 border-green-200 transition-all active:scale-95"
-            >
-              <CheckCircle2 size={16} /> Gedaan
-            </button>
-            <button
-              onClick={() => { onOvergeslagen(sessie.id); setOpen(false) }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-[#f5f3f0] text-[#6b6560] text-sm font-medium border-2 border-[#e8e3dc] transition-all active:scale-95"
-            >
-              <XCircle size={16} /> Overgeslagen
-            </button>
-          </div>
-        )}
-      </Card>
+          <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wide mb-2">
+            Verplaatsen naar
+          </p>
+
+          {kandidaten.length === 0 ? (
+            <p className="text-sm text-[#a09990] mb-4">
+              Geen vrije trainingsdagen gevonden in de komende 4 weken.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2 mb-4">
+              {kandidaten.map(datum => (
+                <button
+                  key={datum}
+                  onClick={() => onVerplaatsen(sessie.id, datum)}
+                  className="flex items-center justify-between px-4 py-3 rounded-2xl bg-[#f5f3f0] border border-[#e8e3dc] text-sm font-medium text-[#1a1612] active:scale-[0.98] transition-transform"
+                >
+                  <span className="capitalize">{formatDatumLabel(datum)}</span>
+                  <MoveRight size={16} className="text-[#a09990]" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={() => onLatenVervallen(sessie.id)}
+            className="w-full py-3 rounded-2xl text-sm font-medium text-[#a09990] border border-[#e8e3dc] active:scale-[0.98] transition-transform"
+          >
+            Laten vervallen
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
 
+// ── Hoofdcomponent ─────────────────────────────────────────────────────────────
 export function SchemaClient({ sessies: initSessies, doel }: Props) {
   const supabase = createClient()
   const [sessies, setSessies] = useState(initSessies)
   const [genereert, setGenereert] = useState(false)
   const [importeert, setImporteert] = useState(false)
-  const [geselecteerdeWeek, setGeselecteerdeWeek] = useState<number | null>(null)
+  const [actieveWeekIndex, setActieveWeekIndex] = useState(0)
   const [uitleg, setUitleg] = useState('')
   const [fout, setFout] = useState('')
   const [foutTekst, setFoutTekst] = useState('')
+  const [roosterSessie, setRoosterSessie] = useState<TrainingSession | null>(null)
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
-
+  // Groepeer op weeknummer
   const weken = useMemo(() => {
     const map = new Map<number, typeof sessies>()
     sessies.forEach(s => {
@@ -155,16 +169,47 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
       if (!map.has(w)) map.set(w, [])
       map.get(w)!.push(s)
     })
-    return Array.from(map.entries()).sort(([a], [b]) => a - b)
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([weekNr, wSessies]) => ({
+        weekNr,
+        sessies: wSessies.sort((a, b) => a.datum.localeCompare(b.datum)),
+      }))
   }, [sessies])
 
-  const huidigWeek = weken[0]?.[0]
-  const actieveWeek = geselecteerdeWeek ?? huidigWeek
+  // Spring naar de eerste week met openstaande sessies
+  useEffect(() => {
+    if (weken.length === 0) return
+    const idx = weken.findIndex(w =>
+      w.sessies.some(s => !s.voltooid && !s.overgeslagen && s.type !== 'rust')
+    )
+    setActieveWeekIndex(Math.max(0, idx === -1 ? 0 : idx))
+  }, [weken.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const weekSessies = sessies
-    .filter(s => s.week_nummer === actieveWeek)
-    .sort((a, b) => new Date(a.datum).getTime() - new Date(b.datum).getTime())
+  const actieveWeek = weken[actieveWeekIndex]
+  const weekSessies = actieveWeek?.sessies ?? []
+  const actieveWeekNr = actieveWeek?.weekNr ?? 0
 
+  // Week statistieken (alleen trainingsessies, niet rust)
+  const weekStats = useMemo(() => {
+    const trainingen = weekSessies.filter(s => s.type !== 'rust')
+    const totalKm = trainingen.reduce((sum, s) => sum + (s.afstand_km ?? 0), 0)
+    const totalMin = trainingen.reduce((sum, s) => sum + (s.duur_minuten ?? 0), 0)
+    const gedaan = trainingen.filter(s => s.voltooid).length
+    const open = trainingen.filter(s => !s.voltooid && !s.overgeslagen).length
+    return { totalKm: Math.round(totalKm * 10) / 10, totalMin, gedaan, open, total: trainingen.length }
+  }, [weekSessies])
+
+  // Dag-dots (Ma t/m Zo)
+  const dagDots = useMemo(() =>
+    DAG_LABELS.map((label, i) => {
+      const sessie = weekSessies.find(s => datumToDagIndex(s.datum) === i)
+      return { label, sessie }
+    }),
+    [weekSessies]
+  )
+
+  // ── Acties ──────────────────────────────────────────────────────────────────
   async function markeerGedaan(id: string) {
     setSessies(prev => prev.map(s => s.id === id ? { ...s, voltooid: true } : s))
     await supabase.from('training_sessions').update({ voltooid: true } as never).eq('id', id)
@@ -175,6 +220,46 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
     await supabase.from('training_sessions').update({ overgeslagen: true } as never).eq('id', id)
   }
 
+  function handleGemist(sessie: TrainingSession) {
+    const isKritiek = ['interval', 'zwaar'].includes(sessie.intensiteit ?? '')
+    if (isKritiek) {
+      // Ren-patroon: bied reschedule aan voor zware sessies
+      setRoosterSessie(sessie)
+    } else {
+      markeerOvergeslagen(sessie.id)
+    }
+  }
+
+  async function handleVerplaatsen(id: string, nieuwDatum: string) {
+    // Zoek week_nummer van de doelweek op basis van bestaande sessies
+    const maandag = new Date(nieuwDatum + 'T12:00:00')
+    const dow = maandag.getDay()
+    maandag.setDate(maandag.getDate() - (dow === 0 ? 6 : dow - 1))
+    const zondag = new Date(maandag)
+    zondag.setDate(zondag.getDate() + 6)
+    const maDatum = maandag.toISOString().split('T')[0]
+    const zoDatum = zondag.toISOString().split('T')[0]
+
+    const doelWeekNr = sessies.find(s => s.datum >= maDatum && s.datum <= zoDatum)?.week_nummer ?? actieveWeekNr
+
+    setSessies(prev =>
+      prev.map(s => s.id === id
+        ? { ...s, datum: nieuwDatum, week_nummer: doelWeekNr, overgeslagen: false }
+        : s
+      )
+    )
+    await supabase
+      .from('training_sessions')
+      .update({ datum: nieuwDatum, week_nummer: doelWeekNr } as never)
+      .eq('id', id)
+    setRoosterSessie(null)
+  }
+
+  async function handleLatenVervallen(id: string) {
+    await markeerOvergeslagen(id)
+    setRoosterSessie(null)
+  }
+
   async function importeerPdfSchema() {
     if (!confirm('Dit vervangt je huidige schema met het volledige plan (opbouwfase + 14-weeks PDF-schema). Hockey en vakanties worden automatisch verwerkt. Doorgaan?')) return
     setImporteert(true)
@@ -182,11 +267,7 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
     try {
       const res = await fetch('/api/training/import-volledig', { method: 'POST' })
       const data = await res.json()
-      if (!res.ok) {
-        setFout(data.error ?? 'Import mislukt')
-        setImporteert(false)
-        return
-      }
+      if (!res.ok) { setFout(data.error ?? 'Import mislukt'); setImporteert(false); return }
       setUitleg(data.bericht ?? 'Schema geïmporteerd!')
       window.location.reload()
     } catch (e) {
@@ -215,62 +296,42 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
     }
   }
 
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-
-    const oudIndex = weekSessies.findIndex(s => s.id === active.id)
-    const nieuwIndex = weekSessies.findIndex(s => s.id === over.id)
-    const nieuwVolgorde = arrayMove(weekSessies, oudIndex, nieuwIndex)
-
-    // Datums rouleren zodat de trainingen op andere dagen vallen maar in dezelfde week blijven
-    const oudeData = weekSessies.map(s => s.datum)
-    const nieuweVolgorde = nieuwVolgorde.map((s, i) => ({ ...s, datum: oudeData[i] }))
-
-    setSessies(prev => prev.map(s => {
-      const update = nieuweVolgorde.find(n => n.id === s.id)
-      return update ? { ...s, datum: update.datum } : s
-    }))
-
-    await Promise.all(
-      nieuweVolgorde.map(s =>
-        supabase.from('training_sessions').update({ datum: s.datum } as never).eq('id', s.id)
-      )
-    )
-  }
-
-  // Weekvoortgang
-  const gedaanInWeek = weekSessies.filter(s => s.voltooid).length
-  const overgeslagenInWeek = weekSessies.filter(s => s.overgeslagen).length
-  const openInWeek = weekSessies.filter(s => !s.voltooid && !s.overgeslagen).length
-
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-5 p-4 pt-8 pb-24">
+
+      {/* Paginaheader */}
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-bold text-[#1a1612]">Trainingsschema</h1>
-          {doel && <p className="text-sm text-[#6b6560] mt-1">{doel.naam}</p>}
+          {doel && <p className="text-sm text-[#6b6560] mt-0.5">{doel.naam}</p>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {sessies.length > 0 && (
             <button
               onClick={() => window.open('/api/training/ical', '_blank')}
-              className="text-sm border border-[#e8e3dc] rounded-xl px-3 py-1.5 text-[#6b6560] hover:border-[#c8c3bc] transition-colors"
+              className="p-2 rounded-xl border border-[#e8e3dc] text-[#a09990] hover:border-[#c8c3bc] transition-colors"
+              title="Exporteer naar agenda"
             >
-              📅 Exporteer naar agenda
+              <Calendar size={16} />
             </button>
           )}
           <Button variant="secondary" size="sm" onClick={importeerPdfSchema} disabled={importeert || genereert}>
-            {importeert ? <Loader2 size={16} className="animate-spin mr-2" /> : <span className="mr-2">📄</span>}
-            {importeert ? 'Importeren...' : 'Slim importeren'}
+            {importeert ? <Loader2 size={15} className="animate-spin mr-1.5" /> : <span className="mr-1.5 text-sm">📄</span>}
+            {importeert ? 'Bezig...' : 'Importeren'}
           </Button>
-          <Button variant="secondary" size="sm" onClick={genereerSchema} disabled={genereert || importeert}>
-            {genereert ? <Loader2 size={16} className="animate-spin mr-2" /> : <RefreshCw size={16} className="mr-2" />}
-            {sessies.length === 0 ? 'Genereer' : 'Opnieuw'}
-          </Button>
+          <button
+            onClick={genereerSchema}
+            disabled={genereert || importeert}
+            className="p-2 rounded-xl border border-[#e8e3dc] text-[#a09990] hover:border-[#c8c3bc] transition-colors disabled:opacity-40"
+            title="Opnieuw genereren"
+          >
+            {genereert ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+          </button>
         </div>
       </div>
 
+      {/* Meldingen */}
       {uitleg && (
         <Card className="bg-[#f97316]/10 border border-[#f97316]/20">
           <p className="text-sm text-[#f97316]">💡 {uitleg}</p>
@@ -284,11 +345,14 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
         </Card>
       )}
 
+      {/* Leeg schema */}
       {sessies.length === 0 ? (
         <Card className="text-center py-12">
           <div className="text-5xl mb-3">📅</div>
           <h3 className="font-semibold text-[#1a1612] mb-1">Geen schema aangemaakt</h3>
-          <p className="text-sm text-[#6b6560] mb-4">Importeer het volledige schema (opbouwfase + PDF-plan, rekening houdend met hockey en vakanties)</p>
+          <p className="text-sm text-[#6b6560] mb-5">
+            Importeer het volledige plan — opbouwfase + PDF-schema, rekening houdend met hockey en vakanties.
+          </p>
           <div className="flex gap-2 justify-center flex-wrap">
             <Button onClick={importeerPdfSchema} loading={importeert}>📄 Slim importeren</Button>
             <Button variant="secondary" onClick={genereerSchema} loading={genereert}>AI-schema genereren</Button>
@@ -296,54 +360,245 @@ export function SchemaClient({ sessies: initSessies, doel }: Props) {
         </Card>
       ) : (
         <>
-          {/* Week selector */}
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-            {weken.map(([week]) => (
-              <button
-                key={week}
-                onClick={() => setGeselecteerdeWeek(week)}
-                className={cn(
-                  'px-4 py-2 rounded-2xl text-sm font-medium whitespace-nowrap transition-all shrink-0',
-                  actieveWeek === week
-                    ? 'bg-[#f97316] text-white'
-                    : 'bg-[#f0ede8] text-[#a09990]'
-                )}
-              >
-                Week {week}
-              </button>
-            ))}
+          {/* ── Week navigatie ──────────────────────────────────────────────── */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActieveWeekIndex(i => Math.max(0, i - 1))}
+              disabled={actieveWeekIndex === 0}
+              className="w-9 h-9 flex items-center justify-center rounded-xl text-[#a09990] disabled:opacity-25 hover:bg-[#f0ede8] transition-colors"
+            >
+              <ChevronLeft size={18} />
+            </button>
+
+            <div className="flex-1 text-center">
+              <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wide">Week {actieveWeekNr}</p>
+              <p className="text-sm font-bold text-[#1a1612]">{weekDateRange(weekSessies)}</p>
+            </div>
+
+            <button
+              onClick={() => setActieveWeekIndex(i => Math.min(weken.length - 1, i + 1))}
+              disabled={actieveWeekIndex === weken.length - 1}
+              className="w-9 h-9 flex items-center justify-center rounded-xl text-[#a09990] disabled:opacity-25 hover:bg-[#f0ede8] transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
 
-          {/* Weekvoortgang */}
-          {weekSessies.length > 0 && (
-            <div className="flex gap-3 text-xs text-[#6b6560]">
-              <span className="flex items-center gap-1"><CheckCircle2 size={12} className="text-green-500" /> {gedaanInWeek} gedaan</span>
-              {overgeslagenInWeek > 0 && <span className="flex items-center gap-1"><XCircle size={12} className="text-[#a09990]" /> {overgeslagenInWeek} overgeslagen</span>}
-              {openInWeek > 0 && <span>{openInWeek} nog te doen</span>}
+          {/* ── Week stats ──────────────────────────────────────────────────── */}
+          <div className="flex justify-between text-xs text-[#6b6560] -mt-2">
+            <div className="flex gap-3">
+              {weekStats.totalKm > 0 && (
+                <span className="flex items-center gap-1"><MapPin size={11} />{weekStats.totalKm} km</span>
+              )}
+              {weekStats.totalMin > 0 && (
+                <span className="flex items-center gap-1"><Timer size={11} />{formatDuur(weekStats.totalMin)}</span>
+              )}
+            </div>
+            <div className="flex gap-3">
+              {weekStats.gedaan > 0 && (
+                <span className="flex items-center gap-1 text-green-600"><CheckCircle2 size={11} /> {weekStats.gedaan} gedaan</span>
+              )}
+              {weekStats.open > 0 && <span>{weekStats.open} te doen</span>}
+            </div>
+          </div>
+
+          {/* ── Dag-dots overzicht (Ren-stijl) ──────────────────────────────── */}
+          <div className="flex gap-1 justify-between px-1">
+            {dagDots.map(({ label, sessie }, i) => {
+              const isGedaan = sessie?.voltooid
+              const isOvergeslagen = sessie?.overgeslagen
+              const isRust = sessie?.type === 'rust'
+              const kleur = sessie && !isRust
+                ? (KLEUR[sessie.intensiteit ?? 'makkelijk'] ?? KLEUR.makkelijk)
+                : RUST_KLEUR
+
+              return (
+                <div key={i} className="flex flex-col items-center gap-1.5">
+                  <div
+                    className={cn(
+                      'w-9 h-9 rounded-full flex items-center justify-center text-sm transition-all',
+                      isGedaan && 'ring-2 ring-green-400 ring-offset-1',
+                      isOvergeslagen && 'opacity-35',
+                    )}
+                    style={{
+                      backgroundColor: sessie && !isRust ? `${kleur.bar}25` : '#f5f3f0',
+                      border: `2px solid ${sessie && !isRust ? kleur.bar : '#e8e3dc'}`,
+                    }}
+                  >
+                    {isGedaan ? (
+                      <CheckCircle2 size={14} className="text-green-500" />
+                    ) : isOvergeslagen ? (
+                      <XCircle size={14} className="text-[#c8c3bc]" />
+                    ) : sessie && !isRust ? (
+                      <span>{TYPE_EMOJI[sessie.type] ?? '🏃'}</span>
+                    ) : null}
+                  </div>
+                  <span className="text-[10px] text-[#a09990] font-medium">{label}</span>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* ── Sessie-kaarten (Ren-stijl) ──────────────────────────────────── */}
+          <div className="flex flex-col gap-2.5">
+            {weekSessies.map(sessie => {
+              const isGedaan = sessie.voltooid
+              const isOvergeslagen = sessie.overgeslagen
+              const isRust = sessie.type === 'rust'
+              const kleur = isRust ? RUST_KLEUR : (KLEUR[sessie.intensiteit ?? 'makkelijk'] ?? KLEUR.makkelijk)
+
+              // Rustdagen compact tonen
+              if (isRust) {
+                return (
+                  <div
+                    key={sessie.id}
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#fafaf9] border border-[#f0ede8]"
+                  >
+                    <div className="w-10 shrink-0 text-center">
+                      <p className="text-[10px] font-semibold text-[#c8c3bc] uppercase">{dagAfkVanDatum(sessie.datum)}</p>
+                      <p className="text-base font-bold text-[#d4cfc8]">{dagNummerVanDatum(sessie.datum)}</p>
+                    </div>
+                    <p className="text-sm text-[#c8c3bc]">Rustdag</p>
+                  </div>
+                )
+              }
+
+              return (
+                <div
+                  key={sessie.id}
+                  className={cn(
+                    'rounded-2xl bg-white border border-[#f0ede8] overflow-hidden transition-opacity',
+                    (isGedaan || isOvergeslagen) && 'opacity-55',
+                  )}
+                >
+                  <div className="flex">
+                    {/* Dag kolom */}
+                    <div
+                      className="w-12 shrink-0 flex flex-col items-center justify-center py-4 gap-0.5"
+                      style={{ backgroundColor: `${kleur.bar}18` }}
+                    >
+                      <span className="text-[10px] font-bold uppercase" style={{ color: kleur.bar }}>
+                        {dagAfkVanDatum(sessie.datum)}
+                      </span>
+                      <span className="text-xl font-bold text-[#1a1612] leading-none">
+                        {dagNummerVanDatum(sessie.datum)}
+                      </span>
+                    </div>
+
+                    {/* Sessie content */}
+                    <div className="flex-1 flex flex-col min-w-0">
+                      {/* Intensiteitsbar (Ren-stijl) */}
+                      <div className="h-1.5 w-full" style={{ backgroundColor: kleur.bar }} />
+
+                      <div className="p-3 pb-2">
+                        {/* Naam + badge */}
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className={cn(
+                            'text-sm font-semibold leading-snug flex-1',
+                            isOvergeslagen ? 'line-through text-[#a09990]' : 'text-[#1a1612]'
+                          )}>
+                            {TYPE_EMOJI[sessie.type] ?? '🏃'} {sessie.beschrijving}
+                          </p>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {isGedaan && <CheckCircle2 size={14} className="text-green-500" />}
+                            {isOvergeslagen && <XCircle size={14} className="text-[#a09990]" />}
+                          </div>
+                        </div>
+
+                        {/* Meta info */}
+                        <div className="flex items-center gap-3">
+                          {sessie.duur_minuten != null && (
+                            <span className="flex items-center gap-1 text-xs text-[#a09990]">
+                              <Timer size={10} />{formatDuur(sessie.duur_minuten)}
+                            </span>
+                          )}
+                          {sessie.afstand_km != null && sessie.afstand_km > 0 && (
+                            <span className="flex items-center gap-1 text-xs text-[#a09990]">
+                              <MapPin size={10} />{sessie.afstand_km} km
+                            </span>
+                          )}
+                          {sessie.intensiteit && (
+                            <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-semibold ml-auto', kleur.badge)}>
+                              {sessie.intensiteit}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actieknoppen */}
+                      {!isGedaan && !isOvergeslagen && (
+                        <div className="flex border-t border-[#f5f3f0]">
+                          <button
+                            onClick={() => markeerGedaan(sessie.id)}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-green-600 active:bg-green-50 transition-colors"
+                          >
+                            <CheckCircle2 size={14} /> Gedaan
+                          </button>
+                          <div className="w-px bg-[#f5f3f0]" />
+                          <button
+                            onClick={() => handleGemist(sessie)}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-[#a09990] active:bg-[#f5f3f0] transition-colors"
+                          >
+                            <XCircle size={14} /> Gemist
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* ── Alle weken (compact pills) ──────────────────────────────────── */}
+          {weken.length > 1 && (
+            <div>
+              <p className="text-[10px] font-semibold text-[#c8c3bc] uppercase tracking-wide mb-2">
+                Alle weken
+              </p>
+              <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                {weken.map(({ weekNr }, i) => {
+                  const heeftOpen = weken[i].sessies.some(s => !s.voltooid && !s.overgeslagen && s.type !== 'rust')
+                  const isCompleet = weken[i].sessies
+                    .filter(s => s.type !== 'rust')
+                    .every(s => s.voltooid || s.overgeslagen)
+                  const isCurrent = actieveWeekIndex === i
+
+                  return (
+                    <button
+                      key={weekNr}
+                      onClick={() => setActieveWeekIndex(i)}
+                      className={cn(
+                        'relative px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all',
+                        isCurrent
+                          ? 'bg-[#1a1612] text-white'
+                          : isCompleet
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-[#f0ede8] text-[#6b6560]',
+                      )}
+                    >
+                      W{weekNr}
+                      {heeftOpen && !isCurrent && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[#f97316] rounded-full" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
-
-          {/* Hint */}
-          {openInWeek > 1 && (
-            <p className="text-xs text-[#a09990]">Versleep trainingen binnen de week om ze op een andere dag te doen.</p>
-          )}
-
-          {/* Sessies met drag-drop */}
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={weekSessies.map(s => s.id)} strategy={verticalListSortingStrategy}>
-              <div className="flex flex-col gap-2">
-                {weekSessies.map(sessie => (
-                  <SortableSessie
-                    key={sessie.id}
-                    sessie={sessie}
-                    onGedaan={markeerGedaan}
-                    onOvergeslagen={markeerOvergeslagen}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
         </>
+      )}
+
+      {/* Reschedule bottom sheet */}
+      {roosterSessie && (
+        <RoosterModal
+          sessie={roosterSessie}
+          alleSessies={sessies}
+          onVerplaatsen={handleVerplaatsen}
+          onLatenVervallen={handleLatenVervallen}
+          onSluiten={() => setRoosterSessie(null)}
+        />
       )}
     </div>
   )
