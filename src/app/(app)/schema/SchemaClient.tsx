@@ -219,8 +219,8 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
   }
 
   async function ongedaanMaken(id: string) {
-    setSessies(prev => prev.map(s => s.id === id ? { ...s, voltooid: false } : s))
-    await supabase.from('training_sessions').update({ voltooid: false } as never).eq('id', id)
+    setSessies(prev => prev.map(s => s.id === id ? { ...s, voltooid: false, overgeslagen: false } : s))
+    await supabase.from('training_sessions').update({ voltooid: false, overgeslagen: false } as never).eq('id', id)
   }
 
   async function markeerOvergeslagen(id: string) {
@@ -555,7 +555,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                       </div>
 
                       {/* Actieknoppen */}
-                      {isGedaan && !sessie.runkeeper_id && (
+                      {(isOvergeslagen || (isGedaan && !sessie.runkeeper_id)) && (
                         <div className="flex border-t border-[#f5f3f0]">
                           <button
                             onClick={() => ongedaanMaken(sessie.id)}
