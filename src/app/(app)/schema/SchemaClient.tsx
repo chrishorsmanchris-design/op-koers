@@ -155,6 +155,12 @@ function RoosterModal({ sessie, alleSessies, onVerplaatsen, onLatenVervallen, on
 export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }: Props) {
   const supabase = createClient()
   const vandaag = new Date().toISOString().split('T')[0]
+  // Volgende maandag — sessies vóór die datum (deze week + verleden) mogen afgevinkt worden
+  const volgendeWeekMaandag = (() => {
+    const d = new Date(); const dag = d.getDay()
+    d.setDate(d.getDate() - (dag === 0 ? 6 : dag - 1) + 7)
+    return d.toISOString().split('T')[0]
+  })()
   const [sessies, setSessies] = useState(initSessies)
   const [genereert, setGenereert] = useState(false)
   const [importeert, setImporteert] = useState(false)
@@ -565,7 +571,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                           </button>
                         </div>
                       )}
-                      {!isGedaan && !isOvergeslagen && sessie.datum <= vandaag && (
+                      {!isGedaan && !isOvergeslagen && sessie.datum < volgendeWeekMaandag && (
                         <div className="flex border-t border-[#f5f3f0]">
                           <button
                             onClick={() => markeerGedaan(sessie.id)}
