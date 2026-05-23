@@ -236,6 +236,11 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
     await supabase.from('training_sessions').update({ voltooid: false, overgeslagen: false } as never).eq('id', id)
   }
 
+  async function verwijderSessie(id: string) {
+    setSessies(prev => prev.filter(s => s.id !== id))
+    await supabase.from('training_sessions').delete().eq('id', id)
+  }
+
   async function markeerOvergeslagen(id: string) {
     setSessies(prev => prev.map(s => s.id === id ? { ...s, overgeslagen: true } : s))
     await supabase.from('training_sessions').update({ overgeslagen: true } as never).eq('id', id)
@@ -576,6 +581,17 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                           >
                             <XCircle size={14} /> Ongedaan maken
                           </button>
+                          {!sessie.runkeeper_id && (
+                            <>
+                              <div className="w-px bg-[#f5f3f0]" />
+                              <button
+                                onClick={() => verwijderSessie(sessie.id)}
+                                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-red-400 active:bg-red-50 transition-colors"
+                              >
+                                Verwijderen
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                       {!isGedaan && !isOvergeslagen && sessie.datum < volgendeWeekMaandag && (
@@ -593,6 +609,17 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                           >
                             <XCircle size={14} /> Gemist
                           </button>
+                          {!sessie.runkeeper_id && (
+                            <>
+                              <div className="w-px bg-[#f5f3f0]" />
+                              <button
+                                onClick={() => verwijderSessie(sessie.id)}
+                                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-red-400 active:bg-red-50 transition-colors"
+                              >
+                                Verwijderen
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>

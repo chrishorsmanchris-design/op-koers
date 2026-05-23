@@ -280,6 +280,11 @@ export function DashboardClient({
     ).length
   }, [sessies, weekStart, vandaag])
 
+  async function sessieVerwijderen(id: string) {
+    setSessies(prev => prev.filter(s => s.id !== id))
+    await supabase.from('training_sessions').delete().eq('id', id)
+  }
+
   // ── Acties ────────────────────────────────────────────────────────────────────
   async function sessieAfgerond(id: string) {
     const sessie = sessies.find(s => s.id === id)
@@ -497,6 +502,12 @@ export function DashboardClient({
                   Sla over
                 </button>
               </div>
+            )}
+            {(vandaagSessie.voltooid || vandaagSessie.overgeslagen) && !vandaagSessie.runkeeper_id && (
+              <button onClick={() => sessieVerwijderen(vandaagSessie.id)}
+                className="w-full text-center text-xs text-red-400 py-1.5 active:opacity-60 transition-opacity">
+                Verwijderen
+              </button>
             )}
           </div>
         </div>
