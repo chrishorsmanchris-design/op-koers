@@ -132,7 +132,7 @@ export async function POST() {
       { data: activiteiten },
     ] = await Promise.all([
       supabase.from('goals').select('*').eq('user_id', user.id).eq('actief', true).single(),
-      supabase.from('profiles').select('*').eq('user_id', user.id).single(),
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase.from('vacations').select('*').eq('user_id', user.id),
       supabase.from('recurring_activities').select('*').eq('user_id', user.id).eq('blokkeert_hardlopen', true),
     ])
@@ -142,8 +142,13 @@ export async function POST() {
     // Permanent geblokkeerde dagen (hockey etc.)
     const geblokkeerd = new Set<number>(activiteiten?.map(a => a.dag_van_week) ?? [])
 
-    // Beschikbare dagen (0=ma..6=zo minus geblokkeerd)
-    const beschikbaar = [0, 1, 2, 3, 4, 5, 6].filter(d => !geblokkeerd.has(d))
+    // Beschikbare dagen: uren > 0 in beschikbaarheid EN niet geblokkeerd
+    const dagSleutels = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
+    const beschikbaarheidMap = (profiel as Record<string, unknown>)?.beschikbaarheid as Record<string, number> | null
+      ?? { ma: 2, di: 0, wo: 2, do: 3, vr: 2, za: 3, zo: 0 }
+    const beschikbaar = [0, 1, 2, 3, 4, 5, 6].filter(d =>
+      !geblokkeerd.has(d) && (beschikbaarheidMap[dagSleutels[d]] ?? 0) > 0
+    )
 
     // Vakanties als simpele array
     const vakantieArray: Vakantie[] = (vakanties ?? []).map(v => ({
@@ -165,8 +170,12 @@ export async function POST() {
     // Aantal pre-plan weken (fase 1)
     const prePlanWeken = Math.max(0, Math.round((fase2Start.getTime() - fase1Start.getTime()) / (7 * 86400000)))
 
-    // Verwijder bestaande sessies
-    await supabase.from('training_sessions').delete().eq('user_id', user.id)
+    // Verwijder alleen niet-voltooide toekomstige sessies — bewaar trainingshistorie
+    const vandaagStr = new Date().toISOString().split('T')[0]
+    await supabase.from('training_sessions').delete()
+      .eq('user_id', user.id)
+      .eq('voltooid', false)
+      .gte('datum', vandaagStr)
 
     const alleSessies: object[] = []
     let volgorde = 1

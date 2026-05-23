@@ -631,6 +631,24 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               )} />
             </button>
           </div>
+          {notificatiesAan && (
+            <div className="mt-3 pt-3 border-t border-[#f0ede8]">
+              <button
+                onClick={async () => {
+                  const res = await fetch('/api/push/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: '🧪 Test notificatie', body: 'Push notificaties werken correct!', url: '/dashboard' }),
+                  })
+                  if (res.ok) alert('✓ Testbericht verstuurd — check je notificaties')
+                  else alert('✗ Versturen mislukt. Controleer of VAPID-sleutels zijn ingesteld in Vercel.')
+                }}
+                className="text-sm text-[#f97316] font-medium"
+              >
+                Stuur testbericht →
+              </button>
+            </div>
+          )}
         </Card>
       </section>
 

@@ -312,7 +312,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
     setGenereert(true)
     setFout('')
     try {
-      const res = await fetch('/api/training/genereer', { method: 'POST' })
+      const res = await fetch('/api/training/import-volledig', { method: 'POST' })
       const data = await res.json()
       if (!res.ok) {
         setFout(data.error ?? 'Onbekende fout')
