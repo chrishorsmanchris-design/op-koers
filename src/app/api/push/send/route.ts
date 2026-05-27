@@ -21,13 +21,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Geen push subscription' }, { status: 400 })
   }
 
+  // Controleer of VAPID-sleutels aanwezig zijn
+  if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_EMAIL) {
+    return NextResponse.json({ error: 'VAPID-sleutels niet geconfigureerd in Vercel omgevingsvariabelen' }, { status: 500 })
+  }
+
   try {
     await webpush.sendNotification(
       profiel.push_subscription as webpush.PushSubscription,
       JSON.stringify({ title, body, url: url ?? '/dashboard' })
     )
     return NextResponse.json({ ok: true })
-  } catch {
-    return NextResponse.json({ error: 'Push mislukt' }, { status: 500 })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Onbekende fout'
+    return NextResponse.json({ error: `Push mislukt: ${msg}` }, { status: 500 })
   }
 }

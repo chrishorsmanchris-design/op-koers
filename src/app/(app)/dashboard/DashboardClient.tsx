@@ -32,7 +32,12 @@ const INTENSITEIT_KLEUR: Record<string, { bar: string; badge: string }> = {
 }
 
 const TYPE_EMOJI: Record<string, string> = {
-  hardlopen: '🏃', rust: '😴', krachttraining: '💪', cross: '🚴', core: '🧘',
+  hardlopen: '🏃', rust: '😴', krachttraining: '💪', cross: '🚴', core: '🧘', fysio: '💊',
+}
+
+function sessieEmoji(sessie: { type: string; beschrijving?: string | null }): string {
+  if (sessie.type === 'core' && sessie.beschrijving?.toLowerCase().includes('fysio')) return '💊'
+  return TYPE_EMOJI[sessie.type] ?? '🏃'
 }
 
 const DAG_LABELS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
@@ -456,7 +461,7 @@ export function DashboardClient({
             <div className="flex items-start justify-between gap-2 mb-3">
               <div className="flex-1">
                 <p className="text-lg font-bold text-[#1a1612] leading-tight">
-                  {TYPE_EMOJI[vandaagSessie.type]} {vandaagSessie.beschrijving}
+                  {sessieEmoji(vandaagSessie)} {vandaagSessie.beschrijving}
                 </p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
@@ -503,7 +508,7 @@ export function DashboardClient({
                 </button>
               </div>
             )}
-            {(vandaagSessie.voltooid || vandaagSessie.overgeslagen) && !vandaagSessie.runkeeper_id && (
+            {(vandaagSessie.voltooid || vandaagSessie.overgeslagen) && (
               <button onClick={() => sessieVerwijderen(vandaagSessie.id)}
                 className="w-full text-center text-xs text-red-400 py-1.5 active:opacity-60 transition-opacity">
                 Verwijderen
@@ -567,7 +572,7 @@ export function DashboardClient({
                 >
                   {isGedaan ? <CheckCircle2 size={13} className="text-green-500" />
                   : isOvergeslagen ? <XCircle size={13} className="text-[#c8c3bc]" />
-                  : sessie ? <span className="text-xs">{TYPE_EMOJI[sessie.type]}</span>
+                  : sessie ? <span className="text-xs">{sessieEmoji(sessie)}</span>
                   : null}
                 </div>
                 <span className={cn(

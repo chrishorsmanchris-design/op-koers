@@ -56,6 +56,12 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   const [opgeslagen, setOpgeslagen] = useState(false)
   const [notificatiesAan, setNotificatiesAan] = useState(!!profiel?.push_subscription)
   const [notificatiesLaden, setNotificatiesLaden] = useState(false)
+  const [notificatieFout, setNotificatieFout] = useState<string | null>(null)
+  const [diagnose, setDiagnose] = useState<{
+    allesOk: boolean
+    checks: Record<string, boolean | string | null>
+  } | null>(null)
+  const [diagnoseLaden, setDiagnoseLaden] = useState(false)
 
   const defaultBeschikbaarheid = { ma: 2, di: 0, wo: 2, do: 3, vr: 2, za: 3, zo: 0 }
   const [beschikbaarheid, setBeschikbaarheid] = useState<Record<string, number>>(
@@ -69,6 +75,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   )
   const [planOpgeslagen, setPlanOpgeslagen] = useState(false)
   const [planLaden, setPlanLaden] = useState(false)
+  const [schemaLaden, setSchemaLaden] = useState(false)
 
   const [nieuwV, setNieuwV] = useState<{ naam: string; start_datum: string; eind_datum: string; kan_trainen: 'ja' | 'nee' | 'beperkt' }>({ naam: '', start_datum: '', eind_datum: '', kan_trainen: 'ja' })
   const [nieuwA, setNieuwA] = useState<NieuweActiviteit>({ naam: '', dag_van_week: 1, tijdstip: 'avond', blokkeert_hardlopen: true, blokkeert_fysio: false })
@@ -104,9 +111,16 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
       opbouwtempo,
       ziek_geblesseerd: ziekGeblesseerd,
     } as never).eq('id', user.id)
-    setPlanOpgeslagen(true)
-    setTimeout(() => setPlanOpgeslagen(false), 2000)
     setPlanLaden(false)
+
+    // Herbereken schema op basis van nieuwe instellingen
+    setSchemaLaden(true)
+    try {
+      await fetch('/api/training/import-volledig', { method: 'POST' })
+    } catch { /* stille fout — schema blijft ongewijzigd */ }
+    setSchemaLaden(false)
+    setPlanOpgeslagen(true)
+    setTimeout(() => setPlanOpgeslagen(false), 3000)
   }
 
   async function toggleZiekGeblesseerd() {
@@ -161,35 +175,61 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   }
 
   async function schakelNotificaties() {
-    if (notificatiesAan) {
-      await fetch('/api/push/subscribe', { method: 'DELETE' })
-      setNotificatiesAan(false)
-      return
-    }
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-      alert('Push notificaties worden niet ondersteund door je browser.')
-      return
-    }
-    setNotificatiesLaden(true)
+    setNotificatieFout(null)
     try {
-      const permission = await Notification.requestPermission()
-      if (permission !== 'granted') {
-        alert('Notificaties geweigerd. Pas dit aan in je browser-instellingen.')
+      if (notificatiesAan) {
+        await fetch('/api/push/subscribe', { method: 'DELETE' })
+        setNotificatiesAan(false)
         return
       }
+
+      if (!('Notification' in window)) {
+        setNotificatieFout('Je browser ondersteunt geen notificaties. Open de app via het beginscherm-icoontje (niet via Safari).')
+        return
+      }
+      if (!('serviceWorker' in navigator)) {
+        setNotificatieFout('Service worker niet beschikbaar. Herlaad de app via het beginscherm-icoontje.')
+        return
+      }
+
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      if (!vapidKey) {
+        setNotificatieFout('NEXT_PUBLIC_VAPID_PUBLIC_KEY niet ingesteld in Vercel.')
+        return
+      }
+
+      setNotificatiesLaden(true)
+
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        setNotificatieFout('Toestemming geweigerd. Ga naar iOS Instellingen → Op Koers → Meldingen → sta toe.')
+        return
+      }
+
       const reg = await navigator.serviceWorker.ready
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+
+      // Verwijder eventuele oude subscription (andere VAPID-key) vóór opnieuw inschrijven
+      const bestaande = await reg.pushManager.getSubscription()
+      if (bestaande) await bestaande.unsubscribe()
+
       const padding = '='.repeat((4 - vapidKey.length % 4) % 4)
       const base64 = (vapidKey + padding).replace(/-/g, '+').replace(/_/g, '/')
       const rawData = window.atob(base64)
       const key = new Uint8Array([...rawData].map(c => c.charCodeAt(0)))
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key })
-      await fetch('/api/push/subscribe', {
+
+      const res = await fetch('/api/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sub),
       })
+      if (!res.ok) {
+        setNotificatieFout('Opslaan subscription mislukt. Probeer opnieuw.')
+        return
+      }
       setNotificatiesAan(true)
+    } catch (err) {
+      setNotificatieFout(`Fout: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setNotificatiesLaden(false)
     }
@@ -360,14 +400,20 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
 
         <button
           onClick={planInstellingenOpslaan}
-          disabled={planLaden}
+          disabled={planLaden || schemaLaden}
           className={cn(
             'w-full py-3.5 rounded-2xl text-sm font-bold transition-all',
             planOpgeslagen ? 'bg-green-500 text-white' : 'bg-[#f97316] text-white active:scale-[0.98]',
-            planLaden && 'opacity-60'
+            (planLaden || schemaLaden) && 'opacity-70'
           )}
         >
-          {planOpgeslagen ? '✓ Opgeslagen' : planLaden ? 'Opslaan…' : 'Instellingen opslaan'}
+          {planOpgeslagen
+            ? '✓ Schema bijgewerkt'
+            : schemaLaden
+            ? '⏳ Schema herberekenen…'
+            : planLaden
+            ? 'Opslaan…'
+            : 'Opslaan & schema bijwerken'}
         </button>
       </section>
 
@@ -631,8 +677,51 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               )} />
             </button>
           </div>
+          {notificatieFout && (
+            <p className="mt-3 text-xs text-red-600 bg-red-50 rounded-xl px-3 py-2">{notificatieFout}</p>
+          )}
           {notificatiesAan && (
-            <div className="mt-3 pt-3 border-t border-[#f0ede8]">
+            <div className="mt-3 pt-3 border-t border-[#f0ede8] flex flex-col gap-3">
+              {/* Diagnose */}
+              <button
+                onClick={async () => {
+                  setDiagnoseLaden(true)
+                  setDiagnose(null)
+                  const res = await fetch('/api/push/diagnose')
+                  if (res.ok) setDiagnose(await res.json())
+                  setDiagnoseLaden(false)
+                }}
+                disabled={diagnoseLaden}
+                className="text-sm text-[#6b6560] font-medium"
+              >
+                {diagnoseLaden ? 'Controleren…' : '🔍 Diagnose uitvoeren'}
+              </button>
+
+              {diagnose && (
+                <div className="rounded-xl bg-[#f5f3f0] p-3 text-xs flex flex-col gap-1.5">
+                  {[
+                    { key: 'vapidPublicKey',  label: 'VAPID public key' },
+                    { key: 'vapidPrivateKey', label: 'VAPID private key' },
+                    { key: 'vapidEmail',      label: 'VAPID e-mail' },
+                    { key: 'cronSecret',      label: 'CRON_SECRET' },
+                    { key: 'pushSubscription',label: 'Push subscription opgeslagen' },
+                  ].map(({ key, label }) => {
+                    const ok = !!diagnose.checks[key]
+                    return (
+                      <div key={key} className="flex items-center gap-2">
+                        <span>{ok ? '✅' : '❌'}</span>
+                        <span className={ok ? 'text-[#1a1612]' : 'text-red-600 font-medium'}>{label}</span>
+                      </div>
+                    )
+                  })}
+                  {diagnose.allesOk
+                    ? <p className="text-green-700 font-medium mt-1">Alles in orde — stuur een testbericht ↓</p>
+                    : <p className="text-red-600 font-medium mt-1">Stel de ontbrekende omgevingsvariabelen in via Vercel → Settings → Environment Variables</p>
+                  }
+                </div>
+              )}
+
+              {/* Test bericht */}
               <button
                 onClick={async () => {
                   const res = await fetch('/api/push/send', {
@@ -640,8 +729,12 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ title: '🧪 Test notificatie', body: 'Push notificaties werken correct!', url: '/dashboard' }),
                   })
-                  if (res.ok) alert('✓ Testbericht verstuurd — check je notificaties')
-                  else alert('✗ Versturen mislukt. Controleer of VAPID-sleutels zijn ingesteld in Vercel.')
+                  if (res.ok) {
+                    alert('✓ Testbericht verstuurd — check je notificaties (kan 10–30s duren)')
+                  } else {
+                    const data = await res.json().catch(() => ({}))
+                    alert(`✗ Versturen mislukt: ${data.error ?? res.status}\n\nVoer de diagnose uit om te zien wat er ontbreekt.`)
+                  }
                 }}
                 className="text-sm text-[#f97316] font-medium"
               >

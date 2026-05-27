@@ -35,6 +35,12 @@ const TYPE_EMOJI: Record<string, string> = {
   krachttraining: '💪',
   cross:          '🚴',
   core:           '🧘',
+  fysio:          '💊',
+}
+
+function sessieEmoji(sessie: { type: string; beschrijving?: string | null }): string {
+  if (sessie.type === 'core' && sessie.beschrijving?.toLowerCase().includes('fysio')) return '💊'
+  return TYPE_EMOJI[sessie.type] ?? '🏃'
 }
 
 const DAG_LABELS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
@@ -462,7 +468,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                     ) : isOvergeslagen ? (
                       <XCircle size={14} className="text-[#c8c3bc]" />
                     ) : sessie && !isRust ? (
-                      <span>{TYPE_EMOJI[sessie.type] ?? '🏃'}</span>
+                      <span>{sessieEmoji(sessie)}</span>
                     ) : null}
                   </div>
                   <span className="text-[10px] text-[#a09990] font-medium">{label}</span>
@@ -536,7 +542,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                             'text-sm font-semibold leading-snug flex-1',
                             isOvergeslagen ? 'line-through text-[#a09990]' : 'text-[#1a1612]'
                           )}>
-                            {TYPE_EMOJI[sessie.type] ?? '🏃'} {sessie.beschrijving}
+                            {sessieEmoji(sessie)} {sessie.beschrijving}
                           </p>
                           <div className="flex items-center gap-1 shrink-0">
                             {isGedaan && <CheckCircle2 size={14} className="text-green-500" />}
@@ -573,7 +579,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                       </div>
 
                       {/* Actieknoppen */}
-                      {(isOvergeslagen || (isGedaan && !sessie.runkeeper_id)) && (
+                      {(isOvergeslagen || isGedaan) && (
                         <div className="flex border-t border-[#f5f3f0]">
                           <button
                             onClick={() => ongedaanMaken(sessie.id)}
@@ -581,17 +587,13 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                           >
                             <XCircle size={14} /> Ongedaan maken
                           </button>
-                          {!sessie.runkeeper_id && (
-                            <>
-                              <div className="w-px bg-[#f5f3f0]" />
-                              <button
-                                onClick={() => verwijderSessie(sessie.id)}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-red-400 active:bg-red-50 transition-colors"
-                              >
-                                Verwijderen
-                              </button>
-                            </>
-                          )}
+                          <div className="w-px bg-[#f5f3f0]" />
+                          <button
+                            onClick={() => verwijderSessie(sessie.id)}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-red-400 active:bg-red-50 transition-colors"
+                          >
+                            Verwijderen
+                          </button>
                         </div>
                       )}
                       {!isGedaan && !isOvergeslagen && sessie.datum < volgendeWeekMaandag && (
