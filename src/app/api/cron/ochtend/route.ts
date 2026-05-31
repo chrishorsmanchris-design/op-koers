@@ -126,27 +126,29 @@ export async function GET(req: NextRequest) {
         heeftFysio ? 'Heeft fysio oefeningen' : '',
       ].filter(Boolean).join('. ')
 
-      // Genereer AI bericht
-      const response = await claude.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 100,
-        messages: [{
-          role: 'user',
-          content: `Schrijf een korte motiverende push notificatie (max 90 tekens) voor hardloper ${naam}. Context: ${context}. Toon: vriendelijk coach, Nederlands, geen emoji aan het begin. Geef ALLEEN de tekst terug.`
-        }]
-      })
-
-      const bericht = response.content[0].type === 'text'
-        ? response.content[0].text.trim().slice(0, 100)
-        : trainingSessie
-          ? `Goedemorgen ${naam}! Je training staat klaar. Laten we gaan! 🏃`
-          : `Goedemorgen ${naam}! Vergeet je fysio en core niet vandaag. 💪`
-
       const titel = trainingSessie
-        ? `🏃 Training vandaag — ${trainingSessie.beschrijving?.slice(0, 30)}`
+        ? `🏃 ${trainingSessie.beschrijving?.slice(0, 40)}`
         : profiel.wil_core
           ? '🧘 Core & Fysio vandaag'
           : '🩺 Fysio vandaag'
+
+      // Genereer AI bericht — eigen try zodat push altijd verstuurd wordt bij AI-fout
+      let bericht = trainingSessie
+        ? `Goedemorgen ${naam}! Je training staat klaar. Laten we gaan! 💪`
+        : `Goedemorgen ${naam}! Vergeet je fysio en core niet vandaag.`
+      try {
+        const response = await claude.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 100,
+          messages: [{
+            role: 'user',
+            content: `Schrijf een korte motiverende push notificatie (max 90 tekens) voor hardloper ${naam}. Context: ${context}. Toon: vriendelijk coach, Nederlands, geen emoji aan het begin. Geef ALLEEN de tekst terug.`
+          }]
+        })
+        if (response.content[0].type === 'text') {
+          bericht = response.content[0].text.trim().slice(0, 100)
+        }
+      } catch { /* AI-fout: gebruik standaard bericht */ }
 
       await webpush.sendNotification(
         profiel.push_subscription as webpush.PushSubscription,
