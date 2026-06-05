@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import webpush from 'web-push'
 import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 export const maxDuration = 60
 
@@ -19,7 +19,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Ongeautoriseerd' }, { status: 401 })
   }
 
-  const supabase = await createClient()
+  const supabase = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
   const vandaag = new Date().toISOString().split('T')[0]
 
   // ── Strava sync voor alle gekoppelde gebruikers ─────────────────────────────
