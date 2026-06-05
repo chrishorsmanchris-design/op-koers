@@ -227,6 +227,7 @@ export function DashboardClient({
   const [coachLaden, setCoachLaden] = useState(false)
   const [stravaSync, setStravaSync] = useState<'idle' | 'bezig' | 'klaar'>('idle')
   const [planAangepast, setPlanAangepast] = useState<string | null>(null)
+  const [spreekt, setSpreekt] = useState(false)
 
   // Strava auto-sync — elke 30 minuten
   useEffect(() => {
@@ -708,7 +709,29 @@ export function DashboardClient({
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-[#6b6560] leading-relaxed">{coachBericht}</p>
+              <>
+                <p className="text-sm text-[#6b6560] leading-relaxed">{coachBericht}</p>
+                <button
+                  onClick={() => {
+                    if (!coachBericht) return
+                    if (spreekt) {
+                      window.speechSynthesis.cancel()
+                      setSpreekt(false)
+                      return
+                    }
+                    const utt = new SpeechSynthesisUtterance(coachBericht)
+                    utt.lang = 'nl-NL'
+                    utt.rate = 0.95
+                    utt.onend = () => setSpreekt(false)
+                    utt.onerror = () => setSpreekt(false)
+                    setSpreekt(true)
+                    window.speechSynthesis.speak(utt)
+                  }}
+                  className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[#f97316]"
+                >
+                  {spreekt ? '⏹ Stop' : '🎙️ Luister'}
+                </button>
+              </>
             )}
           </div>
         </div>
