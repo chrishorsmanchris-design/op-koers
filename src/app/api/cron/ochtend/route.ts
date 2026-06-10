@@ -13,9 +13,15 @@ export async function GET(req: NextRequest) {
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
     process.env.VAPID_PRIVATE_KEY!
   )
-  // Beveilig de cron endpoint
-  const secret = req.headers.get('x-cron-secret') ?? req.nextUrl.searchParams.get('secret')
-  if (secret !== process.env.CRON_SECRET) {
+  // Beveilig de cron endpoint — Vercel stuurt Authorization: Bearer <secret>
+  const authHeader = req.headers.get('authorization')
+  const querySecret = req.nextUrl.searchParams.get('secret')
+  const cronSecret = process.env.CRON_SECRET
+  const geautoriseerd =
+    authHeader === `Bearer ${cronSecret}` ||
+    querySecret === cronSecret ||
+    req.headers.get('x-cron-secret') === cronSecret
+  if (!geautoriseerd) {
     return NextResponse.json({ error: 'Ongeautoriseerd' }, { status: 401 })
   }
 
