@@ -25,9 +25,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Ongeautoriseerd' }, { status: 401 })
   }
 
+  // Controleer service role key — zonder deze werkt de cron niet (RLS blokkeert alles)
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({
+      error: 'SUPABASE_SERVICE_ROLE_KEY ontbreekt in Vercel omgevingsvariabelen. Voeg deze toe via Vercel → Settings → Environment Variables.',
+      verstuurd: 0,
+    }, { status: 500 })
+  }
+
   const supabase = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY
   )
   const vandaag = new Date().toISOString().split('T')[0]
 
@@ -93,12 +101,20 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Haal alle gebruikers op met een push subscription ───────────────────────
-  const { data: profielen } = await supabase
+  const { data: profielen, error: profielenFout } = await supabase
     .from('profiles')
     .select('id, naam, push_subscription, wil_core, core_per_week, fysio_per_week')
     .not('push_subscription', 'is', null)
 
-  if (!profielen?.length) return NextResponse.json({ verstuurd: 0 })
+  if (profielenFout) {
+    return NextResponse.json({
+      error: `Supabase profielen query mislukt: ${profielenFout.message}`,
+      hint: 'Controleer of SUPABASE_SERVICE_ROLE_KEY correct is ingesteld in Vercel.',
+      verstuurd: 0,
+    }, { status: 500 })
+  }
+
+  if (!profielen?.length) return NextResponse.json({ verstuurd: 0, debug: 'Geen profielen met push_subscription gevonden. Controleer of je push-notificaties hebt ingeschakeld in Instellingen.' })
 
   let verstuurd = 0
 
