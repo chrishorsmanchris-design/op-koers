@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
   const duurMin = Math.round((activity.moving_time as number) / 60)
   const hartslagGem = activity.average_heartrate ? Math.round(activity.average_heartrate as number) : null
   const hartslagMax = activity.max_heartrate ? Math.round(activity.max_heartrate as number) : null
+  const routePolyline = (activity.map as Record<string, unknown> | undefined)?.summary_polyline as string | null ?? null
 
   // Zoek bestaande geplande sessie op deze datum
   const { data: geplandeSessies } = await supabase
@@ -132,6 +133,7 @@ export async function POST(req: NextRequest) {
       werkelijke_duur: duurMin,
       hartslag_gem: hartslagGem,
       hartslag_max: hartslagMax,
+      route_polyline: routePolyline,
     } as never).eq('id', bestaandeFeedback.id)
   } else {
     await supabase.from('session_feedback').insert({
@@ -142,6 +144,7 @@ export async function POST(req: NextRequest) {
       werkelijke_duur: duurMin,
       hartslag_gem: hartslagGem,
       hartslag_max: hartslagMax,
+      route_polyline: routePolyline,
       notitie: `Strava — ${(activity.name as string) ?? ''}`,
     } as never)
   }

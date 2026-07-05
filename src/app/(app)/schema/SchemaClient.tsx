@@ -9,6 +9,9 @@ import {
   ChevronLeft, ChevronRight, Calendar, MoveRight, X,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { WorkoutModal } from '@/components/training/WorkoutModal'
+import { TempoZonesCard } from '@/components/training/TempoZonesCard'
+import { RouteThumbnail } from '@/components/training/RouteThumbnail'
 
 interface Props {
   sessies: (TrainingSession & { session_feedback: unknown[] })[]
@@ -170,9 +173,10 @@ interface AgendaWeergaveProps {
   onDatumChange: (id: string, datum: string) => void
   onVerwijderen: (id: string) => void
   onToggleVoltooid: (sessie: TrainingSession) => void
+  onOpenWorkout: (sessie: TrainingSession) => void
 }
 
-function AgendaWeergave({ sessies, onDatumChange, onVerwijderen, onToggleVoltooid }: AgendaWeergaveProps) {
+function AgendaWeergave({ sessies, onDatumChange, onVerwijderen, onToggleVoltooid, onOpenWorkout }: AgendaWeergaveProps) {
   const gesorteerd = [...sessies]
     .filter(s => s.type !== 'rust')
     .sort((a, b) => a.datum.localeCompare(b.datum))
@@ -200,7 +204,7 @@ function AgendaWeergave({ sessies, onDatumChange, onVerwijderen, onToggleVoltooi
               onChange={e => onDatumChange(s.id, e.target.value)}
               className="bg-[#222230] border border-[#2d2d3e] rounded-lg px-1.5 py-1 text-[11px] text-white shrink-0 w-[108px]"
             />
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenWorkout(s)}>
               <p className={cn(
                 'text-sm font-medium truncate',
                 s.overgeslagen ? 'line-through text-[#55556a]' : 'text-white'
@@ -243,6 +247,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
   const [fout, setFout] = useState('')
   const [foutTekst, setFoutTekst] = useState('')
   const [roosterSessie, setRoosterSessie] = useState<TrainingSession | null>(null)
+  const [workoutSessie, setWorkoutSessie] = useState<TrainingSession | null>(null)
   const [weergave, setWeergave] = useState<'week' | 'agenda'>('week')
 
   const huidigeMaandag = (() => {
@@ -590,6 +595,8 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
             </Card>
           )}
 
+          <TempoZonesCard />
+
           {/* ── Weergave-toggle: week-detail vs volledige agenda ─────────────── */}
           <div className="flex gap-1 p-1 bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl">
             <button
@@ -612,6 +619,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
               onDatumChange={handleVerplaatsen}
               onVerwijderen={verwijderSessie}
               onToggleVoltooid={s => s.voltooid ? ongedaanMaken(s.id) : markeerGedaan(s.id)}
+              onOpenWorkout={setWorkoutSessie}
             />
           ) : (
           <>
@@ -727,6 +735,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
 
               // Gesynchroniseerde/gelogde activiteit (Strava/Runkeeper): neutrale kaartstijl
               if (sessie.runkeeper_id) {
+                const routePolyline = (sessie.session_feedback?.[0] as { route_polyline?: string | null } | undefined)?.route_polyline
                 return (
                   <div
                     key={sessie.id}
@@ -750,6 +759,11 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                           <p className="text-sm font-semibold text-white mb-2 truncate">
                             {sessieEmoji(sessie)} {sessie.beschrijving}
                           </p>
+                          {routePolyline && (
+                            <div className="w-full h-14 rounded-lg bg-[#222230] mb-2 overflow-hidden">
+                              <RouteThumbnail polyline={routePolyline} className="w-full h-full" />
+                            </div>
+                          )}
                           <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#2d2d3e]">
                             <div>
                               <p className="text-sm font-bold text-white">{sessie.afstand_km ?? '–'} km</p>
@@ -802,7 +816,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                       {/* Intensiteitsbar (Ren-stijl) */}
                       <div className="h-1.5 w-full" style={{ backgroundColor: kleur.bar }} />
 
-                      <div className="p-3 pb-2">
+                      <div className="p-3 pb-2 cursor-pointer" onClick={() => setWorkoutSessie(sessie)}>
                         {/* Naam + badge */}
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <p className={cn(
@@ -910,6 +924,17 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
           onVerplaatsen={handleVerplaatsen}
           onLatenVervallen={handleLatenVervallen}
           onSluiten={() => setRoosterSessie(null)}
+        />
+      )}
+
+      {/* Workout-detailweergave */}
+      {workoutSessie && (
+        <WorkoutModal
+          beschrijving={workoutSessie.beschrijving}
+          duur_minuten={workoutSessie.duur_minuten}
+          afstand_km={workoutSessie.afstand_km}
+          intensiteit={workoutSessie.intensiteit}
+          onSluiten={() => setWorkoutSessie(null)}
         />
       )}
     </div>

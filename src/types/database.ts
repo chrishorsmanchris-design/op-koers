@@ -105,6 +105,7 @@ export interface Database {
           hartslag_max: number | null
           werkelijke_duur: number | null
           werkelijke_afstand: number | null
+          route_polyline: string | null
           created_at: string
         }
         Insert: Omit<Database['public']['Tables']['session_feedback']['Row'], 'id' | 'created_at'>

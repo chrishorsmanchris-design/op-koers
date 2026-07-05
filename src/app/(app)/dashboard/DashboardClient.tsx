@@ -10,6 +10,10 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import type { Goal, PhysioExercise, TrainingSession, Profile, RecurringActivity } from '@/types/database'
 import { FeedbackModal } from '@/components/training/FeedbackModal'
+import { WorkoutModal } from '@/components/training/WorkoutModal'
+import { RaceCountdownHero } from '@/components/training/RaceCountdownHero'
+import { ConsistencyRing } from '@/components/training/ConsistencyRing'
+import { WeerBadge } from '@/components/training/WeerBadge'
 
 interface Props {
   profiel: Profile | null
@@ -263,6 +267,7 @@ export function DashboardClient({
   const [sessies, setSessies] = useState(initSessies)
   const [feedbackSessie, setFeedbackSessie] = useState<TrainingSession | null>(null)
   const [verplaatsenSessie, setVerplaatsenSessie] = useState<TrainingSession | null>(null)
+  const [workoutSessie, setWorkoutSessie] = useState<TrainingSession | null>(null)
   const [toonRunLog, setToonRunLog] = useState(false)
   const [coachBericht, setCoachBericht] = useState<string | null>(null)
   const [coachLaden, setCoachLaden] = useState(false)
@@ -312,6 +317,12 @@ export function DashboardClient({
   const dagenTotDoel = doel
     ? Math.ceil((new Date(doel.datum).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : null
+
+  const procentPlanVoltooid = useMemo(() => {
+    if (alleSessies.length === 0) return 0
+    const voltooid = alleSessies.filter(s => s.voltooid).length
+    return (voltooid / alleSessies.length) * 100
+  }, [alleSessies])
 
   // Week voortgang voor header label "Week X/Y"
   const planWeekNummer = doel && geselecteerdeSessie?.week_nummer
@@ -531,7 +542,7 @@ export function DashboardClient({
         </div>
       )}
 
-      {/* ── Race / Tapering banner ───────────────────────────────────────────── */}
+      {/* ── Race countdown hero ──────────────────────────────────────────────── */}
       {isRaceDay && doel && (
         <div className="mx-4 mb-3 rounded-2xl bg-gradient-to-br from-[#f97316] to-[#ea6c0a] p-4 text-white text-center">
           <p className="text-3xl mb-1">🎉</p>
@@ -539,16 +550,18 @@ export function DashboardClient({
           <p className="font-semibold text-white/90">{doel.naam}</p>
         </div>
       )}
-      {isRaceWeek && !isRaceDay && doel && (
-        <div className="mx-4 mb-3 rounded-2xl bg-gradient-to-br from-[#f97316]/20 to-[#f97316]/10 border border-[#f97316]/30 p-3">
-          <p className="text-xs font-bold text-[#f97316] uppercase tracking-wide mb-0.5">🏁 Race week</p>
-          <p className="font-bold text-white text-sm">Nog {dagenTotDoel} dagen — {doel.naam}</p>
-        </div>
-      )}
-      {isTapering && !isRaceWeek && (
-        <div className="mx-4 mb-3 rounded-2xl bg-blue-950 border border-blue-800 p-3">
-          <p className="text-xs font-bold text-blue-400 uppercase tracking-wide mb-0.5">⚡ Tapering</p>
-          <p className="font-bold text-white text-sm">Nog {dagenTotDoel} dagen — bouw volume af</p>
+      {!isRaceDay && doel && dagenTotDoel !== null && dagenTotDoel > 0 && (
+        <div className="mx-4 mb-3">
+          <RaceCountdownHero
+            naam={doel.naam}
+            tijdsdoel={doel.tijdsdoel}
+            dagenTotDoel={dagenTotDoel}
+            procentVoltooid={procentPlanVoltooid}
+            onClick={() => router.push('/doel')}
+          />
+          {isTapering && (
+            <p className="mt-2 text-xs font-semibold text-blue-400">⚡ Tapering — bouw het volume nu af</p>
+          )}
         </div>
       )}
 
@@ -583,7 +596,10 @@ export function DashboardClient({
               {/* Kaart inhoud */}
               <div className="flex-1 p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
+                  <div
+                    className={cn('flex-1 min-w-0', geselecteerdeSessie.type === 'hardlopen' && 'cursor-pointer')}
+                    onClick={() => geselecteerdeSessie.type === 'hardlopen' && setWorkoutSessie(geselecteerdeSessie)}
+                  >
                     <p className="font-bold text-white text-base leading-snug">
                       {geselecteerdeSessie.beschrijving}
                     </p>
@@ -631,6 +647,7 @@ export function DashboardClient({
                         <span className="text-xs font-semibold text-white">{geselecteerdeSessie.afstand_km} km</span>
                       </div>
                     )}
+                    {geselecteerdeDag === vandaag && !geselecteerdeSessie.voltooid && <WeerBadge />}
                   </div>
                 )}
               </div>
@@ -695,51 +712,34 @@ export function DashboardClient({
           onClick={() => router.push('/schema')}
           className="w-full bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4 text-left"
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-white">
-              Overzicht van week {planWeekNummer ?? '—'}
-            </span>
-            <ChevronRight size={16} className="text-[#55556a]" />
-          </div>
-          {/* Voortgangsbalk met segmenten */}
-          <div className="flex gap-1 mb-2.5">
-            {Array.from({ length: Math.max(weekVoortgang.totaal, 1) }).map((_, i) => (
-              <div
-                key={i}
-                className={cn('flex-1 h-1 rounded-full transition-all', i < weekVoortgang.voltooid ? 'bg-[#f97316]' : 'bg-[#2d2d3e]')}
-              />
-            ))}
-          </div>
-          <div className="flex justify-between text-xs text-[#8888a8]">
-            <span>Trainingen: <span className="font-bold text-white">{weekVoortgang.voltooid}/{weekVoortgang.totaal}</span></span>
-            {weekVoortgang.totaalKm > 0 && (
-              <span>Afstand: <span className="font-bold text-white">{Math.round(weekVoortgang.voltooideKm * 10) / 10}/{Math.round(weekVoortgang.totaalKm * 10) / 10}KM</span></span>
-            )}
+          <div className="flex items-center gap-3">
+            <ConsistencyRing voltooid={weekVoortgang.voltooid} totaal={Math.max(weekVoortgang.totaal, 0)} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-white">
+                  Overzicht van week {planWeekNummer ?? '—'}
+                </span>
+                <ChevronRight size={16} className="text-[#55556a] shrink-0" />
+              </div>
+              {/* Voortgangsbalk met segmenten */}
+              <div className="flex gap-1 mb-2.5">
+                {Array.from({ length: Math.max(weekVoortgang.totaal, 1) }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={cn('flex-1 h-1 rounded-full transition-all', i < weekVoortgang.voltooid ? 'bg-[#f97316]' : 'bg-[#2d2d3e]')}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between text-xs text-[#8888a8]">
+                <span>Trainingen: <span className="font-bold text-white">{weekVoortgang.voltooid}/{weekVoortgang.totaal}</span></span>
+                {weekVoortgang.totaalKm > 0 && (
+                  <span>Afstand: <span className="font-bold text-white">{Math.round(weekVoortgang.voltooideKm * 10) / 10}/{Math.round(weekVoortgang.totaalKm * 10) / 10}KM</span></span>
+                )}
+              </div>
+            </div>
           </div>
         </button>
       </div>
-
-      {/* ── Doel voortgang ───────────────────────────────────────────────────── */}
-      {doel && dagenTotDoel !== null && dagenTotDoel > 0 && (
-        <div className="mx-4 mb-3">
-          <button
-            onClick={() => router.push('/doel')}
-            className="w-full bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4 text-left"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-[#55556a] mb-0.5">Jouw doel</p>
-                <p className="font-bold text-white truncate">{doel.naam}</p>
-                <div className="flex gap-3 mt-1">
-                  <span className="text-sm font-semibold text-[#f97316]">{dagenTotDoel} dagen</span>
-                  {doel.tijdsdoel && <span className="text-sm text-[#8888a8]">🎯 {doel.tijdsdoel}</span>}
-                </div>
-              </div>
-              <span className="text-3xl shrink-0 ml-3">🏁</span>
-            </div>
-          </button>
-        </div>
-      )}
 
       {/* ── Vandaag ook: Core & Fysio ────────────────────────────────────────── */}
       {(profiel?.wil_core || fysioOefeningen.length > 0) && (
@@ -845,6 +845,15 @@ export function DashboardClient({
       {/* ── Overlays ──────────────────────────────────────────────────────────── */}
       {feedbackSessie && (
         <FeedbackModal sessie={feedbackSessie} onSluit={handleFeedbackGesloten} />
+      )}
+      {workoutSessie && (
+        <WorkoutModal
+          beschrijving={workoutSessie.beschrijving}
+          duur_minuten={workoutSessie.duur_minuten}
+          afstand_km={workoutSessie.afstand_km}
+          intensiteit={workoutSessie.intensiteit}
+          onSluiten={() => setWorkoutSessie(null)}
+        />
       )}
       {verplaatsenSessie && (
         <VerplaatsenSheet
