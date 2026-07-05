@@ -120,7 +120,7 @@ function CountdownTimer({ seconden, onKlaar }: { seconden: number; onKlaar?: () 
 
   return (
     <div className="flex flex-col items-center gap-3 py-4">
-      <div className="text-5xl font-bold tabular-nums text-[#1a1612]">{resterend}s</div>
+      <div className="text-5xl font-bold tabular-nums text-white">{resterend}s</div>
       <div className="flex gap-2">
         <button onClick={() => setActief(v => !v)}
           className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#06b6d4] text-white font-medium">
@@ -128,7 +128,7 @@ function CountdownTimer({ seconden, onKlaar }: { seconden: number; onKlaar?: () 
           {actief ? 'Pauze' : resterend === seconden ? 'Start' : 'Hervat'}
         </button>
         <button onClick={() => { setResterend(seconden); setActief(false) }}
-          className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#f5f3f0] text-[#6b6560] border border-[#e8e3dc]">
+          className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#222230] text-[#8888a8] border border-[#2d2d3e]">
           <RotateCcw size={16} />
         </button>
       </div>
@@ -137,9 +137,9 @@ function CountdownTimer({ seconden, onKlaar }: { seconden: number; onKlaar?: () 
 }
 
 const MOEILIJKHEID_OPTIES = [
-  { label: 'Was makkelijk', icon: TrendingUp, kleur: 'bg-blue-50 text-blue-600 border-blue-200', waarde: 0 },
-  { label: 'Ging goed', icon: Minus, kleur: 'bg-green-50 text-green-600 border-green-200', waarde: 1 },
-  { label: 'Was zwaar', icon: TrendingDown, kleur: 'bg-orange-50 text-orange-600 border-orange-200', waarde: 2 },
+  { label: 'Was makkelijk', icon: TrendingUp, kleur: 'bg-blue-950 text-blue-400 border-blue-800', waarde: 0 },
+  { label: 'Ging goed', icon: Minus, kleur: 'bg-green-950 text-green-400 border-green-800', waarde: 1 },
+  { label: 'Was zwaar', icon: TrendingDown, kleur: 'bg-orange-950 text-orange-300 border-orange-800', waarde: 2 },
 ]
 
 export function CoreSessieClient() {
@@ -217,20 +217,20 @@ export function CoreSessieClient() {
     const goed = Object.values(beoordelingen).filter(v => v === 1).length
     const zwaar = Object.values(beoordelingen).filter(v => v === 2).length
     return (
-      <div className="min-h-screen bg-[#f5f3f0] flex flex-col items-center justify-center p-6 gap-6">
-        <div className="w-16 h-16 rounded-full bg-cyan-100 flex items-center justify-center text-3xl">🧘</div>
+      <div className="min-h-screen bg-[#111118] flex flex-col items-center justify-center p-6 gap-6">
+        <div className="w-16 h-16 rounded-full bg-cyan-950 flex items-center justify-center text-3xl">🧘</div>
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-[#1a1612] mb-2">Core sessie klaar!</h2>
-          <p className="text-[#6b6560]">{totaal} oefeningen · sterker onderrug</p>
+          <h2 className="text-2xl font-bold text-white mb-2">Core sessie klaar!</h2>
+          <p className="text-[#8888a8]">{totaal} oefeningen · sterker onderrug</p>
         </div>
         {/* Samenvatting */}
-        <div className="w-full max-w-xs bg-white rounded-2xl p-4 flex justify-around">
-          {makkelijk > 0 && <div className="text-center"><p className="text-lg font-bold text-blue-600">{makkelijk}</p><p className="text-xs text-[#a09990]">makkelijk</p></div>}
-          {goed > 0 && <div className="text-center"><p className="text-lg font-bold text-green-600">{goed}</p><p className="text-xs text-[#a09990]">goed</p></div>}
-          {zwaar > 0 && <div className="text-center"><p className="text-lg font-bold text-orange-500">{zwaar}</p><p className="text-xs text-[#a09990]">zwaar</p></div>}
+        <div className="w-full max-w-xs bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4 flex justify-around">
+          {makkelijk > 0 && <div className="text-center"><p className="text-lg font-bold text-blue-400">{makkelijk}</p><p className="text-xs text-[#55556a]">makkelijk</p></div>}
+          {goed > 0 && <div className="text-center"><p className="text-lg font-bold text-green-400">{goed}</p><p className="text-xs text-[#55556a]">goed</p></div>}
+          {zwaar > 0 && <div className="text-center"><p className="text-lg font-bold text-orange-400">{zwaar}</p><p className="text-xs text-[#55556a]">zwaar</p></div>}
         </div>
         {makkelijk > 0 && (
-          <p className="text-sm text-[#6b6560] text-center max-w-xs">
+          <p className="text-sm text-[#8888a8] text-center max-w-xs">
             Volgende sessie worden de makkelijke oefeningen iets intensiever. 💪
           </p>
         )}
@@ -245,20 +245,20 @@ export function CoreSessieClient() {
   const huidigVorigeRating = vorigeRatings[huidig]
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] flex flex-col">
+    <div className="min-h-screen bg-[#111118] flex flex-col">
       {/* Header */}
       <div className="px-4 pt-10 pb-4">
         <div className="flex items-center gap-3 mb-4">
-          <button onClick={() => router.push('/dashboard')} className="text-[#6b6560]"><X size={22} /></button>
+          <button onClick={() => router.push('/dashboard')} className="text-[#8888a8]"><X size={22} /></button>
           <div className="flex-1">
-            <p className="text-xs text-[#6b6560]">Core stability</p>
-            <p className="text-sm font-medium text-[#1a1612]">{huidig + 1} van {totaal}</p>
+            <p className="text-xs text-[#8888a8]">Core stability</p>
+            <p className="text-sm font-medium text-white">{huidig + 1} van {totaal}</p>
           </div>
         </div>
         <div className="flex gap-1">
           {oefeningen.map((_, i) => (
             <div key={i} className={cn('h-1.5 flex-1 rounded-full transition-colors',
-              i in beoordelingen ? 'bg-[#06b6d4]' : i === huidig ? 'bg-[#06b6d4]/50' : 'bg-[#e8e3dc]')} />
+              i in beoordelingen ? 'bg-[#06b6d4]' : i === huidig ? 'bg-[#06b6d4]/50' : 'bg-[#2d2d3e]')} />
           ))}
         </div>
       </div>
@@ -266,30 +266,30 @@ export function CoreSessieClient() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-6">
         {/* Oefening info */}
-        <div className="bg-white rounded-2xl p-4 mb-4">
+        <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4 mb-4">
           <div className="flex items-center gap-3 mb-3">
             <span className="text-3xl">{oefening.emoji}</span>
             <div>
-              <h1 className="text-xl font-bold text-[#1a1612]">{oefening.naam}</h1>
+              <h1 className="text-xl font-bold text-white">{oefening.naam}</h1>
               {huidigVorigeRating === 0 && (
-                <span className="text-xs text-blue-500 font-medium">↑ Intensiteit verhoogd</span>
+                <span className="text-xs text-blue-400 font-medium">↑ Intensiteit verhoogd</span>
               )}
               {huidigVorigeRating === 2 && (
-                <span className="text-xs text-orange-500 font-medium">↓ Intensiteit verlaagd</span>
+                <span className="text-xs text-orange-400 font-medium">↓ Intensiteit verlaagd</span>
               )}
             </div>
           </div>
-          <p className="text-sm text-[#6b6560] leading-relaxed mb-3">{oefening.beschrijving}</p>
+          <p className="text-sm text-[#8888a8] leading-relaxed mb-3">{oefening.beschrijving}</p>
           <div className="flex items-center gap-2 bg-[#06b6d4]/10 rounded-xl px-3 py-2">
             <span className="text-xs text-[#06b6d4] font-medium">💡 {oefening.tip}</span>
           </div>
         </div>
 
         {/* Sets / timer */}
-        <div className="bg-white rounded-2xl p-4 mb-4">
+        <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4 mb-4">
           {oefening.duur_seconden ? (
             <>
-              <div className="flex items-center gap-2 mb-1 text-sm text-[#6b6560]">
+              <div className="flex items-center gap-2 mb-1 text-sm text-[#8888a8]">
                 <Timer size={16} className="text-[#06b6d4]" />
                 <span>{oefening.sets} sets van {oefening.duur_seconden}s</span>
               </div>
@@ -298,28 +298,28 @@ export function CoreSessieClient() {
           ) : (
             <div className="flex items-center justify-center gap-6 py-4">
               <div className="text-center">
-                <p className="text-3xl font-bold text-[#1a1612]">{oefening.sets}</p>
-                <p className="text-xs text-[#6b6560] mt-1">sets</p>
+                <p className="text-3xl font-bold text-white">{oefening.sets}</p>
+                <p className="text-xs text-[#8888a8] mt-1">sets</p>
               </div>
-              <div className="text-[#e8e3dc] text-2xl">×</div>
+              <div className="text-[#2d2d3e] text-2xl">×</div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-[#1a1612]">{oefening.reps}</p>
-                <p className="text-xs text-[#6b6560] mt-1">herhalingen</p>
+                <p className="text-3xl font-bold text-white">{oefening.reps}</p>
+                <p className="text-xs text-[#8888a8] mt-1">herhalingen</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Moeilijkheid */}
-        <div className="bg-white rounded-2xl p-4 mb-4">
-          <p className="text-sm font-medium text-[#1a1612] mb-3">Hoe ging het?</p>
+        <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4 mb-4">
+          <p className="text-sm font-medium text-white mb-3">Hoe ging het?</p>
           <div className="flex gap-2">
             {MOEILIJKHEID_OPTIES.map(opt => {
               const Icon = opt.icon
               return (
                 <button key={opt.waarde} onClick={() => setKeuze(opt.waarde)}
                   className={cn('flex-1 py-2.5 rounded-xl text-xs font-medium border transition-all flex flex-col items-center gap-1',
-                    keuze === opt.waarde ? opt.kleur : 'bg-[#f5f3f0] text-[#6b6560] border-[#e8e3dc]')}>
+                    keuze === opt.waarde ? opt.kleur : 'bg-[#222230] text-[#8888a8] border-[#2d2d3e]')}>
                   <Icon size={14} />
                   {opt.label}
                 </button>
@@ -330,26 +330,26 @@ export function CoreSessieClient() {
       </div>
 
       {/* Bottom */}
-      <div className="px-4 pb-8 pt-2 bg-[#f5f3f0] border-t border-[#e8e3dc]">
+      <div className="px-4 pb-8 pt-2 bg-[#111118] border-t border-[#2d2d3e]">
         {fout && (
-          <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">{fout}</div>
+          <div className="mb-3 px-3 py-2 bg-red-950 border border-red-800 rounded-xl text-xs text-red-400">{fout}</div>
         )}
         <div className="flex gap-3">
           {huidig > 0 && (
             <button onClick={() => { setKeuze(null); setHuidig(h => h - 1) }}
-              className="flex items-center gap-1 px-4 py-3 rounded-2xl bg-white border border-[#e8e3dc] text-[#6b6560]">
+              className="flex items-center gap-1 px-4 py-3 rounded-2xl bg-[#1b1b27] border border-[#2d2d3e] text-[#8888a8]">
               <ChevronLeft size={18} />
             </button>
           )}
           <button onClick={markeerGedaan} disabled={keuze === null || opslaan}
             className={cn('flex-1 py-3 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-all',
-              keuze !== null && !opslaan ? 'bg-[#06b6d4] text-white' : 'bg-[#e8e3dc] text-[#9ca3af] cursor-not-allowed')}>
+              keuze !== null && !opslaan ? 'bg-[#06b6d4] text-white' : 'bg-[#2d2d3e] text-[#55556a] cursor-not-allowed')}>
             <CheckCircle2 size={18} />
             {opslaan ? 'Opslaan…' : isLaatste ? 'Sessie afronden' : 'Volgende oefening'}
           </button>
           {!isLaatste && (
             <button onClick={() => { setKeuze(null); setHuidig(h => Math.min(h + 1, totaal - 1)) }}
-              className="flex items-center gap-1 px-4 py-3 rounded-2xl bg-white border border-[#e8e3dc] text-[#6b6560]">
+              className="flex items-center gap-1 px-4 py-3 rounded-2xl bg-[#1b1b27] border border-[#2d2d3e] text-[#8888a8]">
               <ChevronRight size={18} />
             </button>
           )}

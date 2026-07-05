@@ -18,9 +18,9 @@ interface Props {
 }
 
 const KAN_TRAINEN_OPTIES = [
-  { value: 'ja', label: 'Ja', kleur: 'border-green-500 bg-green-500/10 text-green-600' },
-  { value: 'beperkt', label: 'Beperkt', kleur: 'border-yellow-500 bg-yellow-500/10 text-yellow-600' },
-  { value: 'nee', label: 'Nee', kleur: 'border-red-500 bg-red-500/10 text-red-600' },
+  { value: 'ja', label: 'Ja', kleur: 'border-green-500 bg-green-500/10 text-green-400' },
+  { value: 'beperkt', label: 'Beperkt', kleur: 'border-yellow-500 bg-yellow-500/10 text-amber-300' },
+  { value: 'nee', label: 'Nee', kleur: 'border-red-500 bg-red-500/10 text-red-400' },
 ]
 
 const DAGEN = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -239,24 +239,24 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
     <div className="flex flex-col gap-6 p-4 pt-4 pb-24">
 
       {stravaStatus === 'gekoppeld' && (
-        <div className="bg-green-50 border border-green-200 rounded-2xl px-4 py-3 text-sm text-green-700">
+        <div className="bg-green-950 border border-green-800 rounded-2xl px-4 py-3 text-sm text-green-400">
           ✓ Strava succesvol gekoppeld! Runs worden automatisch gesynchroniseerd.
         </div>
       )}
       {stravaStatus === 'geweigerd' && (
-        <div className="bg-[#f5f3f0] border border-[#e8e3dc] rounded-2xl px-4 py-3 text-sm text-[#6b6560]">
+        <div className="bg-[#222230] border border-[#2d2d3e] rounded-2xl px-4 py-3 text-sm text-[#8888a8]">
           Strava koppeling geannuleerd.
         </div>
       )}
       {stravaStatus === 'fout' && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 text-sm text-red-700">
+        <div className="bg-red-950 border border-red-800 rounded-2xl px-4 py-3 text-sm text-red-400">
           ✗ Strava koppeling mislukt. Controleer of de Strava API-sleutels correct zijn ingesteld.
         </div>
       )}
 
       {/* Profiel */}
       <section>
-        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Profiel</h2>
+        <h2 className="text-sm font-semibold text-[#8888a8] uppercase tracking-wider mb-3">Profiel</h2>
         <Card>
           <div className="flex flex-col gap-4">
             <Input id="naam" label="Naam" value={naam} onChange={e => setNaam(e.target.value)} />
@@ -270,18 +270,18 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               onClick={() => setWilCross(v => !v)}
               className={cn(
                 'flex items-center justify-between p-3 rounded-2xl border-2 transition-all text-left',
-                wilCross ? 'border-[#10b981] bg-[#10b981]/10' : 'border-[#e8e3dc] bg-[#f5f3f0]'
+                wilCross ? 'border-[#10b981] bg-[#10b981]/10' : 'border-[#2d2d3e] bg-[#222230]'
               )}
             >
               <div>
-                <p className={cn('font-medium text-sm', wilCross ? 'text-[#10b981]' : 'text-[#1a1612]')}>
+                <p className={cn('font-medium text-sm', wilCross ? 'text-[#10b981]' : 'text-white')}>
                   🚴 Cross-training
                 </p>
-                <p className="text-xs text-[#6b6560] mt-0.5">
+                <p className="text-xs text-[#8888a8] mt-0.5">
                   Fietsen, zwemmen of andere cardio als aanvulling op je loopschema
                 </p>
               </div>
-              <div className={cn('w-10 h-6 rounded-full transition-all shrink-0 ml-3 relative', wilCross ? 'bg-[#10b981]' : 'bg-[#d0cbc4]')}>
+              <div className={cn('w-10 h-6 rounded-full transition-all shrink-0 ml-3 relative', wilCross ? 'bg-[#10b981]' : 'bg-[#2d2d3e]')}>
                 <div className={cn('absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all', wilCross ? 'left-5' : 'left-1')} />
               </div>
             </button>
@@ -295,14 +295,14 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
 
       {/* Trainingsplan instellingen */}
       <section>
-        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Trainingsplan</h2>
+        <h2 className="text-sm font-semibold text-[#8888a8] uppercase tracking-wider mb-3">Trainingsplan</h2>
 
         {/* Ziek / geblesseerd toggle */}
         <Card className="mb-3">
           <div className="flex items-center justify-between">
             <div className="flex-1 pr-3">
-              <p className="font-semibold text-sm text-[#1a1612]">🤒 Ziek / geblesseerd</p>
-              <p className="text-xs text-[#6b6560] mt-0.5">
+              <p className="font-semibold text-sm text-white">🤒 Ziek / geblesseerd</p>
+              <p className="text-xs text-[#8888a8] mt-0.5">
                 {ziekGeblesseerd
                   ? 'Schema is verlicht — zet uit als je hersteld bent'
                   : 'Zet aan om je schema automatisch te verlichten'}
@@ -312,7 +312,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               onClick={toggleZiekGeblesseerd}
               className={cn(
                 'relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0',
-                ziekGeblesseerd ? 'bg-amber-500' : 'bg-[#d0cbc4]'
+                ziekGeblesseerd ? 'bg-amber-500' : 'bg-[#2d2d3e]'
               )}
             >
               <span className={cn(
@@ -325,8 +325,8 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
 
         {/* Opbouwtempo */}
         <Card className="mb-3">
-          <p className="text-sm font-semibold text-[#1a1612] mb-1">📈 Opbouwtempo</p>
-          <p className="text-xs text-[#6b6560] mb-3">
+          <p className="text-sm font-semibold text-white mb-1">📈 Opbouwtempo</p>
+          <p className="text-xs text-[#8888a8] mb-3">
             Elke optie bereikt hetzelfde piekvolume — het verschil is hoe snel je er naartoe werkt.
           </p>
           <div className="flex flex-col gap-2">
@@ -342,13 +342,13 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
                   'flex flex-col items-start p-3 rounded-2xl border-2 text-left transition-all',
                   opbouwtempo === opt.value
                     ? 'border-[#f97316] bg-[#f97316]/8'
-                    : 'border-[#e8e3dc]'
+                    : 'border-[#2d2d3e]'
                 )}
               >
-                <p className={cn('text-sm font-semibold', opbouwtempo === opt.value ? 'text-[#f97316]' : 'text-[#1a1612]')}>
+                <p className={cn('text-sm font-semibold', opbouwtempo === opt.value ? 'text-[#f97316]' : 'text-white')}>
                   {opt.label}
                 </p>
-                <p className="text-xs text-[#6b6560] mt-0.5">{opt.sub}</p>
+                <p className="text-xs text-[#8888a8] mt-0.5">{opt.sub}</p>
               </button>
             ))}
           </div>
@@ -356,8 +356,8 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
 
         {/* Beschikbaarheid */}
         <Card className="mb-3">
-          <p className="text-sm font-semibold text-[#1a1612] mb-1">📅 Beschikbaarheid</p>
-          <p className="text-xs text-[#6b6560] mb-4">
+          <p className="text-sm font-semibold text-white mb-1">📅 Beschikbaarheid</p>
+          <p className="text-xs text-[#8888a8] mb-4">
             Hoeveel tijd heb je per dag beschikbaar om te trainen?
           </p>
           <div className="flex flex-col gap-3">
@@ -373,7 +373,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               const val = beschikbaarheid[key] ?? 0
               return (
                 <div key={key} className="flex items-center gap-3">
-                  <span className="text-sm text-[#1a1612] w-20 shrink-0">{label}</span>
+                  <span className="text-sm text-white w-20 shrink-0">{label}</span>
                   <input
                     type="range" min={0} max={4} step={0.5}
                     value={val}
@@ -382,7 +382,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
                   />
                   <span className={cn(
                     'text-sm font-semibold w-10 text-right shrink-0',
-                    val === 0 ? 'text-[#c8c3bc]' : 'text-[#f97316]'
+                    val === 0 ? 'text-[#55556a]' : 'text-[#f97316]'
                   )}>
                     {val === 0 ? '—' : `${val}u`}
                   </span>
@@ -390,8 +390,8 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               )
             })}
           </div>
-          <p className="text-xs text-[#a09990] mt-3 border-t border-[#f0ede8] pt-3">
-            Totaal: <span className="font-semibold text-[#1a1612]">
+          <p className="text-xs text-[#55556a] mt-3 border-t border-[#2d2d3e] pt-3">
+            Totaal: <span className="font-semibold text-white">
               {Object.values(beschikbaarheid).reduce((a, b) => a + b, 0)}u per week
             </span>
             {' · '}Voor een marathon raden we 4–6u training per week aan.
@@ -419,18 +419,18 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
 
       {/* Fysio & Core — los van trainingsschema */}
       <section>
-        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-1">Fysio & core</h2>
-        <p className="text-xs text-[#a09990] mb-3">Staat los van je trainingsschema — reminders op het dashboard</p>
+        <h2 className="text-sm font-semibold text-[#8888a8] uppercase tracking-wider mb-1">Fysio & core</h2>
+        <p className="text-xs text-[#55556a] mb-3">Staat los van je trainingsschema — reminders op het dashboard</p>
         <Card className="mb-3">
-          <p className="text-sm font-medium text-[#1a1612] mb-1">🩺 Fysio-oefeningen</p>
-          <p className="text-xs text-[#6b6560] mb-3">Hoe vaak per week wil je je fysio-oefeningen doen?</p>
+          <p className="text-sm font-medium text-white mb-1">🩺 Fysio-oefeningen</p>
+          <p className="text-xs text-[#8888a8] mb-3">Hoe vaak per week wil je je fysio-oefeningen doen?</p>
           <div className="flex gap-2">
             {[2, 3, 4, 5].map(n => (
               <button key={n} onClick={() => setFysioPerWeek(n)}
                 className={cn('flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-all',
                   fysioPerWeek === n
                     ? 'border-[#f97316] bg-[#f97316]/10 text-[#f97316]'
-                    : 'border-[#e8e3dc] text-[#6b6560]')}>
+                    : 'border-[#2d2d3e] text-[#8888a8]')}>
                 {n}×
               </button>
             ))}
@@ -447,21 +447,21 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             )}
           >
             <div>
-              <p className={cn('font-medium text-sm', wilCore ? 'text-[#06b6d4]' : 'text-[#1a1612]')}>
+              <p className={cn('font-medium text-sm', wilCore ? 'text-[#06b6d4]' : 'text-white')}>
                 🧘 Core stability
               </p>
-              <p className="text-xs text-[#6b6560] mt-0.5">
+              <p className="text-xs text-[#8888a8] mt-0.5">
                 Onderrug, rompkracht en lenigheid — apart van je hardloopschema
               </p>
             </div>
-            <div className={cn('w-10 h-6 rounded-full transition-all shrink-0 ml-3 relative', wilCore ? 'bg-[#06b6d4]' : 'bg-[#d0cbc4]')}>
+            <div className={cn('w-10 h-6 rounded-full transition-all shrink-0 ml-3 relative', wilCore ? 'bg-[#06b6d4]' : 'bg-[#2d2d3e]')}>
               <div className={cn('absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all', wilCore ? 'left-5' : 'left-1')} />
             </div>
           </button>
 
           {wilCore && (
-            <div className="border-t border-[#f0ede8] pt-3">
-              <p className="text-xs font-medium text-[#6b6560] mb-2">Hoe vaak per week?</p>
+            <div className="border-t border-[#2d2d3e] pt-3">
+              <p className="text-xs font-medium text-[#8888a8] mb-2">Hoe vaak per week?</p>
               <div className="flex gap-2">
                 {[1, 2, 3].map(n => (
                   <button
@@ -471,7 +471,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
                       'flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-all',
                       corePerWeek === n
                         ? 'border-[#06b6d4] bg-[#06b6d4]/10 text-[#06b6d4]'
-                        : 'border-[#e8e3dc] text-[#6b6560]'
+                        : 'border-[#2d2d3e] text-[#8888a8]'
                     )}
                   >
                     {n}×
@@ -489,17 +489,17 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
 
       {/* Doelen */}
       <section>
-        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Doelen</h2>
+        <h2 className="text-sm font-semibold text-[#8888a8] uppercase tracking-wider mb-3">Doelen</h2>
         {doelen.map(doel => (
           <Card key={doel.id} className="mb-2">
             <div className="flex justify-between items-start">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-[#1a1612]">{doel.naam}</h3>
+                  <h3 className="font-semibold text-white">{doel.naam}</h3>
                   {doel.actief && <span className="text-xs bg-[#f97316]/20 text-[#f97316] px-2 py-0.5 rounded-full">Actief</span>}
                 </div>
-                <p className="text-sm text-[#6b6560]">{doel.datum}</p>
-                {doel.tijdsdoel && <p className="text-sm text-[#a09990]">Doel: {doel.tijdsdoel}</p>}
+                <p className="text-sm text-[#8888a8]">{doel.datum}</p>
+                {doel.tijdsdoel && <p className="text-sm text-[#55556a]">Doel: {doel.tijdsdoel}</p>}
               </div>
             </div>
           </Card>
@@ -508,27 +508,27 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
 
       {/* Vaste activiteiten */}
       <section>
-        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Vaste activiteiten</h2>
-        <p className="text-xs text-[#a09990] mb-3">Momenten die je trainingsschema beïnvloeden, bijv. hockeywedstrijd op dinsdag.</p>
+        <h2 className="text-sm font-semibold text-[#8888a8] uppercase tracking-wider mb-3">Vaste activiteiten</h2>
+        <p className="text-xs text-[#55556a] mb-3">Momenten die je trainingsschema beïnvloeden, bijv. hockeywedstrijd op dinsdag.</p>
 
         {activiteiten.map(a => (
           <Card key={a.id} className="mb-2">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="font-semibold text-[#1a1612]">{a.naam}</h3>
-                <p className="text-sm text-[#6b6560]">
+                <h3 className="font-semibold text-white">{a.naam}</h3>
+                <p className="text-sm text-[#8888a8]">
                   {DAGEN[a.dag_van_week]}{a.tijdstip ? ` · ${a.tijdstip}` : ''}
                 </p>
                 <div className="flex gap-1.5 mt-1">
                   {a.blokkeert_hardlopen && (
-                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Geen hardlopen</span>
+                    <span className="text-xs bg-orange-950 text-orange-300 px-2 py-0.5 rounded-full">Geen hardlopen</span>
                   )}
                   {a.blokkeert_fysio && (
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Geen fysio</span>
+                    <span className="text-xs bg-blue-950 text-blue-400 px-2 py-0.5 rounded-full">Geen fysio</span>
                   )}
                 </div>
               </div>
-              <button onClick={() => activiteitVerwijderen(a.id)} className="text-[#a09990]">
+              <button onClick={() => activiteitVerwijderen(a.id)} className="text-[#55556a]">
                 <Trash2 size={18} />
               </button>
             </div>
@@ -541,14 +541,14 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               onChange={e => setNieuwA({ ...nieuwA, naam: e.target.value })} placeholder="bijv. Hockey" />
 
             <div>
-              <p className="text-xs font-medium text-[#6b6560] mb-1.5">Dag</p>
+              <p className="text-xs font-medium text-[#8888a8] mb-1.5">Dag</p>
               <div className="grid grid-cols-4 gap-1.5">
                 {DAGEN.map((dag, i) => (
                   <button key={i} onClick={() => setNieuwA({ ...nieuwA, dag_van_week: i })}
                     className={cn('py-1.5 rounded-xl text-xs font-medium border-2 transition-all',
                       nieuwA.dag_van_week === i
                         ? 'border-[#f97316] bg-[#f97316]/10 text-[#f97316]'
-                        : 'border-[#e8e3dc] text-[#6b6560]'
+                        : 'border-[#2d2d3e] text-[#8888a8]'
                     )}>
                     {dag.slice(0, 2)}
                   </button>
@@ -557,14 +557,14 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             </div>
 
             <div>
-              <p className="text-xs font-medium text-[#6b6560] mb-1.5">Tijdstip</p>
+              <p className="text-xs font-medium text-[#8888a8] mb-1.5">Tijdstip</p>
               <div className="flex gap-2">
                 {TIJDSTIPPEN.map(t => (
                   <button key={t.value} onClick={() => setNieuwA({ ...nieuwA, tijdstip: t.value as NieuweActiviteit['tijdstip'] })}
                     className={cn('flex-1 py-2 rounded-xl text-xs font-medium border-2 transition-all',
                       nieuwA.tijdstip === t.value
                         ? 'border-[#f97316] bg-[#f97316]/10 text-[#f97316]'
-                        : 'border-[#e8e3dc] text-[#6b6560]'
+                        : 'border-[#2d2d3e] text-[#8888a8]'
                     )}>
                     {t.label}
                   </button>
@@ -573,13 +573,13 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             </div>
 
             <div>
-              <p className="text-xs font-medium text-[#6b6560] mb-1.5">Blokkeert</p>
+              <p className="text-xs font-medium text-[#8888a8] mb-1.5">Blokkeert</p>
               <div className="flex gap-2">
                 <button onClick={() => setNieuwA({ ...nieuwA, blokkeert_hardlopen: !nieuwA.blokkeert_hardlopen })}
                   className={cn('flex-1 py-2 rounded-xl text-xs font-medium border-2 transition-all',
                     nieuwA.blokkeert_hardlopen
                       ? 'border-orange-500 bg-orange-500/10 text-orange-600'
-                      : 'border-[#e8e3dc] text-[#6b6560]'
+                      : 'border-[#2d2d3e] text-[#8888a8]'
                   )}>
                   🏃 Hardlopen
                 </button>
@@ -587,7 +587,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
                   className={cn('flex-1 py-2 rounded-xl text-xs font-medium border-2 transition-all',
                     nieuwA.blokkeert_fysio
                       ? 'border-blue-500 bg-blue-500/10 text-blue-600'
-                      : 'border-[#e8e3dc] text-[#6b6560]'
+                      : 'border-[#2d2d3e] text-[#8888a8]'
                   )}>
                   💪 Fysio
                 </button>
@@ -603,21 +603,21 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
 
       {/* Vakanties */}
       <section>
-        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Vakanties</h2>
+        <h2 className="text-sm font-semibold text-[#8888a8] uppercase tracking-wider mb-3">Vakanties</h2>
         {vakanties.map(v => (
           <Card key={v.id} className="mb-2">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="font-semibold text-[#1a1612]">{v.naam}</h3>
-                <p className="text-sm text-[#6b6560]">{v.start_datum} → {v.eind_datum}</p>
+                <h3 className="font-semibold text-white">{v.naam}</h3>
+                <p className="text-sm text-[#8888a8]">{v.start_datum} → {v.eind_datum}</p>
                 <span className={cn('text-xs px-2 py-0.5 rounded-full',
-                  v.kan_trainen === 'ja' ? 'bg-green-100 text-green-700' :
-                  v.kan_trainen === 'beperkt' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                  v.kan_trainen === 'ja' ? 'bg-green-950 text-green-400' :
+                  v.kan_trainen === 'beperkt' ? 'bg-amber-950 text-amber-300' : 'bg-red-950 text-red-400'
                 )}>
                   {v.kan_trainen === 'ja' ? 'Kan trainen' : v.kan_trainen === 'beperkt' ? 'Beperkt' : 'Niet trainen'}
                 </span>
               </div>
-              <button onClick={() => vakantieVerwijderen(v.id)} className="text-[#a09990]">
+              <button onClick={() => vakantieVerwijderen(v.id)} className="text-[#55556a]">
                 <Trash2 size={18} />
               </button>
             </div>
@@ -637,7 +637,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
                 <button key={o.value}
                   onClick={() => setNieuwV({ ...nieuwV, kan_trainen: o.value as 'ja' | 'nee' | 'beperkt' })}
                   className={cn('flex-1 py-2 rounded-xl text-xs font-medium border-2 transition-all',
-                    nieuwV.kan_trainen === o.value ? o.kleur : 'border-[#e8e3dc] text-[#6b6560]')}>
+                    nieuwV.kan_trainen === o.value ? o.kleur : 'border-[#2d2d3e] text-[#8888a8]')}>
                   {o.label}
                 </button>
               ))}
@@ -651,12 +651,12 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
 
       {/* Notificaties */}
       <section>
-        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Notificaties</h2>
+        <h2 className="text-sm font-semibold text-[#8888a8] uppercase tracking-wider mb-3">Notificaties</h2>
         <Card>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-[#1a1612]">Ochtend coach bericht</h3>
-              <p className="text-sm text-[#6b6560]">
+              <h3 className="font-semibold text-white">Ochtend coach bericht</h3>
+              <p className="text-sm text-[#8888a8]">
                 {notificatiesAan
                   ? '✓ Elke ochtend om 7:00 een bericht van je coach'
                   : 'Ontvang elke ochtend je training en motivatie'}
@@ -667,7 +667,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               disabled={notificatiesLaden}
               className={cn(
                 'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none',
-                notificatiesAan ? 'bg-[#f97316]' : 'bg-[#d0cbc4]',
+                notificatiesAan ? 'bg-[#f97316]' : 'bg-[#2d2d3e]',
                 notificatiesLaden && 'opacity-50'
               )}
             >
@@ -678,10 +678,10 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             </button>
           </div>
           {notificatieFout && (
-            <p className="mt-3 text-xs text-red-600 bg-red-50 rounded-xl px-3 py-2">{notificatieFout}</p>
+            <p className="mt-3 text-xs text-red-400 bg-red-950 rounded-xl px-3 py-2">{notificatieFout}</p>
           )}
           {notificatiesAan && (
-            <div className="mt-3 pt-3 border-t border-[#f0ede8] flex flex-col gap-3">
+            <div className="mt-3 pt-3 border-t border-[#2d2d3e] flex flex-col gap-3">
               {/* Diagnose */}
               <button
                 onClick={async () => {
@@ -692,13 +692,13 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
                   setDiagnoseLaden(false)
                 }}
                 disabled={diagnoseLaden}
-                className="text-sm text-[#6b6560] font-medium"
+                className="text-sm text-[#8888a8] font-medium"
               >
                 {diagnoseLaden ? 'Controleren…' : '🔍 Diagnose uitvoeren'}
               </button>
 
               {diagnose && (
-                <div className="rounded-xl bg-[#f5f3f0] p-3 text-xs flex flex-col gap-1.5">
+                <div className="rounded-xl bg-[#222230] p-3 text-xs flex flex-col gap-1.5">
                   {[
                     { key: 'vapidPublicKey',  label: 'VAPID public key' },
                     { key: 'vapidPrivateKey', label: 'VAPID private key' },
@@ -710,13 +710,13 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
                     return (
                       <div key={key} className="flex items-center gap-2">
                         <span>{ok ? '✅' : '❌'}</span>
-                        <span className={ok ? 'text-[#1a1612]' : 'text-red-600 font-medium'}>{label}</span>
+                        <span className={ok ? 'text-white' : 'text-red-400 font-medium'}>{label}</span>
                       </div>
                     )
                   })}
                   {diagnose.allesOk
-                    ? <p className="text-green-700 font-medium mt-1">Alles in orde — stuur een testbericht ↓</p>
-                    : <p className="text-red-600 font-medium mt-1">Stel de ontbrekende omgevingsvariabelen in via Vercel → Settings → Environment Variables</p>
+                    ? <p className="text-green-400 font-medium mt-1">Alles in orde — stuur een testbericht ↓</p>
+                    : <p className="text-red-400 font-medium mt-1">Stel de ontbrekende omgevingsvariabelen in via Vercel → Settings → Environment Variables</p>
                   }
                 </div>
               )}
@@ -747,12 +747,12 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
 
       {/* Koppelingen */}
       <section>
-        <h2 className="text-sm font-semibold text-[#6b6560] uppercase tracking-wider mb-3">Koppelingen</h2>
+        <h2 className="text-sm font-semibold text-[#8888a8] uppercase tracking-wider mb-3">Koppelingen</h2>
         <Card>
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-[#1a1612]">Strava</h3>
-              <p className="text-sm text-[#6b6560]">
+              <h3 className="font-semibold text-white">Strava</h3>
+              <p className="text-sm text-[#8888a8]">
                 {profiel?.strava_refresh_token
                   ? `✓ Gekoppeld als ${profiel.strava_athlete_naam ?? 'onbekend'}`
                   : 'Koppel om runs automatisch te markeren als gedaan'}

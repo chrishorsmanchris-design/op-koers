@@ -66,6 +66,14 @@ function weekDateRange(maandag: string): string {
   return `${fmt(ma)} – ${fmt(zo)}`
 }
 
+function berekenTempo(duurMin?: number | null, afstandKm?: number | null): string {
+  if (!duurMin || !afstandKm) return '–'
+  const minPerKm = duurMin / afstandKm
+  const min = Math.floor(minPerKm)
+  const sec = Math.round((minPerKm - min) * 60)
+  return `${min}:${sec.toString().padStart(2, '0')}/km`
+}
+
 // ── Reschedule bottom sheet ────────────────────────────────────────────────────
 interface RoosterModalProps {
   sessie: TrainingSession
@@ -156,6 +164,67 @@ function RoosterModal({ sessie, alleSessies, onVerplaatsen, onLatenVervallen, on
   )
 }
 
+// ── Bewerkbare volledige agenda-weergave ───────────────────────────────────────
+interface AgendaWeergaveProps {
+  sessies: TrainingSession[]
+  onDatumChange: (id: string, datum: string) => void
+  onVerwijderen: (id: string) => void
+  onToggleVoltooid: (sessie: TrainingSession) => void
+}
+
+function AgendaWeergave({ sessies, onDatumChange, onVerwijderen, onToggleVoltooid }: AgendaWeergaveProps) {
+  const gesorteerd = [...sessies]
+    .filter(s => s.type !== 'rust')
+    .sort((a, b) => a.datum.localeCompare(b.datum))
+
+  if (gesorteerd.length === 0) {
+    return <p className="text-sm text-[#55556a] text-center py-8">Geen trainingen in de agenda.</p>
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {gesorteerd.map(s => {
+        const kleur = KLEUR[s.intensiteit ?? 'makkelijk'] ?? KLEUR.makkelijk
+        return (
+          <div key={s.id} className="flex items-center gap-2.5 p-3 rounded-2xl bg-[#1b1b27] border border-[#2d2d3e]">
+            <button onClick={() => onToggleVoltooid(s)} className="shrink-0">
+              {s.voltooid ? (
+                <CheckCircle2 size={20} className="text-green-500" />
+              ) : (
+                <div className="w-5 h-5 rounded-full border-2" style={{ borderColor: kleur.bar }} />
+              )}
+            </button>
+            <input
+              type="date"
+              value={s.datum}
+              onChange={e => onDatumChange(s.id, e.target.value)}
+              className="bg-[#222230] border border-[#2d2d3e] rounded-lg px-1.5 py-1 text-[11px] text-white shrink-0 w-[108px]"
+            />
+            <div className="flex-1 min-w-0">
+              <p className={cn(
+                'text-sm font-medium truncate',
+                s.overgeslagen ? 'line-through text-[#55556a]' : 'text-white'
+              )}>
+                {sessieEmoji(s)} {s.beschrijving}
+              </p>
+              {(s.duur_minuten || (s.afstand_km ?? 0) > 0) && (
+                <p className="text-[11px] text-[#55556a]">
+                  {s.duur_minuten ? formatDuur(s.duur_minuten) : ''}
+                  {s.duur_minuten && s.afstand_km ? ' · ' : ''}
+                  {s.afstand_km ? `${s.afstand_km} km` : ''}
+                </p>
+              )}
+            </div>
+            <button onClick={() => onVerwijderen(s.id)} className="shrink-0 p-1 text-[#55556a]">
+              <X size={16} />
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Hoofdcomponent ─────────────────────────────────────────────────────────────
 export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }: Props) {
   const supabase = createClient()
@@ -174,6 +243,13 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
   const [fout, setFout] = useState('')
   const [foutTekst, setFoutTekst] = useState('')
   const [roosterSessie, setRoosterSessie] = useState<TrainingSession | null>(null)
+  const [weergave, setWeergave] = useState<'week' | 'agenda'>('week')
+
+  const huidigeMaandag = (() => {
+    const d = new Date(); const dag = d.getDay()
+    d.setDate(d.getDate() - (dag === 0 ? 6 : dag - 1))
+    return d.toISOString().split('T')[0]
+  })()
 
   // Groepeer op kalenderweek (maandag van de week als sleutel) — niet op week_nummer
   // Zo verschijnen Strava-sessies en plan-sessies altijd in de juiste week
@@ -204,11 +280,6 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
   // week met openstaande sessies
   useEffect(() => {
     if (weken.length === 0) return
-    const huidigeMaandag = (() => {
-      const d = new Date(); const dag = d.getDay()
-      d.setDate(d.getDate() - (dag === 0 ? 6 : dag - 1))
-      return d.toISOString().split('T')[0]
-    })()
     const idxVandaag = weken.findIndex(w => w.maandag === huidigeMaandag)
     if (idxVandaag !== -1) {
       setActieveWeekIndex(idxVandaag)
@@ -233,6 +304,42 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
     const open = trainingen.filter(s => !s.voltooid && !s.overgeslagen).length
     return { totalKm: Math.round(totalKm * 10) / 10, totalMin, gedaan, open, total: trainingen.length }
   }, [weekSessies])
+
+  // Algehele plan-statistieken (heel schema, niet alleen actieve week)
+  const algeheleStats = useMemo(() => {
+    const trainingen = sessies.filter(s => s.type !== 'rust')
+    const gedaan = trainingen.filter(s => s.voltooid).length
+    const kmGedaan = trainingen.filter(s => s.voltooid).reduce((sum, s) => sum + (s.afstand_km ?? 0), 0)
+    const kmGepland = trainingen.reduce((sum, s) => sum + (s.afstand_km ?? 0), 0)
+    const wekenVerstreken = weken.filter(w => w.maandag < huidigeMaandag).length
+    const dagenTotWedstrijd = doel
+      ? Math.ceil((new Date(doel.datum + 'T12:00:00').getTime() - Date.now()) / 86400000)
+      : null
+    return {
+      gedaan,
+      totaal: trainingen.length,
+      kmGedaan: Math.round(kmGedaan * 10) / 10,
+      kmGepland: Math.round(kmGepland * 10) / 10,
+      wekenTeGaan: Math.max(0, weken.length - wekenVerstreken),
+      dagenTotWedstrijd,
+    }
+  }, [sessies, weken, huidigeMaandag, doel])
+
+  // Simpel inzicht op basis van gemiste trainingen per intensiteit
+  const inzicht = useMemo(() => {
+    const gemist = sessies.filter(s => s.overgeslagen && s.type !== 'rust')
+    if (gemist.length === 0) {
+      if (algeheleStats.gedaan > 0) return `Sterk bezig — je hebt nog geen enkele training gemist.`
+      return null
+    }
+    const perIntensiteit = new Map<string, number>()
+    gemist.forEach(s => {
+      const key = s.intensiteit ?? 'onbekend'
+      perIntensiteit.set(key, (perIntensiteit.get(key) ?? 0) + 1)
+    })
+    const [meestGemist, aantal] = Array.from(perIntensiteit.entries()).sort((a, b) => b[1] - a[1])[0]
+    return `Je hebt tot nu toe ${gemist.length} training${gemist.length === 1 ? '' : 'en'} gemist, vooral van het type "${meestGemist}" (${aantal}×).`
+  }, [sessies, algeheleStats.gedaan])
 
   // Dag-dots (Ma t/m Zo)
   const dagDots = useMemo(() =>
@@ -410,6 +517,104 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
         </Card>
       ) : (
         <>
+          {/* ── Planoverzicht: racebadge, stats, inzicht, voortgangsdots ───── */}
+          {doel && (
+            <Card className="!p-0 overflow-hidden">
+              <div className="p-4 pb-3 border-b border-[#2d2d3e] flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#f97316] to-[#ea6c0a] flex items-center justify-center text-xl shrink-0">
+                  🏁
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white truncate">{doel.naam}</p>
+                  <p className="text-xs text-[#8888a8]">
+                    {algeheleStats.dagenTotWedstrijd != null && algeheleStats.dagenTotWedstrijd >= 0
+                      ? `${algeheleStats.dagenTotWedstrijd} dagen te gaan`
+                      : 'Wedstrijddag geweest'}
+                    {doel.tijdsdoel && ` · doel ${doel.tijdsdoel}`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 divide-x divide-[#2d2d3e] border-b border-[#2d2d3e]">
+                <div className="p-3 text-center">
+                  <p className="text-base font-bold text-white">{algeheleStats.gedaan}/{algeheleStats.totaal}</p>
+                  <p className="text-[10px] text-[#55556a] uppercase tracking-wide">Trainingen</p>
+                </div>
+                <div className="p-3 text-center">
+                  <p className="text-base font-bold text-white">{algeheleStats.kmGedaan}/{algeheleStats.kmGepland}</p>
+                  <p className="text-[10px] text-[#55556a] uppercase tracking-wide">Km</p>
+                </div>
+                <div className="p-3 text-center">
+                  <p className="text-base font-bold text-white">{algeheleStats.wekenTeGaan}</p>
+                  <p className="text-[10px] text-[#55556a] uppercase tracking-wide">Weken te gaan</p>
+                </div>
+              </div>
+
+              {inzicht && (
+                <div className="px-4 py-3 border-b border-[#2d2d3e]">
+                  <p className="text-xs text-[#8888a8] leading-snug">💡 {inzicht}</p>
+                </div>
+              )}
+
+              <div className="p-4">
+                <p className="text-[10px] font-semibold text-[#55556a] uppercase tracking-wide mb-2">Voortgang per week</p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {weken.map((w, i) => {
+                    const trainingen = w.sessies.filter(s => s.type !== 'rust')
+                    const gedaan = trainingen.filter(s => s.voltooid).length
+                    const heeftOpen = trainingen.some(s => !s.voltooid && !s.overgeslagen)
+                    const isCompleet = trainingen.length > 0 && trainingen.every(s => s.voltooid || s.overgeslagen)
+                    const isVerleden = w.maandag < huidigeMaandag
+                    const isHuidig = i === actieveWeekIndex
+                    let kleur = '#2d2d3e'
+                    if (isCompleet) kleur = '#4ade80'
+                    else if (isVerleden && heeftOpen) kleur = '#f43f5e'
+                    else if (gedaan > 0) kleur = '#f97316'
+                    return (
+                      <button
+                        key={w.weekNr}
+                        onClick={() => { setWeergave('week'); setActieveWeekIndex(i) }}
+                        title={`Week ${w.weekNr} — ${weekDateRange(w.maandag)}`}
+                        className={cn(
+                          'w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold transition-all',
+                          isHuidig && weergave === 'week' && 'ring-2 ring-white ring-offset-1 ring-offset-[#1b1b27]',
+                        )}
+                        style={{ backgroundColor: `${kleur}30`, color: kleur, border: `1.5px solid ${kleur}` }}
+                      >
+                        {w.weekNr}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* ── Weergave-toggle: week-detail vs volledige agenda ─────────────── */}
+          <div className="flex gap-1 p-1 bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl">
+            <button
+              onClick={() => setWeergave('week')}
+              className={cn('flex-1 py-2 rounded-xl text-xs font-semibold transition-colors', weergave === 'week' ? 'bg-white text-black' : 'text-[#8888a8]')}
+            >
+              Week
+            </button>
+            <button
+              onClick={() => setWeergave('agenda')}
+              className={cn('flex-1 py-2 rounded-xl text-xs font-semibold transition-colors', weergave === 'agenda' ? 'bg-white text-black' : 'text-[#8888a8]')}
+            >
+              Agenda
+            </button>
+          </div>
+
+          {weergave === 'agenda' ? (
+            <AgendaWeergave
+              sessies={sessies}
+              onDatumChange={handleVerplaatsen}
+              onVerwijderen={verwijderSessie}
+              onToggleVoltooid={s => s.voltooid ? ongedaanMaken(s.id) : markeerGedaan(s.id)}
+            />
+          ) : (
+          <>
           {/* ── Week navigatie ──────────────────────────────────────────────── */}
           <div className="flex items-center gap-2">
             <button
@@ -516,6 +721,56 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                         {heeftFysio && <span className="text-xs bg-[#f97316]/10 text-[#f97316] px-1.5 py-0.5 rounded-lg font-medium">💊</span>}
                       </div>
                     )}
+                  </div>
+                )
+              }
+
+              // Gesynchroniseerde/gelogde activiteit (Strava/Runkeeper): neutrale kaartstijl
+              if (sessie.runkeeper_id) {
+                return (
+                  <div
+                    key={sessie.id}
+                    className="rounded-2xl bg-[#1b1b27] border border-[#2d2d3e] overflow-hidden"
+                  >
+                    <div className="flex">
+                      <div className="w-12 shrink-0 flex flex-col items-center justify-center py-4 gap-0.5 bg-[#22222e]">
+                        <span className="text-[10px] font-bold uppercase text-[#8888a8]">
+                          {dagAfkVanDatum(sessie.datum)}
+                        </span>
+                        <span className="text-xl font-bold text-white leading-none">
+                          {dagNummerVanDatum(sessie.datum)}
+                        </span>
+                      </div>
+                      <div className="flex-1 flex flex-col min-w-0">
+                        <div className="h-1.5 w-full bg-[#55556a]" />
+                        <div className="p-3">
+                          <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#222230] text-[#8888a8] uppercase tracking-wide mb-2">
+                            🔗 Gesynchroniseerd
+                          </span>
+                          <p className="text-sm font-semibold text-white mb-2 truncate">
+                            {sessieEmoji(sessie)} {sessie.beschrijving}
+                          </p>
+                          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#2d2d3e]">
+                            <div>
+                              <p className="text-sm font-bold text-white">{sessie.afstand_km ?? '–'} km</p>
+                              <p className="text-[10px] text-[#55556a] uppercase">Afstand</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-white">
+                                {sessie.duur_minuten ? formatDuur(sessie.duur_minuten) : '–'}
+                              </p>
+                              <p className="text-[10px] text-[#55556a] uppercase">Tijd</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-white">
+                                {berekenTempo(sessie.duur_minuten, sessie.afstand_km)}
+                              </p>
+                              <p className="text-[10px] text-[#55556a] uppercase">Gem. tempo</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )
               }
@@ -642,43 +897,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
               )
             })}
           </div>
-
-          {/* ── Alle weken (compact pills) ──────────────────────────────────── */}
-          {weken.length > 1 && (
-            <div>
-              <p className="text-[10px] font-semibold text-[#3d3d50] uppercase tracking-wide mb-2">
-                Alle weken
-              </p>
-              <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                {weken.map(({ weekNr }, i) => {
-                  const heeftOpen = weken[i].sessies.some(s => !s.voltooid && !s.overgeslagen && s.type !== 'rust')
-                  const isCompleet = weken[i].sessies
-                    .filter(s => s.type !== 'rust')
-                    .every(s => s.voltooid || s.overgeslagen)
-                  const isCurrent = actieveWeekIndex === i
-
-                  return (
-                    <button
-                      key={weekNr}
-                      onClick={() => setActieveWeekIndex(i)}
-                      className={cn(
-                        'relative px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all',
-                        isCurrent
-                          ? 'bg-white text-black'
-                          : isCompleet
-                          ? 'bg-green-950 text-green-400'
-                          : 'bg-[#222230] text-[#8888a8]',
-                      )}
-                    >
-                      W{weekNr}
-                      {heeftOpen && !isCurrent && (
-                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[#f97316] rounded-full" />
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+          </>
           )}
         </>
       )}

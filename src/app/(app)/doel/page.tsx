@@ -107,13 +107,13 @@ export default function DoelPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f3f0] flex flex-col p-4 pt-8 pb-24">
+    <div className="min-h-screen bg-[#111118] flex flex-col p-4 pt-8 pb-24">
       {/* Progress */}
       {stap !== 'klaar' && (
         <div className="flex gap-1.5 mb-8">
           {STAPPEN.filter(s => s !== 'klaar').map((s, i) => (
             <div key={s} className={cn('h-1 flex-1 rounded-full transition-all',
-              i <= stapIndex ? 'bg-[#f97316]' : 'bg-[#333]')} />
+              i <= stapIndex ? 'bg-[#f97316]' : 'bg-[#2d2d3e]')} />
           ))}
         </div>
       )}
@@ -124,8 +124,8 @@ export default function DoelPage() {
         {stap === 'type' && (
           <div className="flex flex-col gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-[#1a1612]">Wat is je doel?</h2>
-              <p className="text-[#6b6560] mt-1">Kies wat je wilt gaan bereiken</p>
+              <h2 className="text-2xl font-bold text-white">Wat is je doel?</h2>
+              <p className="text-[#8888a8] mt-1">Kies wat je wilt gaan bereiken</p>
             </div>
             <div className="flex flex-col gap-2">
               {DOEL_TYPES.map(t => (
@@ -136,13 +136,13 @@ export default function DoelPage() {
                     'flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all',
                     doelType === t.value
                       ? 'border-[#f97316] bg-[#f97316]/10'
-                      : 'border-[#e8e3dc] bg-white'
+                      : 'border-[#2d2d3e] bg-[#1b1b27]'
                   )}
                 >
                   <span className="text-3xl">{t.emoji}</span>
                   <div>
-                    <p className="font-semibold text-[#1a1612]">{t.label}</p>
-                    <p className="text-sm text-[#6b6560]">{t.beschrijving}</p>
+                    <p className="font-semibold text-white">{t.label}</p>
+                    <p className="text-sm text-[#8888a8]">{t.beschrijving}</p>
                   </div>
                 </button>
               ))}
@@ -154,8 +154,8 @@ export default function DoelPage() {
         {stap === 'details' && (
           <div className="flex flex-col gap-5">
             <div>
-              <h2 className="text-2xl font-bold text-[#1a1612]">Details</h2>
-              <p className="text-[#6b6560] mt-1">Wanneer en wat is je doel?</p>
+              <h2 className="text-2xl font-bold text-white">Details</h2>
+              <p className="text-[#8888a8] mt-1">Wanneer en wat is je doel?</p>
             </div>
             <Input id="naam" label="Naam van het evenement" value={doelNaam}
               onChange={e => setDoelNaam(e.target.value)}
@@ -171,8 +171,8 @@ export default function DoelPage() {
         {stap === 'niveau' && (
           <div className="flex flex-col gap-5">
             <div>
-              <h2 className="text-2xl font-bold text-[#1a1612]">Jouw niveau</h2>
-              <p className="text-[#6b6560] mt-1">Helpt ons het schema goed te kalibreren</p>
+              <h2 className="text-2xl font-bold text-white">Jouw niveau</h2>
+              <p className="text-[#8888a8] mt-1">Helpt ons het schema goed te kalibreren</p>
             </div>
             <Input id="km" type="number" label="Km per week (huidig of voor blessure)" value={kmPerWeek}
               onChange={e => setKmPerWeek(e.target.value)} placeholder="bijv. 30" />
@@ -185,24 +185,24 @@ export default function DoelPage() {
         {stap === 'resultaten' && (
           <div className="flex flex-col gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-[#1a1612]">Eerdere resultaten</h2>
-              <p className="text-[#6b6560] mt-1">Optioneel — helpt bij je tijdsdoel</p>
+              <h2 className="text-2xl font-bold text-white">Eerdere resultaten</h2>
+              <p className="text-[#8888a8] mt-1">Optioneel — helpt bij je tijdsdoel</p>
             </div>
             {resultaten.map((r, i) => (
               <Card key={i} className="flex justify-between items-center py-3">
                 <div>
-                  <p className="font-medium text-[#1a1612] text-sm">{r.type} · {r.tijd}</p>
-                  <p className="text-xs text-[#6b6560]">{r.datum}</p>
+                  <p className="font-medium text-white text-sm">{r.type} · {r.tijd}</p>
+                  <p className="text-xs text-[#8888a8]">{r.datum}</p>
                 </div>
                 <button onClick={() => setResultaten(resultaten.filter((_, j) => j !== i))}>
-                  <Trash2 size={16} className="text-[#6b6560]" />
+                  <Trash2 size={16} className="text-[#8888a8]" />
                 </button>
               </Card>
             ))}
             <Card>
               <div className="flex flex-col gap-3">
                 <select value={nieuwR.type} onChange={e => setNieuwR({ ...nieuwR, type: e.target.value })}
-                  className="bg-[#f0ede8] text-[#1a1612] rounded-xl px-3 py-2.5 border border-[#e8e3dc] focus:outline-none text-sm">
+                  className="bg-[#222230] text-white rounded-xl px-3 py-2.5 border border-[#2d2d3e] focus:outline-none text-sm">
                   {DOEL_TYPES.filter(t => t.value !== 'fysio' && t.value !== 'anders').map(t =>
                     <option key={t.value} value={t.value}>{t.label}</option>
                   )}
@@ -224,14 +224,14 @@ export default function DoelPage() {
         {stap === 'vakanties' && (
           <div className="flex flex-col gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-[#1a1612]">Vakanties</h2>
-              <p className="text-[#6b6560] mt-1">We houden hier rekening mee in je schema</p>
+              <h2 className="text-2xl font-bold text-white">Vakanties</h2>
+              <p className="text-[#8888a8] mt-1">We houden hier rekening mee in je schema</p>
             </div>
             {vakanties.map((v, i) => (
               <Card key={i} className="flex justify-between items-center py-3">
                 <div>
-                  <p className="font-medium text-[#1a1612] text-sm">{v.naam}</p>
-                  <p className="text-xs text-[#6b6560]">{v.start_datum} → {v.eind_datum}</p>
+                  <p className="font-medium text-white text-sm">{v.naam}</p>
+                  <p className="text-xs text-[#8888a8]">{v.start_datum} → {v.eind_datum}</p>
                   <span className={cn('text-xs px-2 py-0.5 rounded-full mt-1 inline-block',
                     v.kan_trainen === 'ja' ? 'bg-green-900/50 text-green-300' :
                     v.kan_trainen === 'beperkt' ? 'bg-yellow-900/50 text-yellow-300' : 'bg-red-900/50 text-red-300'
@@ -240,7 +240,7 @@ export default function DoelPage() {
                   </span>
                 </div>
                 <button onClick={() => setVakanties(vakanties.filter((_, j) => j !== i))}>
-                  <Trash2 size={16} className="text-[#6b6560]" />
+                  <Trash2 size={16} className="text-[#8888a8]" />
                 </button>
               </Card>
             ))}
@@ -257,7 +257,7 @@ export default function DoelPage() {
                     <button key={o.value}
                       onClick={() => setNieuwV({ ...nieuwV, kan_trainen: o.value as 'ja' | 'nee' | 'beperkt' })}
                       className={cn('flex-1 py-2 rounded-xl text-xs font-medium border-2 transition-all',
-                        nieuwV.kan_trainen === o.value ? o.kleur : 'border-[#e8e3dc] text-[#6b6560]')}>
+                        nieuwV.kan_trainen === o.value ? o.kleur : 'border-[#2d2d3e] text-[#8888a8]')}>
                       {o.label}
                     </button>
                   ))}
@@ -276,10 +276,10 @@ export default function DoelPage() {
           <div className="flex flex-col items-center text-center gap-6 pt-8">
             <div className="text-7xl">{isFysio ? '💪' : '🎯'}</div>
             <div>
-              <h2 className="text-3xl font-bold text-[#1a1612]">
+              <h2 className="text-3xl font-bold text-white">
                 {isFysio ? 'Klaar om te oefenen!' : 'Schema wordt gemaakt!'}
               </h2>
-              <p className="text-[#6b6560] mt-2">
+              <p className="text-[#8888a8] mt-2">
                 {isFysio
                   ? 'Je kunt fysio-oefeningen toevoegen via de Fysio tab.'
                   : 'Claude maakt nu jouw persoonlijke trainingsschema op basis van de informatie.'}

@@ -32,11 +32,11 @@ const TYPE_EMOJI: Record<string, string> = {
 }
 
 const INTENSITEIT_KLEUR: Record<string, string> = {
-  herstel: 'bg-blue-50 text-blue-700',
-  makkelijk: 'bg-green-50 text-green-700',
-  gemiddeld: 'bg-amber-50 text-amber-800',
-  zwaar: 'bg-orange-50 text-orange-700',
-  interval: 'bg-rose-50 text-rose-700',
+  herstel: 'bg-blue-950 text-blue-400',
+  makkelijk: 'bg-green-950 text-green-400',
+  gemiddeld: 'bg-amber-950 text-amber-300',
+  zwaar: 'bg-orange-950 text-orange-300',
+  interval: 'bg-rose-950 text-rose-300',
 }
 
 function isoWeekLabel(datum: string): string {
@@ -146,18 +146,18 @@ export function ActiviteitenClient({ sessies, fysioSessies, coreSessies, heeftSt
     return (
       <div className="flex flex-col gap-4 p-4 pt-8 pb-24">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-[#1a1612]">Activiteiten</h1>
+          <h1 className="text-2xl font-bold text-white">Activiteiten</h1>
           {heeftStrava && (
             <button onClick={syncStrava} disabled={syncing}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-[#e8e3dc] text-[#a09990]">
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#1b1b27] border border-[#2d2d3e] text-[#55556a]">
               <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} />
             </button>
           )}
         </div>
-        <div className="bg-white rounded-3xl border border-[#f0ede8] p-6 text-center shadow-sm">
+        <div className="bg-[#1b1b27] rounded-3xl border border-[#2d2d3e] p-6 text-center">
           <p className="text-3xl mb-3">🏃</p>
-          <p className="font-semibold text-[#1a1612] mb-1">Nog geen activiteiten</p>
-          <p className="text-sm text-[#a09990] mb-4">Voltooi trainingen of verbind Strava om je geschiedenis te zien.</p>
+          <p className="font-semibold text-white mb-1">Nog geen activiteiten</p>
+          <p className="text-sm text-[#55556a] mb-4">Voltooi trainingen of verbind Strava om je geschiedenis te zien.</p>
           {!heeftStrava && (
             <button onClick={() => router.push('/instellingen')}
               className="text-sm font-semibold text-[#f97316] underline underline-offset-2">
@@ -172,11 +172,11 @@ export function ActiviteitenClient({ sessies, fysioSessies, coreSessies, heeftSt
   return (
     <div className="flex flex-col gap-3 p-4 pt-8 pb-24">
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-2xl font-bold text-[#1a1612]">Activiteiten</h1>
+        <h1 className="text-2xl font-bold text-white">Activiteiten</h1>
         {heeftStrava && (
           <button onClick={syncStrava} disabled={syncing}
             className={cn('w-9 h-9 flex items-center justify-center rounded-xl border transition-colors',
-              syncing ? 'bg-[#f5f3f0] border-[#e8e3dc]' : 'bg-white border-[#e8e3dc] text-[#a09990]'
+              syncing ? 'bg-[#222230] border-[#2d2d3e]' : 'bg-[#1b1b27] border-[#2d2d3e] text-[#55556a]'
             )}>
             <RefreshCw size={15} className={syncing ? 'animate-spin text-[#f97316]' : ''} />
           </button>
@@ -190,29 +190,29 @@ export function ActiviteitenClient({ sessies, fysioSessies, coreSessies, heeftSt
         const titel = weekTitel(key, label) || label
 
         return (
-          <div key={key} className="bg-white rounded-3xl border border-[#f0ede8] overflow-hidden shadow-sm">
+          <div key={key} className="bg-[#1b1b27] rounded-3xl border border-[#2d2d3e] overflow-hidden">
             {/* Week header */}
             <button
               onClick={() => toggleWeek(key)}
               className="w-full flex items-start justify-between px-4 pt-4 pb-3"
             >
               <div className="text-left">
-                <p className="text-xs font-bold uppercase tracking-widest text-[#a09990]">{titel}</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#55556a]">{titel}</p>
                 <div className="flex gap-4 mt-1.5">
                   <div className="text-left">
-                    <p className="text-[10px] text-[#c8c3bc] uppercase tracking-wide font-medium">Activiteiten</p>
-                    <p className="text-lg font-bold text-[#1a1612]">{wSessies.length}</p>
+                    <p className="text-[10px] text-[#55556a] uppercase tracking-wide font-medium">Activiteiten</p>
+                    <p className="text-lg font-bold text-white">{wSessies.length}</p>
                   </div>
                   {totalMin > 0 && (
                     <div className="text-left">
-                      <p className="text-[10px] text-[#c8c3bc] uppercase tracking-wide font-medium">Tijd</p>
-                      <p className="text-lg font-bold text-[#1a1612]">{formatDuur(totalMin)}</p>
+                      <p className="text-[10px] text-[#55556a] uppercase tracking-wide font-medium">Tijd</p>
+                      <p className="text-lg font-bold text-white">{formatDuur(totalMin)}</p>
                     </div>
                   )}
                   {totalKm > 0 && (
                     <div className="text-left">
-                      <p className="text-[10px] text-[#c8c3bc] uppercase tracking-wide font-medium">Afstand</p>
-                      <p className="text-lg font-bold text-[#1a1612]">{totalKm.toFixed(1)} km</p>
+                      <p className="text-[10px] text-[#55556a] uppercase tracking-wide font-medium">Afstand</p>
+                      <p className="text-lg font-bold text-white">{totalKm.toFixed(1)} km</p>
                     </div>
                   )}
                 </div>
@@ -232,31 +232,31 @@ export function ActiviteitenClient({ sessies, fysioSessies, coreSessies, heeftSt
                 )}
               </div>
               {isOpen
-                ? <ChevronUp size={18} className="text-[#c8c3bc] mt-1 shrink-0" />
-                : <ChevronDown size={18} className="text-[#c8c3bc] mt-1 shrink-0" />}
+                ? <ChevronUp size={18} className="text-[#55556a] mt-1 shrink-0" />
+                : <ChevronDown size={18} className="text-[#55556a] mt-1 shrink-0" />}
             </button>
 
             {/* Sessies */}
             {isOpen && (
-              <div className="border-t border-[#f5f3f0] divide-y divide-[#f5f3f0]">
+              <div className="border-t border-[#2d2d3e] divide-y divide-[#2d2d3e]">
                 {wSessies.map(s => (
                   <div key={s.id} className="flex items-center gap-3 px-4 py-3">
-                    <div className="w-8 h-8 rounded-xl bg-[#f5f3f0] flex items-center justify-center text-base shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-[#222230] flex items-center justify-center text-base shrink-0">
                       {TYPE_EMOJI[s.type] ?? '🏃'}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#1a1612] truncate">{s.beschrijving}</p>
+                      <p className="text-sm font-semibold text-white truncate">{s.beschrijving}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-[11px] text-[#a09990]">
+                        <p className="text-[11px] text-[#55556a]">
                           {new Date(s.datum + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
                         </p>
                         {s.duur_minuten != null && (
-                          <span className="flex items-center gap-0.5 text-[11px] text-[#a09990]">
+                          <span className="flex items-center gap-0.5 text-[11px] text-[#55556a]">
                             <Timer size={9} />{formatDuur(s.duur_minuten)}
                           </span>
                         )}
                         {s.afstand_km != null && s.afstand_km > 0 && (
-                          <span className="flex items-center gap-0.5 text-[11px] text-[#a09990]">
+                          <span className="flex items-center gap-0.5 text-[11px] text-[#55556a]">
                             <MapPin size={9} />{s.afstand_km} km
                           </span>
                         )}

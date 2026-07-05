@@ -66,7 +66,7 @@ async function InstellingenData() {
 
 export default function InstellingenPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-[#6b6560]">Laden...</div>}>
+    <Suspense fallback={<div className="p-8 text-[#8888a8]">Laden...</div>}>
       <InstellingenData />
     </Suspense>
   )

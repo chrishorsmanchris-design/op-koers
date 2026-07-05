@@ -271,25 +271,25 @@ export function BibliotheekClient({ actieveOefeningIds }: Props) {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#f5f3f0]">
+    <div className="flex flex-col min-h-screen bg-[#111118]">
       {/* Header */}
-      <div className="bg-white border-b border-[#e8e3dc] px-4 pt-safe pb-3 sticky top-0 z-10">
+      <div className="bg-[#1b1b27] border-b border-[#2d2d3e] px-4 pt-safe pb-3 sticky top-0 z-10">
         <div className="flex items-center gap-3 mb-3">
-          <Link href="/fysio" className="text-[#6b6560] p-1 -ml-1">
+          <Link href="/fysio" className="text-[#8888a8] p-1 -ml-1">
             <ArrowLeft size={20} />
           </Link>
-          <h1 className="text-lg font-bold text-[#1a1612]">Oefeningen bibliotheek</h1>
+          <h1 className="text-lg font-bold text-white">Oefeningen bibliotheek</h1>
         </div>
 
         {/* Zoekbalk */}
         <div className="relative mb-3">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a09990]" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#55556a]" />
           <input
             type="text"
             value={zoekterm}
             onChange={e => setZoekterm(e.target.value)}
             placeholder="Zoek oefening..."
-            className="w-full pl-9 pr-4 py-2.5 bg-[#f5f3f0] rounded-xl text-sm text-[#1a1612] placeholder-[#a09990] border border-[#e8e3dc] focus:outline-none focus:border-[#f97316]"
+            className="w-full pl-9 pr-4 py-2.5 bg-[#222230] rounded-xl text-sm text-white placeholder-[#55556a] border border-[#2d2d3e] focus:outline-none focus:border-[#f97316]"
           />
         </div>
 
@@ -303,7 +303,7 @@ export function BibliotheekClient({ actieveOefeningIds }: Props) {
                 'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
                 gefilterdeCategorie === cat
                   ? 'bg-[#f97316] border-[#f97316] text-white'
-                  : 'bg-white border-[#e8e3dc] text-[#6b6560]'
+                  : 'bg-[#222230] border-[#2d2d3e] text-[#8888a8]'
               )}
             >
               {CATEGORIE_LABELS[cat]}
@@ -315,7 +315,7 @@ export function BibliotheekClient({ actieveOefeningIds }: Props) {
       {/* Lijst */}
       <div className="flex flex-col gap-3 p-4 pb-24">
         {gefilterd.length === 0 && (
-          <p className="text-center text-[#a09990] text-sm mt-8">Geen oefeningen gevonden</p>
+          <p className="text-center text-[#55556a] text-sm mt-8">Geen oefeningen gevonden</p>
         )}
 
         {CATEGORIEËN.filter(c => c !== 'alle').map(cat => {
@@ -325,7 +325,7 @@ export function BibliotheekClient({ actieveOefeningIds }: Props) {
 
           return (
             <div key={cat}>
-              <h2 className="text-xs font-semibold text-[#6b6560] uppercase tracking-wider mb-2">
+              <h2 className="text-xs font-semibold text-[#8888a8] uppercase tracking-wider mb-2">
                 {CATEGORIE_LABELS[cat]}
               </h2>
               <div className="flex flex-col gap-2">
@@ -336,23 +336,23 @@ export function BibliotheekClient({ actieveOefeningIds }: Props) {
                   return (
                     <div
                       key={oefening.id}
-                      className="bg-white rounded-2xl p-4 shadow-sm"
+                      className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4"
                     >
                       <div className="flex items-start gap-3">
                         <span className="text-2xl shrink-0">{oefening.emoji}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-[#1a1612] text-sm">{oefening.naam}</h3>
+                              <h3 className="font-semibold text-white text-sm">{oefening.naam}</h3>
                               <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-xs bg-[#f5f3f0] text-[#6b6560] px-2 py-0.5 rounded-full">
+                                <span className="text-xs bg-[#222230] text-[#8888a8] px-2 py-0.5 rounded-full">
                                   {CATEGORIE_LABELS[oefening.categorie]}
                                 </span>
-                                <span className="text-xs text-[#a09990]">
+                                <span className="text-xs text-[#55556a]">
                                   {formatDuur(oefening.sets, oefening.reps, oefening.duur_seconden)}
                                 </span>
                               </div>
-                              <p className="text-xs text-[#6b6560] mt-1.5 leading-relaxed line-clamp-2">
+                              <p className="text-xs text-[#8888a8] mt-1.5 leading-relaxed line-clamp-2">
                                 {oefening.beschrijving}
                               </p>
                             </div>
@@ -362,9 +362,9 @@ export function BibliotheekClient({ actieveOefeningIds }: Props) {
                               className={cn(
                                 'shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all',
                                 isActief
-                                  ? 'bg-green-100 text-green-600'
+                                  ? 'bg-green-950 text-green-400'
                                   : isLaden
-                                    ? 'bg-[#f5f3f0] text-[#a09990]'
+                                    ? 'bg-[#222230] text-[#55556a]'
                                     : 'bg-[#f97316] text-white active:scale-95'
                               )}
                             >
@@ -384,7 +384,7 @@ export function BibliotheekClient({ actieveOefeningIds }: Props) {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#1a1612] text-white text-sm px-4 py-2.5 rounded-full shadow-lg z-50 whitespace-nowrap">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#222230] text-white text-sm px-4 py-2.5 rounded-full shadow-lg z-50 whitespace-nowrap">
           ✓ {toast}
         </div>
       )}

@@ -82,7 +82,7 @@ const TYPE_KLEUR: Record<string, string> = {
   krachttraining: '#8b5cf6',
   core: '#06b6d4',
   cross: '#10b981',
-  rust: '#e5e7eb',
+  rust: '#55556a',
 }
 const TYPE_LABEL: Record<string, string> = {
   hardlopen: 'Hardlopen',
@@ -138,13 +138,13 @@ function StatKaart({ label, waarde, sub, kleur, icon: Icon }: {
   kleur: string; icon?: React.ElementType
 }) {
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm">
+    <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
       <div className="flex items-center gap-2 mb-2">
         {Icon && <Icon size={14} style={{ color: kleur }} />}
-        <p className="text-xs font-medium text-[#a09990]">{label}</p>
+        <p className="text-xs font-medium text-[#55556a]">{label}</p>
       </div>
       <p className="text-2xl font-bold" style={{ color: kleur }}>{waarde}</p>
-      {sub && <p className="text-xs text-[#a09990] mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-[#55556a] mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -153,9 +153,9 @@ function Trendpijl({ huidig, vorig, eenheid = '' }: { huidig: number; vorig: num
   if (!vorig) return null
   const diff = huidig - vorig
   const pct = Math.abs(Math.round((diff / vorig) * 100))
-  if (pct < 2) return <span className="text-xs text-[#a09990] flex items-center gap-0.5"><Minus size={11} /> gelijk</span>
-  if (diff > 0) return <span className="text-xs text-green-600 flex items-center gap-0.5"><TrendingUp size={11} /> +{Math.abs(diff).toFixed(1)}{eenheid}</span>
-  return <span className="text-xs text-red-500 flex items-center gap-0.5"><TrendingDown size={11} /> -{Math.abs(diff).toFixed(1)}{eenheid}</span>
+  if (pct < 2) return <span className="text-xs text-[#55556a] flex items-center gap-0.5"><Minus size={11} /> gelijk</span>
+  if (diff > 0) return <span className="text-xs text-green-400 flex items-center gap-0.5"><TrendingUp size={11} /> +{Math.abs(diff).toFixed(1)}{eenheid}</span>
+  return <span className="text-xs text-red-400 flex items-center gap-0.5"><TrendingDown size={11} /> -{Math.abs(diff).toFixed(1)}{eenheid}</span>
 }
 
 // Activiteiten heatmap — 12 weken terugkijkend
@@ -192,11 +192,11 @@ function Heatmap({ sessies, fysioSessies }: { sessies: Sessie[]; fysioSessies: F
   }
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm">
-      <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Activiteiten — afgelopen 12 weken</p>
+    <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+      <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-3">Activiteiten — afgelopen 12 weken</p>
       <div className="flex gap-1 mb-2">
         {['Ma','Di','Wo','Do','Vr','Za','Zo'].map(d => (
-          <div key={d} className="flex-1 text-center text-[9px] text-[#c8c3bc] font-medium">{d}</div>
+          <div key={d} className="flex-1 text-center text-[9px] text-[#55556a] font-medium">{d}</div>
         ))}
       </div>
       <div className="flex flex-col gap-1">
@@ -204,7 +204,7 @@ function Heatmap({ sessies, fysioSessies }: { sessies: Sessie[]; fysioSessies: F
           <div key={maandag} className="flex gap-1">
             {dagen.map(({ datum, typen }) => {
               const hoofdtype = typen[0]
-              const bg = hoofdtype ? (TYPE_DOT[hoofdtype] ?? '#f97316') : '#f0ede8'
+              const bg = hoofdtype ? (TYPE_DOT[hoofdtype] ?? '#f97316') : '#2d2d3e'
               const meerdere = typen.length > 1
               return (
                 <div key={datum}
@@ -231,7 +231,7 @@ function Heatmap({ sessies, fysioSessies }: { sessies: Sessie[]; fysioSessies: F
         ].map(l => (
           <div key={l.label} className="flex items-center gap-1">
             <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: l.kleur, opacity: 0.85 }} />
-            <span className="text-[10px] text-[#a09990]">{l.label}</span>
+            <span className="text-[10px] text-[#55556a]">{l.label}</span>
           </div>
         ))}
       </div>
@@ -252,12 +252,12 @@ function BarChart({ data, kleur, suffix = '' }: {
         const hoogte = Math.max(4, (d.waarde / max) * 72)
         return (
           <div key={i} className="flex-1 flex flex-col items-center gap-1">
-            <span className="text-[8px] text-[#a09990]">{d.waarde > 0 ? `${d.waarde.toFixed(d.waarde < 10 ? 1 : 0)}${suffix}` : ''}</span>
+            <span className="text-[8px] text-[#55556a]">{d.waarde > 0 ? `${d.waarde.toFixed(d.waarde < 10 ? 1 : 0)}${suffix}` : ''}</span>
             <div
               className="w-full rounded-t-md transition-all"
               style={{ height: hoogte, backgroundColor: d.highlight ? kleur : kleur + '40' }}
             />
-            <span className="text-[9px] text-[#a09990] leading-tight text-center truncate w-full text-center">{d.label}</span>
+            <span className="text-[9px] text-[#55556a] leading-tight text-center truncate w-full text-center">{d.label}</span>
           </div>
         )
       })}
@@ -292,7 +292,7 @@ function PaceSparkline({ runs }: { runs: { datum: string; pace: number }[] }) {
         <text x={points[points.findIndex(p => p.pace === maxPace)].x} y={points.find(p => p.pace === maxPace)!.y + 12}
           fontSize="8" fill="#ef4444" textAnchor="middle">{formatPace(maxPace)}</text>
       </svg>
-      <div className="flex justify-between text-[9px] text-[#c8c3bc] mt-1 px-1">
+      <div className="flex justify-between text-[9px] text-[#55556a] mt-1 px-1">
         <span>{new Date(runs[0].datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</span>
         <span>{new Date(runs[runs.length - 1].datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</span>
       </div>
@@ -355,22 +355,22 @@ function ATLCTLChart({ sessies }: { sessies: Sessie[] }) {
   const huidig = data[data.length - 1]
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm">
+    <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
       <div className="flex items-center justify-between mb-1">
-        <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">Trainingsbelasting (ATL/CTL)</p>
+        <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider">Trainingsbelasting (ATL/CTL)</p>
       </div>
       <div className="flex gap-4 mb-3 text-xs">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-0.5 rounded bg-[#f97316]" />
-          <span className="text-[#6b6560]">ATL <span className="font-semibold text-[#1a1612]">{huidig.atl.toFixed(0)}</span></span>
+          <span className="text-[#8888a8]">ATL <span className="font-semibold text-white">{huidig.atl.toFixed(0)}</span></span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-0.5 rounded bg-[#3b82f6]" />
-          <span className="text-[#6b6560]">CTL <span className="font-semibold text-[#1a1612]">{huidig.ctl.toFixed(0)}</span></span>
+          <span className="text-[#8888a8]">CTL <span className="font-semibold text-white">{huidig.ctl.toFixed(0)}</span></span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-2 rounded" style={{ backgroundColor: huidig.tsb >= 0 ? '#22c55e40' : '#ef444440' }} />
-          <span className="text-[#6b6560]">TSB <span className="font-semibold" style={{ color: huidig.tsb >= 0 ? '#22c55e' : '#ef4444' }}>{huidig.tsb >= 0 ? '+' : ''}{huidig.tsb.toFixed(0)}</span></span>
+          <span className="text-[#8888a8]">TSB <span className="font-semibold" style={{ color: huidig.tsb >= 0 ? '#22c55e' : '#ef4444' }}>{huidig.tsb >= 0 ? '+' : ''}{huidig.tsb.toFixed(0)}</span></span>
         </div>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: H }}>
@@ -391,19 +391,19 @@ function ATLCTLChart({ sessies }: { sessies: Sessie[] }) {
         })}
         {/* Scheidingslijn */}
         <line x1={pad.l} y1={pad.t + innerH * 0.72} x2={W - pad.r} y2={pad.t + innerH * 0.72}
-          stroke="#e5e0d8" strokeWidth="0.5" strokeDasharray="2,2" />
+          stroke="#2d2d3e" strokeWidth="0.5" strokeDasharray="2,2" />
         {/* CTL lijn */}
         <path d={ctlPath} fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         {/* ATL lijn */}
         <path d={atlPath} fill="none" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4,2" />
         {/* Week ticks */}
         {ticks.map(t => (
-          <text key={t.i} x={xOf(t.i)} y={H - 2} fontSize="7" fill="#c8c3bc" textAnchor="middle">
+          <text key={t.i} x={xOf(t.i)} y={H - 2} fontSize="7" fill="#55556a" textAnchor="middle">
             {new Date(t.datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
           </text>
         ))}
       </svg>
-      <p className="text-[10px] text-[#a09990] mt-2">
+      <p className="text-[10px] text-[#55556a] mt-2">
         TSB &gt; 0 = fris · TSB &lt; 0 = opbouw · ATL = vermoeidheid · CTL = conditie
       </p>
     </div>
@@ -422,9 +422,9 @@ function WeekVergelijking({ dezeWeek, vorigeWeek }: {
     { label: 'Consistentie', deze: dezeWeek.consistentie, vorige: vorigeWeek.consistentie, fmt: (v: number) => `${v}%`, eenheid: '%' },
   ]
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm">
-      <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Week vergelijking</p>
-      <div className="grid grid-cols-3 gap-1 mb-2 text-[10px] text-[#a09990]">
+    <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+      <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-3">Week vergelijking</p>
+      <div className="grid grid-cols-3 gap-1 mb-2 text-[10px] text-[#55556a]">
         <span>Onderdeel</span>
         <span className="text-center font-semibold text-[#f97316]">Deze week</span>
         <span className="text-center">Vorige week</span>
@@ -436,16 +436,16 @@ function WeekVergelijking({ dezeWeek, vorigeWeek }: {
           const toon = pct >= 2
           return (
             <div key={r.label} className="grid grid-cols-3 gap-1 items-center">
-              <span className="text-xs text-[#6b6560]">{r.label}</span>
+              <span className="text-xs text-[#8888a8]">{r.label}</span>
               <div className="flex flex-col items-center">
-                <span className="text-sm font-bold text-[#1a1612]">{r.fmt(r.deze)}</span>
+                <span className="text-sm font-bold text-white">{r.fmt(r.deze)}</span>
                 {toon && (
                   <span className="text-[9px]" style={{ color: diff > 0 ? '#22c55e' : '#ef4444' }}>
                     {diff > 0 ? '▲' : '▼'} {pct}%
                   </span>
                 )}
               </div>
-              <span className="text-sm text-[#a09990] text-center">{r.fmt(r.vorige)}</span>
+              <span className="text-sm text-[#55556a] text-center">{r.fmt(r.vorige)}</span>
             </div>
           )
         })}
@@ -498,25 +498,25 @@ function RacePredictor({ loopSessies }: { loopSessies: Sessie[] }) {
   if (!predictor) return null
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm">
+    <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
       <div className="flex items-center gap-2 mb-1">
-        <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">Race Predictor</p>
+        <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider">Race Predictor</p>
       </div>
-      <p className="text-[10px] text-[#a09990] mb-3">
+      <p className="text-[10px] text-[#55556a] mb-3">
         Op basis van je {predictor.d1.toFixed(1)} km run op{' '}
         {new Date(predictor.datum + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}
       </p>
       <div className="flex flex-col gap-2">
         {predictor.voorspellingen.map(v => (
           <div key={v.label} className="flex items-center justify-between">
-            <span className="text-sm text-[#1a1612]" style={{ opacity: v.relevant ? 1 : 0.5 }}>{v.label}</span>
-            <span className="text-sm font-bold" style={{ color: v.relevant ? '#f97316' : '#a09990' }}>
+            <span className="text-sm text-white" style={{ opacity: v.relevant ? 1 : 0.5 }}>{v.label}</span>
+            <span className="text-sm font-bold" style={{ color: v.relevant ? '#f97316' : '#55556a' }}>
               {formatHMS(v.tijd)}
             </span>
           </div>
         ))}
       </div>
-      <p className="text-[10px] text-[#c8c3bc] mt-3">Riegel formule · t₂ = t₁ × (d₂/d₁)^1.06</p>
+      <p className="text-[10px] text-[#55556a] mt-3">Riegel formule · t₂ = t₁ × (d₂/d₁)^1.06</p>
     </div>
   )
 }
@@ -548,11 +548,11 @@ function HartslagZones({ loopSessies, maxHR }: { loopSessies: Sessie[]; maxHR: n
   if (totaal === 0) return null
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm">
+    <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
       <div className="flex items-center gap-2 mb-3">
         <Heart size={14} className="text-red-400" />
-        <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">Hartslag zones</p>
-        <span className="text-[10px] text-[#a09990] ml-auto">max {maxHR} bpm</span>
+        <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider">Hartslag zones</p>
+        <span className="text-[10px] text-[#55556a] ml-auto">max {maxHR} bpm</span>
       </div>
       {/* Verdeling balk */}
       <div className="flex h-3 rounded-full overflow-hidden gap-px mb-3">
@@ -570,10 +570,10 @@ function HartslagZones({ loopSessies, maxHR }: { loopSessies: Sessie[]; maxHR: n
           return (
             <div key={z.label} className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: z.kleur }} />
-              <span className="text-xs text-[#1a1612] flex-1">{z.label}</span>
-              <span className="text-xs text-[#a09990]">{Math.round(z.min * maxHR)}–{Math.round(z.max * maxHR)} bpm</span>
-              <span className="text-xs font-semibold text-[#1a1612] w-6 text-right">{zoneCounts[i]}</span>
-              <span className="text-[10px] text-[#a09990] w-7 text-right">{pct}%</span>
+              <span className="text-xs text-white flex-1">{z.label}</span>
+              <span className="text-xs text-[#55556a]">{Math.round(z.min * maxHR)}–{Math.round(z.max * maxHR)} bpm</span>
+              <span className="text-xs font-semibold text-white w-6 text-right">{zoneCounts[i]}</span>
+              <span className="text-[10px] text-[#55556a] w-7 text-right">{pct}%</span>
             </div>
           )
         })}
@@ -592,35 +592,35 @@ function LogEntry({ sessie }: { sessie: Sessie }) {
   const rating = fb?.rating
 
   return (
-    <div className="border-b border-[#f0ede8] last:border-0 py-2.5">
+    <div className="border-b border-[#2d2d3e] last:border-0 py-2.5">
       <button className="w-full text-left" onClick={() => setOpen(v => !v)}>
         <div className="flex items-center gap-2">
           <span className="text-base">{TYPE_EMOJI[sessie.type] ?? '🏃'}</span>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-[#1a1612] truncate">
+              <span className="text-sm font-medium text-white truncate">
                 {TYPE_LABEL[sessie.type] ?? sessie.type}
                 {sessie.intensiteit ? ` · ${INTENSITEIT_LABEL[sessie.intensiteit] ?? sessie.intensiteit}` : ''}
               </span>
               {rating && (
                 <span className="w-2 h-2 rounded-full shrink-0 inline-block"
-                  style={{ backgroundColor: RATING_KLEUR[rating] ?? '#a09990' }}
+                  style={{ backgroundColor: RATING_KLEUR[rating] ?? '#55556a' }}
                   title={rating}
                 />
               )}
             </div>
-            <div className="flex items-center gap-2 text-[10px] text-[#a09990] mt-0.5 flex-wrap">
+            <div className="flex items-center gap-2 text-[10px] text-[#55556a] mt-0.5 flex-wrap">
               <span>{new Date(sessie.datum + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
               {afstand > 0 && <span>{afstand.toFixed(1)} km</span>}
               {duur && <span>{Math.floor(duur / 60)}u {duur % 60}m</span>}
               {pace && <span>{formatPace(pace)} /km</span>}
             </div>
           </div>
-          {open ? <ChevronUp size={14} className="text-[#a09990] shrink-0" /> : <ChevronDown size={14} className="text-[#a09990] shrink-0" />}
+          {open ? <ChevronUp size={14} className="text-[#55556a] shrink-0" /> : <ChevronDown size={14} className="text-[#55556a] shrink-0" />}
         </div>
       </button>
       {open && (
-        <div className="mt-2 pl-7 text-xs text-[#6b6560] flex flex-col gap-1">
+        <div className="mt-2 pl-7 text-xs text-[#8888a8] flex flex-col gap-1">
           {sessie.beschrijving && <p>{sessie.beschrijving}</p>}
           {fb?.hartslag_gem && <p>Hartslag: {fb.hartslag_gem} bpm gem{fb.hartslag_max ? `, ${fb.hartslag_max} bpm max` : ''}</p>}
           {fb?.werkelijke_afstand != null && sessie.afstand_km != null && Math.abs(fb.werkelijke_afstand - sessie.afstand_km) > 0.1 && (
@@ -653,7 +653,7 @@ function TrainingsLog({ sessies }: { sessies: Sessie[] }) {
     return (
       <div className="text-center py-12">
         <p className="text-3xl mb-2">📋</p>
-        <p className="text-[#6b6560]">Nog geen voltooide sessies</p>
+        <p className="text-[#8888a8]">Nog geen voltooide sessies</p>
       </div>
     )
   }
@@ -664,12 +664,12 @@ function TrainingsLog({ sessies }: { sessies: Sessie[] }) {
         const zo = new Date(maandag + 'T12:00:00'); zo.setDate(zo.getDate() + 6)
         const weekKm = weekSessies.filter(s => s.type === 'hardlopen').reduce((sum, s) => sum + berekenAfstand(s), 0)
         return (
-          <div key={maandag} className="bg-white rounded-2xl p-4 shadow-sm">
+          <div key={maandag} className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
             <div className="flex items-baseline justify-between mb-2">
-              <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">
+              <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider">
                 Week van {new Date(maandag + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}
               </p>
-              <div className="flex items-center gap-3 text-[10px] text-[#a09990]">
+              <div className="flex items-center gap-3 text-[10px] text-[#55556a]">
                 {weekKm > 0 && <span>{weekKm.toFixed(1)} km</span>}
                 <span>{weekSessies.length} sessies</span>
               </div>
@@ -998,8 +998,8 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
     return (
       <div className="p-4 pb-24 text-center pt-12">
         <p className="text-4xl mb-3">📊</p>
-        <p className="font-semibold text-[#1a1612]">Nog geen data</p>
-        <p className="text-sm text-[#6b6560] mt-1">Zodra je trainingen afrondt verschijnen hier je statistieken</p>
+        <p className="font-semibold text-white">Nog geen data</p>
+        <p className="text-sm text-[#8888a8] mt-1">Zodra je trainingen afrondt verschijnen hier je statistieken</p>
       </div>
     )
   }
@@ -1007,8 +1007,8 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
   return (
     <div className="pb-24">
       {/* Tab navigatie */}
-      <div className="sticky top-0 bg-[#f5f3f0] z-10 px-4 pt-4 pb-2">
-        <div className="flex gap-1 bg-white rounded-2xl p-1 shadow-sm">
+      <div className="sticky top-0 bg-[#222230] z-10 px-4 pt-4 pb-2">
+        <div className="flex gap-1 bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-1">
           {([
             { id: 'overzicht', label: 'Overzicht' },
             { id: 'hardlopen', label: 'Lopen' },
@@ -1018,7 +1018,7 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
           ] as const).map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={cn('flex-1 py-2 rounded-xl text-xs font-medium transition-all',
-                tab === t.id ? 'bg-[#f97316] text-white shadow-sm' : 'text-[#6b6560]')}>
+                tab === t.id ? 'bg-[#f97316] text-white' : 'text-[#8888a8]')}>
               {t.label}
             </button>
           ))}
@@ -1044,15 +1044,15 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
 
             {/* Trainingstijd */}
             {totaalDuur > 0 && (
-              <div className="bg-white rounded-2xl p-4 shadow-sm">
-                <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-2">Totale trainingstijd</p>
+              <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+                <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-2">Totale trainingstijd</p>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-[#1a1612]">{Math.floor(totaalDuur / 60)}</span>
-                  <span className="text-[#a09990]">uur</span>
-                  <span className="text-2xl font-bold text-[#1a1612] ml-1">{totaalDuur % 60}</span>
-                  <span className="text-[#a09990]">min</span>
+                  <span className="text-3xl font-bold text-white">{Math.floor(totaalDuur / 60)}</span>
+                  <span className="text-[#55556a]">uur</span>
+                  <span className="text-2xl font-bold text-white ml-1">{totaalDuur % 60}</span>
+                  <span className="text-[#55556a]">min</span>
                 </div>
-                <p className="text-xs text-[#a09990] mt-1">in {voltooid.length} sessies de afgelopen 6 maanden</p>
+                <p className="text-xs text-[#55556a] mt-1">in {voltooid.length} sessies de afgelopen 6 maanden</p>
               </div>
             )}
 
@@ -1061,12 +1061,12 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
 
             {/* ATL/CTL trainingsbelasting */}
             {voltooid.filter(s => s.type !== 'rust').length < 5 ? (
-              <div className="bg-white rounded-2xl p-4 shadow-sm">
-                <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-2">Trainingsbelasting</p>
+              <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+                <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-2">Trainingsbelasting</p>
                 <div className="py-6 text-center">
                   <p className="text-2xl mb-2">📈</p>
-                  <p className="text-sm font-medium text-[#1a1612]">Nog even geduld</p>
-                  <p className="text-xs text-[#6b6560] mt-1">Na 2 weken trainen verschijnt hier je belastingsgrafiek (ATL/CTL)</p>
+                  <p className="text-sm font-medium text-white">Nog even geduld</p>
+                  <p className="text-xs text-[#8888a8] mt-1">Na 2 weken trainen verschijnt hier je belastingsgrafiek (ATL/CTL)</p>
                 </div>
               </div>
             ) : (
@@ -1075,8 +1075,8 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
 
             {/* Type verdeling */}
             {typeVerdeling.length > 0 && (
-              <div className="bg-white rounded-2xl p-4 shadow-sm">
-                <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Verdeling per activiteit</p>
+              <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+                <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-3">Verdeling per activiteit</p>
                 <div className="flex h-3 rounded-full overflow-hidden gap-px mb-4">
                   {typeVerdeling.map(({ type, pct }) => (
                     <div key={type} style={{ width: `${pct}%`, backgroundColor: TYPE_KLEUR[type] ?? '#f59e0b' }} />
@@ -1087,16 +1087,16 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                     <div key={type} className="flex items-center gap-2.5">
                       <div className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: type === 'fysio' ? '#f59e0b' : TYPE_KLEUR[type] ?? '#f59e0b' }} />
-                      <span className="text-sm text-[#1a1612] flex-1">
+                      <span className="text-sm text-white flex-1">
                         {type === 'fysio' ? 'Fysio' : TYPE_LABEL[type] ?? type}
                       </span>
                       <div className="flex items-center gap-1">
-                        <div className="w-20 h-1.5 bg-[#f0ede8] rounded-full overflow-hidden">
+                        <div className="w-20 h-1.5 bg-[#222230] rounded-full overflow-hidden">
                           <div className="h-full rounded-full"
                             style={{ width: `${pct}%`, backgroundColor: type === 'fysio' ? '#f59e0b' : TYPE_KLEUR[type] ?? '#f59e0b' }} />
                         </div>
-                        <span className="text-xs font-semibold text-[#1a1612] w-5 text-right">{count}</span>
-                        <span className="text-xs text-[#a09990] w-7 text-right">{pct}%</span>
+                        <span className="text-xs font-semibold text-white w-5 text-right">{count}</span>
+                        <span className="text-xs text-[#55556a] w-7 text-right">{pct}%</span>
                       </div>
                     </div>
                   ))}
@@ -1115,7 +1115,7 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
             {loopSessies.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-3xl mb-2">🏃</p>
-                <p className="text-[#6b6560]">Nog geen looptrainingen voltooid</p>
+                <p className="text-[#8888a8]">Nog geen looptrainingen voltooid</p>
               </div>
             ) : (
               <>
@@ -1125,27 +1125,27 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                     sub="afgelopen 6 mnd" kleur="#f97316" icon={MapPin} />
                   <StatKaart label="Langste run" waarde={`${langsteRun.toFixed(1)} km`}
                     sub="beste prestatie" kleur="#ef4444" icon={TrendingUp} />
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
+                  <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <Activity size={14} className="text-[#f97316]" />
-                      <p className="text-xs font-medium text-[#a09990]">Deze week</p>
+                      <p className="text-xs font-medium text-[#55556a]">Deze week</p>
                     </div>
-                    <p className="text-2xl font-bold text-[#f97316]">{kmDezeWeek.toFixed(1)} <span className="text-sm font-normal text-[#a09990]">km</span></p>
+                    <p className="text-2xl font-bold text-[#f97316]">{kmDezeWeek.toFixed(1)} <span className="text-sm font-normal text-[#55556a]">km</span></p>
                     <div className="mt-1">
                       <Trendpijl huidig={kmDezeWeek} vorig={kmVorigeWeek} eenheid=" km" />
                     </div>
                   </div>
                   {gemPace && (
-                    <div className="bg-white rounded-2xl p-4 shadow-sm">
+                    <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <Timer size={14} className="text-[#f97316]" />
-                        <p className="text-xs font-medium text-[#a09990]">Gem. tempo</p>
+                        <p className="text-xs font-medium text-[#55556a]">Gem. tempo</p>
                       </div>
-                      <p className="text-2xl font-bold text-[#f97316]">{formatPace(gemPace)} <span className="text-sm font-normal text-[#a09990]">/km</span></p>
+                      <p className="text-2xl font-bold text-[#f97316]">{formatPace(gemPace)} <span className="text-sm font-normal text-[#55556a]">/km</span></p>
                       {gemPaceDeze && gemPaceVorige && (
-                        <div className="mt-1 text-xs text-[#a09990] flex items-center gap-1">
+                        <div className="mt-1 text-xs text-[#55556a] flex items-center gap-1">
                           {gemPaceDeze < gemPaceVorige
-                            ? <><TrendingUp size={11} className="text-green-500" /><span className="text-green-600">{(gemPaceVorige - gemPaceDeze).toFixed(1)} sec sneller</span></>
+                            ? <><TrendingUp size={11} className="text-green-400" /><span className="text-green-400">{(gemPaceVorige - gemPaceDeze).toFixed(1)} sec sneller</span></>
                             : gemPaceDeze > gemPaceVorige
                               ? <><TrendingDown size={11} className="text-orange-400" /><span className="text-orange-500">{(gemPaceDeze - gemPaceVorige).toFixed(1)} sec langzamer</span></>
                               : <><Minus size={11} /><span>gelijk aan vorige periode</span></>
@@ -1161,25 +1161,25 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
 
                 {/* Tempo trend */}
                 {paceRuns.length >= 3 && (
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
-                    <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Tempo — laatste {paceRuns.length} runs</p>
+                  <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+                    <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-3">Tempo — laatste {paceRuns.length} runs</p>
                     <PaceSparkline runs={paceRuns} />
-                    <p className="text-xs text-[#a09990] mt-2 text-center">Lager = sneller</p>
+                    <p className="text-xs text-[#55556a] mt-2 text-center">Lager = sneller</p>
                   </div>
                 )}
 
                 {/* Km per week */}
                 {kmPerWeek.length > 1 && (
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
-                    <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-4">Km per week</p>
+                  <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+                    <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-4">Km per week</p>
                     <BarChart data={kmPerWeek} kleur="#f97316" suffix=" km" />
                   </div>
                 )}
 
                 {/* Intensiteit × pace */}
                 {pacePerIntensiteit.length > 0 && (
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
-                    <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Tempo per trainingstype</p>
+                  <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+                    <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-3">Tempo per trainingstype</p>
                     <div className="flex flex-col gap-3">
                       {pacePerIntensiteit.map(({ intensiteit, count, gemPace }) => (
                         <div key={intensiteit} className="flex items-center gap-3">
@@ -1187,10 +1187,10 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                             style={{ backgroundColor: INTENSITEIT_KLEUR[intensiteit] }} />
                           <div className="flex-1">
                             <div className="flex justify-between items-baseline mb-1">
-                              <span className="text-sm font-medium text-[#1a1612]">{INTENSITEIT_LABEL[intensiteit]}</span>
+                              <span className="text-sm font-medium text-white">{INTENSITEIT_LABEL[intensiteit]}</span>
                               <div className="flex items-center gap-2">
-                                <span className="text-xs text-[#a09990]">{count}×</span>
-                                <span className="text-sm font-bold text-[#1a1612]">{formatPace(gemPace)} /km</span>
+                                <span className="text-xs text-[#55556a]">{count}×</span>
+                                <span className="text-sm font-bold text-white">{formatPace(gemPace)} /km</span>
                               </div>
                             </div>
                           </div>
@@ -1202,12 +1202,12 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
 
                 {/* Hartslag zones nudge (als max_hartslag niet ingesteld) */}
                 {!maxHartslag && (
-                  <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#f97316]/20">
+                  <div className="bg-[#1b1b27] rounded-2xl p-4 border border-[#f97316]/30">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">❤️</span>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-[#1a1612]">Hartslag zones instellen</p>
-                        <p className="text-xs text-[#6b6560] mt-0.5">Voeg je max hartslag toe voor persoonlijke zones</p>
+                        <p className="text-sm font-semibold text-white">Hartslag zones instellen</p>
+                        <p className="text-xs text-[#8888a8] mt-0.5">Voeg je max hartslag toe voor persoonlijke zones</p>
                       </div>
                       <button
                         onClick={() => window.location.href = '/instellingen'}
@@ -1226,25 +1226,25 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
 
                 {/* Hartslag gem/max stats */}
                 {hartslagStats && (
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
+                  <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <Heart size={14} className="text-red-400" />
-                      <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">Hartslag statistieken</p>
+                      <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider">Hartslag statistieken</p>
                     </div>
                     <div className="flex gap-6">
                       <div>
                         <p className="text-2xl font-bold text-red-400">{hartslagStats.gem}</p>
-                        <p className="text-xs text-[#a09990]">gem. bpm</p>
+                        <p className="text-xs text-[#55556a]">gem. bpm</p>
                       </div>
-                      <div className="w-px bg-[#f0ede8]" />
+                      <div className="w-px bg-[#222230]" />
                       <div>
-                        <p className="text-2xl font-bold text-[#1a1612]">{hartslagStats.max}</p>
-                        <p className="text-xs text-[#a09990]">max bpm</p>
+                        <p className="text-2xl font-bold text-white">{hartslagStats.max}</p>
+                        <p className="text-xs text-[#55556a]">max bpm</p>
                       </div>
-                      <div className="w-px bg-[#f0ede8]" />
+                      <div className="w-px bg-[#222230]" />
                       <div>
-                        <p className="text-2xl font-bold text-[#1a1612]">{hartslagStats.aantalSessies}</p>
-                        <p className="text-xs text-[#a09990]">runs</p>
+                        <p className="text-2xl font-bold text-white">{hartslagStats.aantalSessies}</p>
+                        <p className="text-xs text-[#55556a]">runs</p>
                       </div>
                     </div>
                   </div>
@@ -1252,24 +1252,24 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
 
                 {/* Cross-training & kracht */}
                 {(krachtSessies.length > 0 || crossSessies.length > 0) && (
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
-                    <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Aanvullende training</p>
+                  <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+                    <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-3">Aanvullende training</p>
                     <div className="flex gap-4">
                       {krachtSessies.length > 0 && (
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center text-sm">💪</div>
+                          <div className="w-8 h-8 rounded-xl bg-purple-950 flex items-center justify-center text-sm">💪</div>
                           <div>
                             <p className="text-lg font-bold text-[#8b5cf6]">{krachtSessies.length}</p>
-                            <p className="text-xs text-[#a09990]">kracht</p>
+                            <p className="text-xs text-[#55556a]">kracht</p>
                           </div>
                         </div>
                       )}
                       {crossSessies.length > 0 && (
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xl bg-green-100 flex items-center justify-center text-sm">🚴</div>
+                          <div className="w-8 h-8 rounded-xl bg-green-950 flex items-center justify-center text-sm">🚴</div>
                           <div>
                             <p className="text-lg font-bold text-[#10b981]">{crossSessies.length}</p>
-                            <p className="text-xs text-[#a09990]">cross</p>
+                            <p className="text-xs text-[#55556a]">cross</p>
                           </div>
                         </div>
                       )}
@@ -1292,7 +1292,7 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
             {coreSessies.length === 0 && fysioVoltooid.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-3xl mb-2">🧘</p>
-                <p className="text-[#6b6560]">Nog geen herstel-sessies voltooid</p>
+                <p className="text-[#8888a8]">Nog geen herstel-sessies voltooid</p>
               </div>
             ) : (
               <>
@@ -1305,34 +1305,34 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
 
                 {/* Core per week */}
                 {corePerWeek.length > 1 && (
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
-                    <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-4">Core sessies per week</p>
+                  <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+                    <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-4">Core sessies per week</p>
                     <BarChart data={corePerWeek} kleur="#06b6d4" />
                   </div>
                 )}
 
                 {/* Fysio per week */}
                 {fysioPerWeek.length > 1 && (
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
-                    <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-4">Fysio sessies per week</p>
+                  <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+                    <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-4">Fysio sessies per week</p>
                     <BarChart data={fysioPerWeek} kleur="#f59e0b" />
                   </div>
                 )}
 
                 {/* Consistentie tabel */}
-                <div className="bg-white rounded-2xl p-4 shadow-sm">
-                  <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Consistentie herstel</p>
+                <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+                  <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-3">Consistentie herstel</p>
                   <div className="flex flex-col gap-3">
                     {coreSessies.length > 0 && (
                       <div>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-[#1a1612] font-medium flex items-center gap-2">
+                          <span className="text-white font-medium flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full bg-[#06b6d4] inline-block" />
                             Core stability
                           </span>
-                          <span className="text-[#a09990]">{coreSessies.length} sessies</span>
+                          <span className="text-[#55556a]">{coreSessies.length} sessies</span>
                         </div>
-                        <div className="text-xs text-[#6b6560]">
+                        <div className="text-xs text-[#8888a8]">
                           Ingesteld: {profiel?.core_per_week ?? 2}× per week
                           {' · '}gem. {gemCorePerWeek}× gedaan
                         </div>
@@ -1341,13 +1341,13 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                     {fysioVoltooid.length > 0 && (
                       <div>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-[#1a1612] font-medium flex items-center gap-2">
+                          <span className="text-white font-medium flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] inline-block" />
                             Fysio
                           </span>
-                          <span className="text-[#a09990]">{fysioVoltooid.length} sessies</span>
+                          <span className="text-[#55556a]">{fysioVoltooid.length} sessies</span>
                         </div>
-                        <div className="text-xs text-[#6b6560]">
+                        <div className="text-xs text-[#8888a8]">
                           Ingesteld: {profiel?.fysio_per_week ?? 3}× per week
                           {' · '}gem. {gemFysioPerWeek}× gedaan
                         </div>
@@ -1356,11 +1356,11 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                     {krachtSessies.length > 0 && (
                       <div>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-[#1a1612] font-medium flex items-center gap-2">
+                          <span className="text-white font-medium flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full bg-[#8b5cf6] inline-block" />
                             Krachttraining
                           </span>
-                          <span className="text-[#a09990]">{krachtSessies.length} sessies</span>
+                          <span className="text-[#55556a]">{krachtSessies.length} sessies</span>
                         </div>
                       </div>
                     )}
@@ -1368,11 +1368,11 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                 </div>
 
                 {/* Heatmap herstel */}
-                <div className="bg-white rounded-2xl p-4 shadow-sm">
-                  <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider mb-3">Activiteiten — afgelopen 12 weken</p>
+                <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+                  <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider mb-3">Activiteiten — afgelopen 12 weken</p>
                   <div className="flex gap-1 mb-2">
                     {['Ma','Di','Wo','Do','Vr','Za','Zo'].map(d => (
-                      <div key={d} className="flex-1 text-center text-[9px] text-[#c8c3bc] font-medium">{d}</div>
+                      <div key={d} className="flex-1 text-center text-[9px] text-[#55556a] font-medium">{d}</div>
                     ))}
                   </div>
                   {(() => {
@@ -1397,7 +1397,7 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                         {weken2.map((dagen, wi) => (
                           <div key={wi} className="flex gap-1">
                             {dagen.map(({ datum, heeftCore, heeftFysio, heeftKracht }) => {
-                              const bg = heeftCore ? '#06b6d4' : heeftFysio ? '#f59e0b' : heeftKracht ? '#8b5cf6' : '#f0ede8'
+                              const bg = heeftCore ? '#06b6d4' : heeftFysio ? '#f59e0b' : heeftKracht ? '#8b5cf6' : '#2d2d3e'
                               const actief = heeftCore || heeftFysio || heeftKracht
                               return (
                                 <div key={datum} className="flex-1 aspect-square rounded-md"
@@ -1417,7 +1417,7 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                     ].map(l => (
                       <div key={l.label} className="flex items-center gap-1">
                         <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: l.kleur, opacity: 0.8 }} />
-                        <span className="text-[10px] text-[#a09990]">{l.label}</span>
+                        <span className="text-[10px] text-[#55556a]">{l.label}</span>
                       </div>
                     ))}
                   </div>
@@ -1429,16 +1429,16 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
 
         {/* ── PRESTATIES ──────────────────────────────────────────────────── */}
         {tab === 'prestaties' && (
-          <div className="bg-white rounded-3xl p-5 shadow-sm">
+          <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-3xl p-5">
             {/* Header */}
             <div className="flex items-center justify-between mb-5">
               <div>
-                <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wider">Prestaties</p>
-                <p className="text-2xl font-bold text-[#1a1612] mt-0.5">{aantalBehaald} / {badges.length}</p>
+                <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider">Prestaties</p>
+                <p className="text-2xl font-bold text-white mt-0.5">{aantalBehaald} / {badges.length}</p>
               </div>
               <div className="relative w-14 h-14">
                 <svg viewBox="0 0 56 56" className="w-full h-full -rotate-90">
-                  <circle cx="28" cy="28" r="22" fill="none" stroke="#f0ede8" strokeWidth="5" />
+                  <circle cx="28" cy="28" r="22" fill="none" stroke="#2d2d3e" strokeWidth="5" />
                   <circle cx="28" cy="28" r="22" fill="none" stroke="#f97316" strokeWidth="5"
                     strokeDasharray={`${(aantalBehaald / badges.length) * 138.2} 138.2`}
                     strokeLinecap="round" />
@@ -1455,19 +1455,19 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
                 <div key={badge.id}
                   className={cn(
                     'rounded-2xl p-3 flex flex-col items-center text-center gap-2 transition-all',
-                    badge.behaald ? 'bg-[#fff8f3]' : 'bg-[#f5f3f0]'
+                    badge.behaald ? 'bg-[#f97316]/10' : 'bg-[#222230]'
                   )}>
                   <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl transition-all"
                     style={badge.behaald
                       ? { backgroundColor: badge.kleur + '20', outline: `2px solid ${badge.kleur}`, outlineOffset: '2px' }
-                      : { backgroundColor: '#e5e2de', opacity: 0.35 }}>
+                      : { backgroundColor: '#2d2d3e', opacity: 0.35 }}>
                     <span style={badge.behaald ? {} : { filter: 'grayscale(1)' }}>{badge.emoji}</span>
                   </div>
                   <div>
-                    <p className={cn('text-xs font-semibold leading-tight', badge.behaald ? 'text-[#1a1612]' : 'text-[#a09990]')}>
+                    <p className={cn('text-xs font-semibold leading-tight', badge.behaald ? 'text-white' : 'text-[#55556a]')}>
                       {badge.naam}
                     </p>
-                    <p className="text-[10px] text-[#a09990] mt-0.5 leading-tight">{badge.beschrijving}</p>
+                    <p className="text-[10px] text-[#55556a] mt-0.5 leading-tight">{badge.beschrijving}</p>
                   </div>
                   {badge.behaald && (
                     <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: badge.kleur }} />

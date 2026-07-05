@@ -189,17 +189,17 @@ export function CoachChatClient({ profiel, doel, recente_sessies, weekreview, us
   }
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#f5f3f0]">
+    <div className="flex flex-col h-[100dvh] bg-[#111118]">
       {/* Header */}
-      <div className="px-4 pt-12 pb-3 bg-[#f5f3f0] flex items-start justify-between">
+      <div className="px-4 pt-12 pb-3 bg-[#111118] flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1a1612]">Coach 🤖</h1>
-          <p className="text-sm text-[#6b6560] mt-0.5">Vraag de coach alles over je training</p>
+          <h1 className="text-2xl font-bold text-white">Coach 🤖</h1>
+          <p className="text-sm text-[#8888a8] mt-0.5">Vraag de coach alles over je training</p>
         </div>
         {messages.length > 0 && (
           <button
             onClick={wisGesprek}
-            className="text-xs text-[#a09990] hover:text-[#6b6560] transition-colors mt-1 pt-12"
+            className="text-xs text-[#55556a] hover:text-[#8888a8] transition-colors mt-1 pt-12"
           >
             Gesprek wissen
           </button>
@@ -210,22 +210,22 @@ export function CoachChatClient({ profiel, doel, recente_sessies, weekreview, us
       <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
         {/* Weekreview card */}
         {weekreview && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-green-500">
-            <p className="text-xs font-semibold text-green-700 mb-1">📋 Weekreview</p>
-            <p className="text-sm text-[#1a1612] leading-relaxed">{weekreview}</p>
+          <div className="bg-[#1b1b27] rounded-2xl p-4 border border-[#2d2d3e] border-l-4 border-l-green-500">
+            <p className="text-xs font-semibold text-green-400 mb-1">📋 Weekreview</p>
+            <p className="text-sm text-white leading-relaxed">{weekreview}</p>
           </div>
         )}
 
         {/* Empty state + suggested questions */}
         {messages.length === 0 && (
           <div className="space-y-3 pt-2">
-            <p className="text-sm text-[#6b6560] text-center">Stel een vraag aan je coach</p>
+            <p className="text-sm text-[#8888a8] text-center">Stel een vraag aan je coach</p>
             <div className="flex flex-wrap gap-2 justify-center">
               {SUGGESTIES.map(s => (
                 <button
                   key={s}
                   onClick={() => sendMessage(s)}
-                  className="bg-white text-[#1a1612] text-xs px-3 py-2 rounded-full shadow-sm border border-[#e8e3dc] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
+                  className="bg-[#1b1b27] text-white text-xs px-3 py-2 rounded-full border border-[#2d2d3e] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
                 >
                   {s}
                 </button>
@@ -244,7 +244,7 @@ export function CoachChatClient({ profiel, doel, recente_sessies, weekreview, us
               className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 msg.role === 'user'
                   ? 'bg-[#f97316] text-white rounded-br-sm'
-                  : 'bg-white text-[#1a1612] shadow-sm rounded-bl-sm'
+                  : 'bg-[#1b1b27] text-white border border-[#2d2d3e] rounded-bl-sm'
               }`}
             >
               {msg.content}
@@ -255,10 +255,10 @@ export function CoachChatClient({ profiel, doel, recente_sessies, weekreview, us
         {/* Loading dots */}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-white rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-[#6b6560] animate-bounce [animation-delay:0ms]" />
-              <span className="w-2 h-2 rounded-full bg-[#6b6560] animate-bounce [animation-delay:150ms]" />
-              <span className="w-2 h-2 rounded-full bg-[#6b6560] animate-bounce [animation-delay:300ms]" />
+            <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-[#8888a8] animate-bounce [animation-delay:0ms]" />
+              <span className="w-2 h-2 rounded-full bg-[#8888a8] animate-bounce [animation-delay:150ms]" />
+              <span className="w-2 h-2 rounded-full bg-[#8888a8] animate-bounce [animation-delay:300ms]" />
             </div>
           </div>
         )}
@@ -270,7 +270,7 @@ export function CoachChatClient({ profiel, doel, recente_sessies, weekreview, us
               <button
                 key={s}
                 onClick={() => sendMessage(s)}
-                className="bg-white text-[#6b6560] text-[11px] px-3 py-1.5 rounded-full shadow-sm border border-[#e8e3dc] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
+                className="bg-[#1b1b27] text-[#8888a8] text-[11px] px-3 py-1.5 rounded-full border border-[#2d2d3e] hover:border-[#f97316] hover:text-[#f97316] transition-colors"
               >
                 {s}
               </button>
@@ -284,14 +284,14 @@ export function CoachChatClient({ profiel, doel, recente_sessies, weekreview, us
       {/* Input bar */}
       <form
         onSubmit={handleSubmit}
-        className="flex items-center gap-2 px-4 py-3 bg-white border-t border-[#e8e3dc] safe-bottom"
+        className="flex items-center gap-2 px-4 py-3 bg-[#1b1b27] border-t border-[#2d2d3e] safe-bottom"
       >
         <input
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
           placeholder="Stel een vraag..."
-          className="flex-1 bg-[#f5f3f0] rounded-full px-4 py-2.5 text-sm text-[#1a1612] placeholder:text-[#a09990] outline-none"
+          className="flex-1 bg-[#222230] rounded-full px-4 py-2.5 text-sm text-white placeholder:text-[#55556a] outline-none"
           disabled={loading}
         />
         <button
