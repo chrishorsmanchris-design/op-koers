@@ -28,16 +28,20 @@ export async function POST() {
 
     if (!doel) return NextResponse.json({ error: 'Geen actief doel gevonden' }, { status: 400 })
 
-    // Permanent geblokkeerde dagen (hockey etc.)
-    const geblokkeerd = new Set<number>(activiteiten?.map(a => a.dag_van_week) ?? [])
+    // Permanent geblokkeerde dagen (hockey etc.) — blokkeert alleen hardlopen
+    const hockeyDagen = new Set<number>(activiteiten?.map(a => a.dag_van_week) ?? [])
 
-    // Beschikbare dagen: uren > 0 in beschikbaarheid EN niet geblokkeerd
+    // Dagen met 0u beschikbaarheid — gebruiker heeft daar helemaal geen tijd om te trainen
     const dagSleutels = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo']
     const beschikbaarheidMap = (profiel as Record<string, unknown>)?.beschikbaarheid as Record<string, number> | null
       ?? { ma: 2, di: 0, wo: 2, do: 3, vr: 2, za: 3, zo: 0 }
-    const beschikbaar = [0, 1, 2, 3, 4, 5, 6].filter(d =>
-      !geblokkeerd.has(d) && (beschikbaarheidMap[dagSleutels[d]] ?? 0) > 0
+    const geenTijdDagen = new Set<number>(
+      [0, 1, 2, 3, 4, 5, 6].filter(d => (beschikbaarheidMap[dagSleutels[d]] ?? 0) <= 0)
     )
+
+    // Alle dagen die volledig geblokkeerd zijn voor de hardloop-scheduler
+    // (hockey blokkeert alleen hardlopen; 0u-beschikbaarheid blokkeert alles)
+    const geblokkeerd = new Set<number>([...hockeyDagen, ...geenTijdDagen])
 
     // Vakanties als simpele array
     const vakantieArray: Vakantie[] = (vakanties ?? []).map(v => ({
@@ -166,6 +170,8 @@ export async function POST() {
       const herstelloopDagen: string[] = [] // alleen herstel-intensiteit → geschikt voor core
 
       for (let d = 0; d < 7; d++) {
+        if (geenTijdDagen.has(d)) continue // geen tijd deze dag — ook geen fysio/core
+
         const datum = new Date(weekMaandag)
         datum.setDate(datum.getDate() + d)
         const datumStr = datum.toISOString().split('T')[0]
