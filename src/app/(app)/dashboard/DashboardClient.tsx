@@ -439,8 +439,8 @@ export function DashboardClient({
           </div>
         </button>
 
-        {/* Week indicator */}
-        <button className="flex items-center gap-1.5">
+        {/* Week indicator — naar volledig schema met alle weken */}
+        <button onClick={() => router.push('/schema')} className="flex items-center gap-1.5">
           <span className="text-white font-semibold text-base">
             {planWeekNummer ? `Week ${planWeekNummer}/${totaalWeken}` : 'Overzicht'}
           </span>
