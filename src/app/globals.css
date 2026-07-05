@@ -3,13 +3,13 @@
 :root {
   --oranje: #f97316;
   --oranje-dark: #ea6c0a;
-  --achtergrond: #f5f3f0;
-  --kaart: #ffffff;
-  --kaart-2: #f0ede8;
-  --rand: #e8e3dc;
-  --tekst: #1a1612;
-  --tekst-2: #6b6560;
-  --tekst-licht: #a09990;
+  --achtergrond: #111118;
+  --kaart: #1b1b27;
+  --kaart-2: #222230;
+  --rand: #2d2d3e;
+  --tekst: #f0f0f8;
+  --tekst-2: #8888a8;
+  --tekst-licht: #55556a;
 }
 
 * {

@@ -20,14 +20,14 @@ interface Props {
 
 // ── Kleuren per intensiteit ────────────────────────────────────────────────────
 const KLEUR: Record<string, { bar: string; badge: string; dot: string }> = {
-  herstel:   { bar: '#93c5fd', badge: 'bg-blue-50 text-blue-700',     dot: '#93c5fd' },
-  makkelijk: { bar: '#4ade80', badge: 'bg-green-50 text-green-700',   dot: '#4ade80' },
-  gemiddeld: { bar: '#fbbf24', badge: 'bg-amber-50 text-amber-800',   dot: '#fbbf24' },
-  zwaar:     { bar: '#f97316', badge: 'bg-orange-50 text-orange-700', dot: '#f97316' },
-  interval:  { bar: '#f43f5e', badge: 'bg-rose-50 text-rose-700',     dot: '#f43f5e' },
+  herstel:   { bar: '#93c5fd', badge: 'bg-blue-950 text-blue-300',     dot: '#93c5fd' },
+  makkelijk: { bar: '#4ade80', badge: 'bg-green-950 text-green-300',   dot: '#4ade80' },
+  gemiddeld: { bar: '#fbbf24', badge: 'bg-amber-950 text-amber-300',   dot: '#fbbf24' },
+  zwaar:     { bar: '#f97316', badge: 'bg-orange-950 text-orange-300', dot: '#f97316' },
+  interval:  { bar: '#f43f5e', badge: 'bg-rose-950 text-rose-300',     dot: '#f43f5e' },
 }
 
-const RUST_KLEUR = { bar: '#e8e3dc', badge: '', dot: '#e8e3dc' }
+const RUST_KLEUR = { bar: '#2d2d3e', badge: '', dot: '#2d2d3e' }
 
 const TYPE_EMOJI: Record<string, string> = {
   hardlopen:      '🏃',
@@ -103,30 +103,30 @@ function RoosterModal({ sessie, alleSessies, onVerplaatsen, onLatenVervallen, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">
-      <div className="absolute inset-0 bg-black/40" onClick={onSluiten} />
-      <div className="relative w-full bg-white rounded-t-3xl shadow-2xl overflow-hidden">
+      <div className="absolute inset-0 bg-black/60" onClick={onSluiten} />
+      <div className="relative w-full bg-[#1b1b27] rounded-t-3xl shadow-2xl overflow-hidden border-t border-[#2d2d3e]">
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 bg-[#e8e3dc] rounded-full" />
+          <div className="w-10 h-1 bg-[#2d2d3e] rounded-full" />
         </div>
 
         <div className="px-5 pb-safe-or-8 pb-8">
           <div className="flex justify-between items-start mb-4 mt-1">
             <div>
-              <h3 className="font-bold text-[#1a1612] text-base">Training gemist</h3>
-              <p className="text-sm text-[#6b6560] mt-0.5 leading-snug">{sessie.beschrijving}</p>
+              <h3 className="font-bold text-white text-base">Training gemist</h3>
+              <p className="text-sm text-[#8888a8] mt-0.5 leading-snug">{sessie.beschrijving}</p>
             </div>
-            <button onClick={onSluiten} className="p-1.5 text-[#a09990] -mt-0.5">
+            <button onClick={onSluiten} className="p-1.5 text-[#55556a] -mt-0.5">
               <X size={18} />
             </button>
           </div>
 
-          <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wide mb-2">
+          <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wide mb-2">
             Verplaatsen naar
           </p>
 
           {kandidaten.length === 0 ? (
-            <p className="text-sm text-[#a09990] mb-4">
+            <p className="text-sm text-[#55556a] mb-4">
               Geen vrije trainingsdagen gevonden in de komende 4 weken.
             </p>
           ) : (
@@ -135,10 +135,10 @@ function RoosterModal({ sessie, alleSessies, onVerplaatsen, onLatenVervallen, on
                 <button
                   key={datum}
                   onClick={() => onVerplaatsen(sessie.id, datum)}
-                  className="flex items-center justify-between px-4 py-3 rounded-2xl bg-[#f5f3f0] border border-[#e8e3dc] text-sm font-medium text-[#1a1612] active:scale-[0.98] transition-transform"
+                  className="flex items-center justify-between px-4 py-3 rounded-2xl bg-[#222230] border border-[#2d2d3e] text-sm font-medium text-white active:scale-[0.98] transition-transform"
                 >
                   <span className="capitalize">{formatDatumLabel(datum)}</span>
-                  <MoveRight size={16} className="text-[#a09990]" />
+                  <MoveRight size={16} className="text-[#55556a]" />
                 </button>
               ))}
             </div>
@@ -146,7 +146,7 @@ function RoosterModal({ sessie, alleSessies, onVerplaatsen, onLatenVervallen, on
 
           <button
             onClick={() => onLatenVervallen(sessie.id)}
-            className="w-full py-3 rounded-2xl text-sm font-medium text-[#a09990] border border-[#e8e3dc] active:scale-[0.98] transition-transform"
+            className="w-full py-3 rounded-2xl text-sm font-medium text-[#8888a8] border border-[#2d2d3e] active:scale-[0.98] transition-transform"
           >
             Laten vervallen
           </button>
@@ -336,19 +336,19 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-5 p-4 pt-8 pb-24">
+    <div className="flex flex-col gap-5 p-4 pt-8 pb-24 bg-[#111118] min-h-screen">
 
       {/* Paginaheader */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-[#1a1612]">Trainingsschema</h1>
-          {doel && <p className="text-sm text-[#6b6560] mt-0.5">{doel.naam}</p>}
+          <h1 className="text-2xl font-bold text-white">Trainingsschema</h1>
+          {doel && <p className="text-sm text-[#8888a8] mt-0.5">{doel.naam}</p>}
         </div>
         <div className="flex items-center gap-1.5">
           {sessies.length > 0 && (
             <button
               onClick={() => window.open('/api/training/ical', '_blank')}
-              className="p-2 rounded-xl border border-[#e8e3dc] text-[#a09990] hover:border-[#c8c3bc] transition-colors"
+              className="p-2 rounded-xl border border-[#2d2d3e] text-[#8888a8] hover:border-[#3d3d50] transition-colors"
               title="Exporteer naar agenda"
             >
               <Calendar size={16} />
@@ -361,7 +361,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
           <button
             onClick={genereerSchema}
             disabled={genereert || importeert}
-            className="p-2 rounded-xl border border-[#e8e3dc] text-[#a09990] hover:border-[#c8c3bc] transition-colors disabled:opacity-40"
+            className="p-2 rounded-xl border border-[#2d2d3e] text-[#8888a8] hover:border-[#3d3d50] transition-colors disabled:opacity-40"
             title="Opnieuw genereren"
           >
             {genereert ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
@@ -376,19 +376,19 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
         </Card>
       )}
       {fout && (
-        <Card className="bg-red-50 border border-red-200">
-          <p className="text-sm font-medium text-red-700 mb-1">Schema genereren mislukt</p>
+        <Card className="bg-red-950 border border-red-800">
+          <p className="text-sm font-medium text-red-400 mb-1">Schema genereren mislukt</p>
           <p className="text-xs text-red-500 font-mono break-all">{fout}</p>
-          {foutTekst && <p className="text-xs text-red-400 font-mono break-all mt-1 border-t border-red-100 pt-1">{foutTekst}</p>}
+          {foutTekst && <p className="text-xs text-red-600 font-mono break-all mt-1 border-t border-red-900 pt-1">{foutTekst}</p>}
         </Card>
       )}
 
       {/* Leeg schema */}
       {sessies.length === 0 ? (
-        <Card className="text-center py-12">
+        <Card className="text-center py-12 bg-[#1b1b27] border-[#2d2d3e]">
           <div className="text-5xl mb-3">📅</div>
-          <h3 className="font-semibold text-[#1a1612] mb-1">Geen schema aangemaakt</h3>
-          <p className="text-sm text-[#6b6560] mb-5">
+          <h3 className="font-semibold text-white mb-1">Geen schema aangemaakt</h3>
+          <p className="text-sm text-[#8888a8] mb-5">
             Importeer het volledige plan — opbouwfase + PDF-schema, rekening houdend met hockey en vakanties.
           </p>
           <div className="flex gap-2 justify-center flex-wrap">
@@ -403,27 +403,27 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
             <button
               onClick={() => setActieveWeekIndex(i => Math.max(0, i - 1))}
               disabled={actieveWeekIndex === 0}
-              className="w-9 h-9 flex items-center justify-center rounded-xl text-[#a09990] disabled:opacity-25 hover:bg-[#f0ede8] transition-colors"
+              className="w-9 h-9 flex items-center justify-center rounded-xl text-[#8888a8] disabled:opacity-25 hover:bg-[#222230] transition-colors"
             >
               <ChevronLeft size={18} />
             </button>
 
             <div className="flex-1 text-center">
-              <p className="text-xs font-semibold text-[#a09990] uppercase tracking-wide">Week {actieveWeekNr}</p>
-              <p className="text-sm font-bold text-[#1a1612]">{weekDateRange(actieveWeek?.maandag ?? '')}</p>
+              <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wide">Week {actieveWeekNr}</p>
+              <p className="text-sm font-bold text-white">{weekDateRange(actieveWeek?.maandag ?? '')}</p>
             </div>
 
             <button
               onClick={() => setActieveWeekIndex(i => Math.min(weken.length - 1, i + 1))}
               disabled={actieveWeekIndex === weken.length - 1}
-              className="w-9 h-9 flex items-center justify-center rounded-xl text-[#a09990] disabled:opacity-25 hover:bg-[#f0ede8] transition-colors"
+              className="w-9 h-9 flex items-center justify-center rounded-xl text-[#8888a8] disabled:opacity-25 hover:bg-[#222230] transition-colors"
             >
               <ChevronRight size={18} />
             </button>
           </div>
 
           {/* ── Week stats ──────────────────────────────────────────────────── */}
-          <div className="flex justify-between text-xs text-[#6b6560] -mt-2">
+          <div className="flex justify-between text-xs text-[#55556a] -mt-2">
             <div className="flex gap-3">
               {weekStats.totalKm > 0 && (
                 <span className="flex items-center gap-1"><MapPin size={11} />{weekStats.totalKm} km</span>
@@ -434,7 +434,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
             </div>
             <div className="flex gap-3">
               {weekStats.gedaan > 0 && (
-                <span className="flex items-center gap-1 text-green-600"><CheckCircle2 size={11} /> {weekStats.gedaan} gedaan</span>
+                <span className="flex items-center gap-1 text-green-400"><CheckCircle2 size={11} /> {weekStats.gedaan} gedaan</span>
               )}
               {weekStats.open > 0 && <span>{weekStats.open} te doen</span>}
             </div>
@@ -459,8 +459,8 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                       isOvergeslagen && 'opacity-35',
                     )}
                     style={{
-                      backgroundColor: sessie && !isRust ? `${kleur.bar}25` : '#f5f3f0',
-                      border: `2px solid ${sessie && !isRust ? kleur.bar : '#e8e3dc'}`,
+                      backgroundColor: sessie && !isRust ? `${kleur.bar}20` : '#1b1b27',
+                      border: `2px solid ${sessie && !isRust ? kleur.bar : '#2d2d3e'}`,
                     }}
                   >
                     {isGedaan ? (
@@ -471,7 +471,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                       <span>{sessieEmoji(sessie)}</span>
                     ) : null}
                   </div>
-                  <span className="text-[10px] text-[#a09990] font-medium">{label}</span>
+                  <span className="text-[10px] text-[#55556a] font-medium">{label}</span>
                 </div>
               )
             })}
@@ -491,13 +491,13 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                 return (
                   <div
                     key={sessie.id}
-                    className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#fafaf9] border border-[#f0ede8]"
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#1b1b27] border border-[#2d2d3e]"
                   >
                     <div className="w-10 shrink-0 text-center">
-                      <p className="text-[10px] font-semibold text-[#c8c3bc] uppercase">{dagAfkVanDatum(sessie.datum)}</p>
-                      <p className="text-base font-bold text-[#d4cfc8]">{dagNummerVanDatum(sessie.datum)}</p>
+                      <p className="text-[10px] font-semibold text-[#3d3d50] uppercase">{dagAfkVanDatum(sessie.datum)}</p>
+                      <p className="text-base font-bold text-[#3d3d50]">{dagNummerVanDatum(sessie.datum)}</p>
                     </div>
-                    <p className="text-sm text-[#c8c3bc] flex-1">Rustdag</p>
+                    <p className="text-sm text-[#3d3d50] flex-1">Rustdag</p>
                     {heeftExtra && (
                       <div className="flex gap-1">
                         {wilCore && <span className="text-xs bg-[#06b6d4]/10 text-[#06b6d4] px-1.5 py-0.5 rounded-lg font-medium">🧘</span>}
@@ -512,7 +512,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                 <div
                   key={sessie.id}
                   className={cn(
-                    'rounded-2xl bg-white border border-[#f0ede8] overflow-hidden transition-opacity',
+                    'rounded-2xl bg-[#1b1b27] border border-[#2d2d3e] overflow-hidden transition-opacity',
                     (isGedaan || isOvergeslagen) && 'opacity-55',
                   )}
                 >
@@ -520,12 +520,12 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                     {/* Dag kolom */}
                     <div
                       className="w-12 shrink-0 flex flex-col items-center justify-center py-4 gap-0.5"
-                      style={{ backgroundColor: `${kleur.bar}18` }}
+                      style={{ backgroundColor: `${kleur.bar}15` }}
                     >
                       <span className="text-[10px] font-bold uppercase" style={{ color: kleur.bar }}>
                         {dagAfkVanDatum(sessie.datum)}
                       </span>
-                      <span className="text-xl font-bold text-[#1a1612] leading-none">
+                      <span className="text-xl font-bold text-white leading-none">
                         {dagNummerVanDatum(sessie.datum)}
                       </span>
                     </div>
@@ -540,7 +540,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <p className={cn(
                             'text-sm font-semibold leading-snug flex-1',
-                            isOvergeslagen ? 'line-through text-[#a09990]' : 'text-[#1a1612]'
+                            isOvergeslagen ? 'line-through text-[#55556a]' : 'text-white'
                           )}>
                             {sessieEmoji(sessie)} {sessie.beschrijving}
                           </p>
@@ -553,12 +553,12 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                         {/* Meta info */}
                         <div className="flex items-center gap-3 flex-wrap">
                           {sessie.duur_minuten != null && (
-                            <span className="flex items-center gap-1 text-xs text-[#a09990]">
+                            <span className="flex items-center gap-1 text-xs text-[#55556a]">
                               <Timer size={10} />{formatDuur(sessie.duur_minuten)}
                             </span>
                           )}
                           {sessie.afstand_km != null && sessie.afstand_km > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-[#a09990]">
+                            <span className="flex items-center gap-1 text-xs text-[#55556a]">
                               <MapPin size={10} />{sessie.afstand_km} km
                             </span>
                           )}
@@ -580,43 +580,43 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
 
                       {/* Actieknoppen */}
                       {(isOvergeslagen || isGedaan) && (
-                        <div className="flex border-t border-[#f5f3f0]">
+                        <div className="flex border-t border-[#2d2d3e]">
                           <button
                             onClick={() => ongedaanMaken(sessie.id)}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-[#a09990] active:bg-[#f5f3f0] transition-colors"
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-[#8888a8] active:bg-[#222230] transition-colors"
                           >
                             <XCircle size={14} /> Ongedaan maken
                           </button>
-                          <div className="w-px bg-[#f5f3f0]" />
+                          <div className="w-px bg-[#2d2d3e]" />
                           <button
                             onClick={() => verwijderSessie(sessie.id)}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-red-400 active:bg-red-50 transition-colors"
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-red-500 active:bg-red-950 transition-colors"
                           >
                             Verwijderen
                           </button>
                         </div>
                       )}
                       {!isGedaan && !isOvergeslagen && sessie.datum < volgendeWeekMaandag && (
-                        <div className="flex border-t border-[#f5f3f0]">
+                        <div className="flex border-t border-[#2d2d3e]">
                           <button
                             onClick={() => markeerGedaan(sessie.id)}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-green-600 active:bg-green-50 transition-colors"
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-green-400 active:bg-green-950 transition-colors"
                           >
                             <CheckCircle2 size={14} /> Gedaan
                           </button>
-                          <div className="w-px bg-[#f5f3f0]" />
+                          <div className="w-px bg-[#2d2d3e]" />
                           <button
                             onClick={() => handleGemist(sessie)}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-[#a09990] active:bg-[#f5f3f0] transition-colors"
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-[#8888a8] active:bg-[#222230] transition-colors"
                           >
                             <XCircle size={14} /> Gemist
                           </button>
                           {!sessie.runkeeper_id && (
                             <>
-                              <div className="w-px bg-[#f5f3f0]" />
+                              <div className="w-px bg-[#2d2d3e]" />
                               <button
                                 onClick={() => verwijderSessie(sessie.id)}
-                                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-red-400 active:bg-red-50 transition-colors"
+                                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium text-red-500 active:bg-red-950 transition-colors"
                               >
                                 Verwijderen
                               </button>
@@ -634,7 +634,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
           {/* ── Alle weken (compact pills) ──────────────────────────────────── */}
           {weken.length > 1 && (
             <div>
-              <p className="text-[10px] font-semibold text-[#c8c3bc] uppercase tracking-wide mb-2">
+              <p className="text-[10px] font-semibold text-[#3d3d50] uppercase tracking-wide mb-2">
                 Alle weken
               </p>
               <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
@@ -652,10 +652,10 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
                       className={cn(
                         'relative px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all',
                         isCurrent
-                          ? 'bg-[#1a1612] text-white'
+                          ? 'bg-white text-black'
                           : isCompleet
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-[#f0ede8] text-[#6b6560]',
+                          ? 'bg-green-950 text-green-400'
+                          : 'bg-[#222230] text-[#8888a8]',
                       )}
                     >
                       W{weekNr}

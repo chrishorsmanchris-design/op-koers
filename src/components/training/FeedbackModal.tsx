@@ -39,7 +39,6 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
       notitie: notitie || null,
     })
 
-    // Schema aanpassen als er significante afwijking is
     const needsAdjustment = ['te_zwaar', 'zwaar', 'beter_dan_verwacht', 'topdag'].includes(rating)
     if (needsAdjustment) {
       const res = await fetch('/api/training/aanpassen', {
@@ -62,15 +61,19 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-end z-50" onClick={() => onSluit()}>
       <div
-        className="bg-white rounded-t-3xl p-6 w-full max-w-lg mx-auto pb-10"
+        className="bg-[#1b1b27] border-t border-[#2d2d3e] rounded-t-3xl p-6 w-full max-w-lg mx-auto pb-10"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-bold text-[#1a1612]">Hoe ging het?</h3>
-          <button onClick={() => onSluit()} className="text-[#6b6560]"><X size={22} /></button>
+        {/* Handle */}
+        <div className="flex justify-center -mt-2 mb-4">
+          <div className="w-10 h-1 bg-[#2d2d3e] rounded-full" />
+        </div>
+        <div className="flex justify-between items-center mb-5">
+          <h3 className="text-lg font-bold text-white">Hoe ging het?</h3>
+          <button onClick={() => onSluit()} className="text-[#55556a]"><X size={22} /></button>
         </div>
 
-        <p className="text-sm text-[#6b6560] mb-4">{sessie.beschrijving}</p>
+        <p className="text-sm text-[#8888a8] mb-4">{sessie.beschrijving}</p>
 
         <div className="grid grid-cols-1 gap-2 mb-4">
           {RATINGS.map(r => (
@@ -79,7 +82,7 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
               onClick={() => setRating(r.value)}
               className={cn(
                 'flex items-center gap-3 p-3 rounded-2xl border-2 transition-all text-left',
-                rating === r.value ? r.kleur : 'border-[#e8e3dc] text-[#a09990]'
+                rating === r.value ? r.kleur : 'border-[#2d2d3e] text-[#55556a]'
               )}
             >
               <span className="text-2xl">{r.emoji}</span>
@@ -92,11 +95,11 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
           value={notitie}
           onChange={e => setNotitie(e.target.value)}
           placeholder="Notitie (optioneel)..."
-          className="w-full bg-[#f0ede8] border border-[#e8e3dc] rounded-2xl px-4 py-3 text-[#1a1612] placeholder:text-[#6b6560] focus:outline-none focus:border-[#f97316] resize-none h-20 mb-4"
+          className="w-full bg-[#222230] border border-[#2d2d3e] rounded-2xl px-4 py-3 text-white placeholder:text-[#55556a] focus:outline-none focus:border-[#f97316] resize-none h-20 mb-4"
         />
 
         {bevestiging ? (
-          <div className="rounded-2xl bg-green-50 border border-green-200 p-4 text-sm text-green-700">
+          <div className="rounded-2xl bg-green-950 border border-green-800 p-4 text-sm text-green-400">
             <p className="font-semibold mb-1">✅ Schema aangepast</p>
             <p>{bevestiging}</p>
           </div>
