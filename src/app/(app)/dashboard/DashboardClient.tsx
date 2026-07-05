@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn, formatDuur } from '@/lib/utils'
 import {
@@ -269,6 +269,7 @@ export function DashboardClient({
   const [verplaatsenSessie, setVerplaatsenSessie] = useState<TrainingSession | null>(null)
   const [workoutSessie, setWorkoutSessie] = useState<TrainingSession | null>(null)
   const [weekOverzichtOpen, setWeekOverzichtOpen] = useState(false)
+  const weekOverzichtRef = useRef<HTMLDivElement>(null)
   const [toonRunLog, setToonRunLog] = useState(false)
   const [coachBericht, setCoachBericht] = useState<string | null>(null)
   const [coachLaden, setCoachLaden] = useState(false)
@@ -439,12 +440,24 @@ export function DashboardClient({
           </div>
         </button>
 
-        {/* Week indicator — naar volledig schema met alle weken */}
-        <button onClick={() => router.push('/schema')} className="flex items-center gap-1.5">
+        {/* Week indicator — klapt het weekoverzicht hieronder uit */}
+        <button
+          onClick={() => {
+            setWeekOverzichtOpen(o => {
+              const nieuw = !o
+              if (nieuw) setTimeout(() => weekOverzichtRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+              return nieuw
+            })
+          }}
+          className="flex items-center gap-1.5"
+        >
           <span className="text-white font-semibold text-base">
             {planWeekNummer ? `Week ${planWeekNummer}/${totaalWeken}` : 'Overzicht'}
           </span>
-          <ChevronDown size={16} className="text-[#8888a8]" />
+          <ChevronDown
+            size={16}
+            className={cn('text-[#8888a8] transition-transform', weekOverzichtOpen && 'rotate-180')}
+          />
         </button>
 
         {/* Acties */}
@@ -714,7 +727,7 @@ export function DashboardClient({
       ))}
 
       {/* ── Week overzicht kaart ─────────────────────────────────────────────── */}
-      <div className="px-4 mb-3">
+      <div className="px-4 mb-3" ref={weekOverzichtRef}>
         <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl overflow-hidden">
           <button
             onClick={() => setWeekOverzichtOpen(o => !o)}
