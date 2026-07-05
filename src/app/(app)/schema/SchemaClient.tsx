@@ -199,9 +199,21 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
     }))
   }, [sessies])
 
-  // Spring naar de eerste week met openstaande sessies
+  // Spring naar de week van vandaag; als vandaag niet in het schema voorkomt
+  // (schema loopt achter of is nog niet zo ver), val terug op de eerste
+  // week met openstaande sessies
   useEffect(() => {
     if (weken.length === 0) return
+    const huidigeMaandag = (() => {
+      const d = new Date(); const dag = d.getDay()
+      d.setDate(d.getDate() - (dag === 0 ? 6 : dag - 1))
+      return d.toISOString().split('T')[0]
+    })()
+    const idxVandaag = weken.findIndex(w => w.maandag === huidigeMaandag)
+    if (idxVandaag !== -1) {
+      setActieveWeekIndex(idxVandaag)
+      return
+    }
     const idx = weken.findIndex(w =>
       w.sessies.some(s => !s.voltooid && !s.overgeslagen && s.type !== 'rust')
     )
