@@ -268,6 +268,7 @@ export function DashboardClient({
   const [feedbackSessie, setFeedbackSessie] = useState<TrainingSession | null>(null)
   const [verplaatsenSessie, setVerplaatsenSessie] = useState<TrainingSession | null>(null)
   const [workoutSessie, setWorkoutSessie] = useState<TrainingSession | null>(null)
+  const [weekOverzichtOpen, setWeekOverzichtOpen] = useState(false)
   const [toonRunLog, setToonRunLog] = useState(false)
   const [coachBericht, setCoachBericht] = useState<string | null>(null)
   const [coachLaden, setCoachLaden] = useState(false)
@@ -342,6 +343,12 @@ export function DashboardClient({
     const totaalKm = weekSessies.reduce((sum, s) => sum + (s.afstand_km ?? 0), 0)
     const voltooideKm = weekSessies.filter(s => s.voltooid).reduce((sum, s) => sum + (s.afstand_km ?? 0), 0)
     return { totaal: weekSessies.length, voltooid, totaalKm, voltooideKm }
+  }, [sessies, weekStart, dagen])
+
+  const weekOverzichtSessies = useMemo(() => {
+    return sessies
+      .filter(s => s.datum >= weekStart && s.datum <= dagen[6] && s.type !== 'rust' && !s.overgeslagen)
+      .sort((a, b) => a.datum.localeCompare(b.datum))
   }, [sessies, weekStart, dagen])
 
   const aantalGemistDezeWeek = useMemo(() => {
@@ -708,37 +715,86 @@ export function DashboardClient({
 
       {/* ── Week overzicht kaart ─────────────────────────────────────────────── */}
       <div className="px-4 mb-3">
-        <button
-          onClick={() => router.push('/schema')}
-          className="w-full bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4 text-left"
-        >
-          <div className="flex items-center gap-3">
-            <ConsistencyRing voltooid={weekVoortgang.voltooid} totaal={Math.max(weekVoortgang.totaal, 0)} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-semibold text-white">
-                  Overzicht van week {planWeekNummer ?? '—'}
-                </span>
-                <ChevronRight size={16} className="text-[#55556a] shrink-0" />
-              </div>
-              {/* Voortgangsbalk met segmenten */}
-              <div className="flex gap-1 mb-2.5">
-                {Array.from({ length: Math.max(weekVoortgang.totaal, 1) }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={cn('flex-1 h-1 rounded-full transition-all', i < weekVoortgang.voltooid ? 'bg-[#f97316]' : 'bg-[#2d2d3e]')}
+        <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl overflow-hidden">
+          <button
+            onClick={() => setWeekOverzichtOpen(o => !o)}
+            className="w-full p-4 text-left"
+          >
+            <div className="flex items-center gap-3">
+              <ConsistencyRing voltooid={weekVoortgang.voltooid} totaal={Math.max(weekVoortgang.totaal, 0)} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-white">
+                    Overzicht van week {planWeekNummer ?? '—'}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={cn('text-[#55556a] shrink-0 transition-transform', weekOverzichtOpen && 'rotate-180')}
                   />
-                ))}
-              </div>
-              <div className="flex justify-between text-xs text-[#8888a8]">
-                <span>Trainingen: <span className="font-bold text-white">{weekVoortgang.voltooid}/{weekVoortgang.totaal}</span></span>
-                {weekVoortgang.totaalKm > 0 && (
-                  <span>Afstand: <span className="font-bold text-white">{Math.round(weekVoortgang.voltooideKm * 10) / 10}/{Math.round(weekVoortgang.totaalKm * 10) / 10}KM</span></span>
-                )}
+                </div>
+                {/* Voortgangsbalk met segmenten */}
+                <div className="flex gap-1 mb-2.5">
+                  {Array.from({ length: Math.max(weekVoortgang.totaal, 1) }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={cn('flex-1 h-1 rounded-full transition-all', i < weekVoortgang.voltooid ? 'bg-[#f97316]' : 'bg-[#2d2d3e]')}
+                    />
+                  ))}
+                </div>
+                <div className="flex justify-between text-xs text-[#8888a8]">
+                  <span>Trainingen: <span className="font-bold text-white">{weekVoortgang.voltooid}/{weekVoortgang.totaal}</span></span>
+                  {weekVoortgang.totaalKm > 0 && (
+                    <span>Afstand: <span className="font-bold text-white">{Math.round(weekVoortgang.voltooideKm * 10) / 10}/{Math.round(weekVoortgang.totaalKm * 10) / 10}KM</span></span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </button>
+          </button>
+
+          {weekOverzichtOpen && (
+            <div className="border-t border-[#2d2d3e] px-4 pt-3 pb-4">
+              <div className="flex flex-col gap-2">
+                {weekOverzichtSessies.length === 0 && (
+                  <p className="text-xs text-[#55556a] text-center py-2">Geen trainingen deze week.</p>
+                )}
+                {weekOverzichtSessies.map(s => (
+                  <div
+                    key={s.id}
+                    className={cn(
+                      'flex items-center gap-3 p-2.5 rounded-xl bg-[#222230]',
+                      s.type === 'hardlopen' && 'cursor-pointer'
+                    )}
+                    onClick={() => s.type === 'hardlopen' && setWorkoutSessie(s)}
+                  >
+                    {s.voltooid ? (
+                      <CheckCircle2 size={16} className="text-green-400 shrink-0" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-[#3d3d50] shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className={cn('text-xs font-semibold truncate', s.voltooid ? 'text-[#8888a8]' : 'text-white')}>
+                        {new Date(s.datum + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short' })} · {s.beschrijving}
+                      </p>
+                    </div>
+                    {(s.duur_minuten != null || (s.afstand_km ?? 0) > 0) && (
+                      <span className="text-[11px] text-[#55556a] shrink-0">
+                        {s.duur_minuten != null ? formatDuur(s.duur_minuten) : ''}
+                        {s.duur_minuten != null && (s.afstand_km ?? 0) > 0 ? ' · ' : ''}
+                        {(s.afstand_km ?? 0) > 0 ? `${s.afstand_km} km` : ''}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => router.push('/schema')}
+                className="w-full mt-3 flex items-center justify-center gap-1 text-xs font-semibold text-[#f97316]"
+              >
+                Bekijk volledig schema <ChevronRight size={13} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Vandaag ook: Core & Fysio ────────────────────────────────────────── */}
