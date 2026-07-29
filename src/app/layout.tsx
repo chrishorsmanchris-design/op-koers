@@ -39,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="h-full antialiased">
         {children}
         <script dangerouslySetInnerHTML={{
-          __html: `if('serviceWorker'in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js')})}`
+          __html: `if('serviceWorker'in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').then(function(reg){reg.update()});let herladen=false;navigator.serviceWorker.addEventListener('controllerchange',function(){if(herladen)return;herladen=true;window.location.reload()})})}`
         }} />
       </body>
     </html>

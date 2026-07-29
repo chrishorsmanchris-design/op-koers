@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getStravaAccessToken } from '@/lib/strava-sync'
-
-function isoWeeknummer(datum: string): number {
-  const d = new Date(datum + 'T12:00:00')
-  const dag = d.getDay() || 7
-  d.setDate(d.getDate() + 4 - dag)
-  const jaarStart = new Date(d.getFullYear(), 0, 1)
-  return Math.ceil(((d.getTime() - jaarStart.getTime()) / 86400000 + 1) / 7)
-}
+import { getStravaAccessToken, vindOfMaakSessie } from '@/lib/strava-sync'
 
 // GET: Strava webhook validatie
 export async function GET(req: NextRequest) {
@@ -67,49 +59,11 @@ export async function POST(req: NextRequest) {
   const hartslagMax = activity.max_heartrate ? Math.round(activity.max_heartrate as number) : null
   const routePolyline = (activity.map as Record<string, unknown> | undefined)?.summary_polyline as string | null ?? null
 
-  // Zoek bestaande geplande sessie op deze datum
-  const { data: geplandeSessies } = await supabase
-    .from('training_sessions')
-    .select('id')
-    .eq('user_id', profiel.id)
-    .eq('datum', datum)
-    .eq('type', 'hardlopen')
-    .is('runkeeper_id', null)
-    .limit(1)
-
-  let sessieId: string
-
-  if (geplandeSessies?.length) {
-    // Koppel aan bestaande sessie
-    sessieId = geplandeSessies[0].id
-    await supabase.from('training_sessions').update({
-      voltooid: true,
-      runkeeper_id: String(activityId),
-    } as never).eq('id', sessieId)
-  } else {
-    // Maak nieuwe sessie aan voor spontane run
-    const { data: nieuw } = await supabase
-      .from('training_sessions')
-      .insert({
-        user_id: profiel.id,
-        datum,
-        type: 'hardlopen',
-        beschrijving: (activity.name as string) ?? `Spontane run — ${afstandKm} km`,
-        duur_minuten: duurMin,
-        afstand_km: afstandKm,
-        intensiteit: 'makkelijk',
-        voltooid: true,
-        overgeslagen: false,
-        runkeeper_id: String(activityId),
-        week_nummer: isoWeeknummer(datum),
-        volgorde: 0,
-      } as never)
-      .select('id')
-      .single()
-
-    if (!nieuw) return NextResponse.json({ ok: true })
-    sessieId = (nieuw as Record<string, string>).id
-  }
+  // Zoek/koppel/maak de sessie — dedupeert eerst op het exacte Strava activity-ID
+  const sessieId = await vindOfMaakSessie(
+    supabase, profiel.id, { ...activity, id: activityId }, datum, afstandKm, duurMin
+  )
+  if (!sessieId) return NextResponse.json({ ok: true })
 
   // Sla Strava data op in session_feedback
   const { data: bestaandeFeedback } = await supabase

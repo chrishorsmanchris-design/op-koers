@@ -1,4 +1,4 @@
-const CACHE_NAME = 'op-koers-v1'
+const CACHE_NAME = 'op-koers-v2'
 const OFFLINE_URL = '/offline'
 
 self.addEventListener('install', (event) => {

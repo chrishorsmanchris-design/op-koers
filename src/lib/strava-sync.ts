@@ -25,6 +25,75 @@ export async function getStravaAccessToken(refreshToken: string): Promise<string
 }
 
 /**
+ * Vindt (of maakt) de training_session die bij een specifieke Strava-activiteit hoort.
+ * Dedupeert eerst op het exacte Strava activity-ID (zodat herhaalde syncs nooit
+ * dubbele sessies aanmaken), en koppelt anders aan een geplande sessie op dezelfde
+ * datum, of maakt een nieuwe spontane sessie aan.
+ */
+export async function vindOfMaakSessie(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any, any, any>,
+  userId: string,
+  run: Record<string, unknown>,
+  datum: string,
+  afstandKm: number,
+  duurMin: number
+): Promise<string | null> {
+  const activityId = String(run.id)
+
+  // Stap 1: is deze exacte activiteit al eerder gesynct? Dan nooit opnieuw aanmaken.
+  const { data: reedsGesynct } = await supabase
+    .from('training_sessions')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('runkeeper_id', activityId)
+    .limit(1)
+
+  if (reedsGesynct?.length) return reedsGesynct[0].id
+
+  // Stap 2: koppel aan een geplande, nog niet gesynchroniseerde sessie op dezelfde datum
+  const { data: sessies } = await supabase
+    .from('training_sessions')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('datum', datum)
+    .eq('type', 'hardlopen')
+    .is('runkeeper_id', null)
+    .limit(1)
+
+  if (sessies?.length) {
+    const sessieId = sessies[0].id
+    await supabase.from('training_sessions').update({
+      voltooid: true,
+      runkeeper_id: activityId,
+    } as never).eq('id', sessieId)
+    return sessieId
+  }
+
+  // Stap 3: geen match — maak een nieuwe spontane sessie aan
+  const { data: nieuw } = await supabase
+    .from('training_sessions')
+    .insert({
+      user_id: userId,
+      datum,
+      type: 'hardlopen',
+      beschrijving: (run.name as string) ?? `Spontane run — ${afstandKm} km`,
+      duur_minuten: duurMin,
+      afstand_km: afstandKm,
+      intensiteit: 'makkelijk',
+      voltooid: true,
+      overgeslagen: false,
+      runkeeper_id: activityId,
+      week_nummer: isoWeeknummer(datum),
+      volgorde: 0,
+    } as never)
+    .select('id')
+    .single()
+
+  return nieuw ? (nieuw as Record<string, string>).id : null
+}
+
+/**
  * Synct Strava-hardloopactiviteiten van de afgelopen 90 dagen naar training_sessions
  * + session_feedback. Gedeeld tussen de sync-route (handmatig), de callback-route
  * (direct na koppelen) en de webhook-route (per activiteit).
@@ -58,45 +127,8 @@ export async function syncStravaRuns(
     const hartslagMax = run.max_heartrate ? Math.round(run.max_heartrate as number) : null
     const routePolyline = (run.map as Record<string, unknown> | undefined)?.summary_polyline as string | null ?? null
 
-    const { data: sessies } = await supabase
-      .from('training_sessions')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('datum', datum)
-      .eq('type', 'hardlopen')
-      .is('runkeeper_id', null)
-      .limit(1)
-
-    let sessieId: string
-
-    if (!sessies?.length) {
-      const { data: nieuw } = await supabase
-        .from('training_sessions')
-        .insert({
-          user_id: userId,
-          datum,
-          type: 'hardlopen',
-          beschrijving: (run.name as string) ?? `Spontane run — ${afstandKm} km`,
-          duur_minuten: duurMin,
-          afstand_km: afstandKm,
-          intensiteit: 'makkelijk',
-          voltooid: true,
-          overgeslagen: false,
-          runkeeper_id: String(run.id),
-          week_nummer: isoWeeknummer(datum),
-          volgorde: 0,
-        } as never)
-        .select('id')
-        .single()
-      if (!nieuw) continue
-      sessieId = (nieuw as Record<string, string>).id
-    } else {
-      sessieId = sessies[0].id
-      await supabase.from('training_sessions').update({
-        voltooid: true,
-        runkeeper_id: String(run.id),
-      } as never).eq('id', sessieId)
-    }
+    const sessieId = await vindOfMaakSessie(supabase, userId, run, datum, afstandKm, duurMin)
+    if (!sessieId) continue
 
     const { data: bestaandeFeedback } = await supabase
       .from('session_feedback')
