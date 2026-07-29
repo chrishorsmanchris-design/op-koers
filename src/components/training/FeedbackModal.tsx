@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import type { TrainingSession } from '@/types/database'
 import { X } from 'lucide-react'
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
+import { useSheetMaxHeight } from '@/hooks/useSheetMaxHeight'
 
 const RATINGS = [
   { value: 'te_zwaar', label: 'Te zwaar', emoji: '😮‍💨', kleur: 'border-red-500 bg-red-500/10 text-red-400' },
@@ -59,6 +60,7 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
     onSluit()
   }
   useLockBodyScroll()
+  const maxHeight = useSheetMaxHeight()
 
   return (
     <div
@@ -66,8 +68,8 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
       onClick={() => onSluit()}
     >
       <div
-        className="bg-[#1b1b27] border-t border-[#2d2d3e] rounded-t-3xl p-6 w-full max-w-lg mx-auto pb-10 max-h-[85dvh] overflow-y-auto overscroll-contain"
-        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        className="bg-[#1b1b27] border-t border-[#2d2d3e] rounded-t-3xl p-6 w-full max-w-lg mx-auto pb-10 overflow-y-auto overscroll-contain"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', maxHeight: maxHeight ? `${maxHeight}px` : '85vh' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Handle */}

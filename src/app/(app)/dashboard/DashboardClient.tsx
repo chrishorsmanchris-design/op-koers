@@ -15,6 +15,7 @@ import { RaceCountdownHero } from '@/components/training/RaceCountdownHero'
 import { ConsistencyRing } from '@/components/training/ConsistencyRing'
 import { WeerBadge } from '@/components/training/WeerBadge'
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
+import { useSheetMaxHeight } from '@/hooks/useSheetMaxHeight'
 
 interface Props {
   profiel: Profile | null
@@ -137,13 +138,14 @@ function VerplaatsenSheet({
   const fmt = (d: string) =>
     new Date(d + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
   useLockBodyScroll()
+  const maxHeight = useSheetMaxHeight()
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="absolute inset-0 bg-black/60" onClick={onSluiten} />
       <div
-        className="relative w-full max-h-[85dvh] overflow-y-auto overscroll-contain bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]"
-        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        className="relative w-full overflow-y-auto overscroll-contain bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', maxHeight: maxHeight ? `${maxHeight}px` : '85vh' }}
       >
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-[#2d2d3e] rounded-full" />
@@ -211,13 +213,14 @@ function RunLogSheet({
     setLaden(false)
   }
   useLockBodyScroll()
+  const maxHeight = useSheetMaxHeight()
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="absolute inset-0 bg-black/60" onClick={onSluiten} />
       <div
-        className="relative w-full max-h-[85dvh] overflow-y-auto overscroll-contain bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]"
-        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        className="relative w-full overflow-y-auto overscroll-contain bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', maxHeight: maxHeight ? `${maxHeight}px` : '85vh' }}
       >
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-[#2d2d3e] rounded-full" />
