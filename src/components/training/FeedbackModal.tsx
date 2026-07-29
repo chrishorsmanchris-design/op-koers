@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import type { TrainingSession } from '@/types/database'
 import { X } from 'lucide-react'
+import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
 
 const RATINGS = [
   { value: 'te_zwaar', label: 'Te zwaar', emoji: '😮‍💨', kleur: 'border-red-500 bg-red-500/10 text-red-400' },
@@ -57,13 +58,20 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
 
     onSluit()
   }
+  useLockBodyScroll()
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-end z-50" onClick={() => onSluit()}>
+    <div
+      className="fixed inset-0 bg-black/70 flex items-end z-50"
+      style={{ touchAction: 'none' }}
+      onClick={() => onSluit()}
+      onTouchMove={(e) => e.preventDefault()}
+    >
       <div
         className="bg-[#1b1b27] border-t border-[#2d2d3e] rounded-t-3xl p-6 w-full max-w-lg mx-auto pb-10 max-h-[85dvh] overflow-y-auto overscroll-contain"
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         onClick={e => e.stopPropagation()}
+        onTouchMove={e => e.stopPropagation()}
       >
         {/* Handle */}
         <div className="flex justify-center -mt-2 mb-4">

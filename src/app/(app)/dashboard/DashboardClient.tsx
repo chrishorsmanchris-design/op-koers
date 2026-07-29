@@ -14,6 +14,7 @@ import { WorkoutModal } from '@/components/training/WorkoutModal'
 import { RaceCountdownHero } from '@/components/training/RaceCountdownHero'
 import { ConsistencyRing } from '@/components/training/ConsistencyRing'
 import { WeerBadge } from '@/components/training/WeerBadge'
+import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
 
 interface Props {
   profiel: Profile | null
@@ -135,10 +136,11 @@ function VerplaatsenSheet({
   }
   const fmt = (d: string) =>
     new Date(d + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+  useLockBodyScroll()
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">
-      <div className="absolute inset-0 bg-black/60" onClick={onSluiten} />
+      <div className="absolute inset-0 bg-black/60" style={{ touchAction: 'none' }} onClick={onSluiten} onTouchMove={(e) => e.preventDefault()} />
       <div
         className="relative w-full max-h-[85dvh] overflow-y-auto overscroll-contain bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]"
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
@@ -208,10 +210,11 @@ function RunLogSheet({
     if (data) onOpgeslagen(data as TrainingSession)
     setLaden(false)
   }
+  useLockBodyScroll()
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">
-      <div className="absolute inset-0 bg-black/60" onClick={onSluiten} />
+      <div className="absolute inset-0 bg-black/60" style={{ touchAction: 'none' }} onClick={onSluiten} onTouchMove={(e) => e.preventDefault()} />
       <div
         className="relative w-full max-h-[85dvh] overflow-y-auto overscroll-contain bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]"
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
