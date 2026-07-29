@@ -79,13 +79,25 @@ function isDezWeek(datum: string): boolean {
 export function ActiviteitenClient({ sessies, fysioSessies, coreSessies, heeftStrava }: Props) {
   const router = useRouter()
   const [syncing, setSyncing] = useState(false)
+  const [syncFout, setSyncFout] = useState<string | null>(null)
   const [openWeeks, setOpenWeeks] = useState<Set<string>>(new Set())
 
   async function syncStrava() {
     setSyncing(true)
-    await fetch('/api/strava/sync', { method: 'POST' })
-    setSyncing(false)
-    window.location.reload()
+    setSyncFout(null)
+    try {
+      const res = await fetch('/api/strava/sync', { method: 'POST' })
+      if (!res.ok) {
+        const d = await res.json().catch(() => null)
+        setSyncFout(d?.error ?? 'Strava-synchronisatie mislukt')
+        setSyncing(false)
+        return
+      }
+      window.location.reload()
+    } catch {
+      setSyncFout('Strava-synchronisatie mislukt')
+      setSyncing(false)
+    }
   }
 
   // Groepeer alle loopsessies per ISO-week
@@ -182,6 +194,13 @@ export function ActiviteitenClient({ sessies, fysioSessies, coreSessies, heeftSt
           </button>
         )}
       </div>
+
+      {syncFout && (
+        <div className="px-3 py-2 rounded-xl bg-red-950/60 border border-red-900 text-xs text-red-400 flex items-center justify-between gap-2">
+          <span>⚠️ {syncFout}</span>
+          <button onClick={() => setSyncFout(null)} className="text-red-400/70 shrink-0">✕</button>
+        </div>
+      )}
 
       {weken.map(({ key, label, sessies: wSessies, fysio, core }) => {
         const isOpen = openWeeks.has(key) || key === eersteWeekKey

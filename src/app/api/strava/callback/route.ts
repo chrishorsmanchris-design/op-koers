@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { syncStravaRuns } from '@/lib/strava-sync'
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code')
@@ -38,8 +39,10 @@ export async function GET(req: NextRequest) {
     strava_athlete_naam: atleet ? `${atleet.firstname ?? ''} ${atleet.lastname ?? ''}`.trim() : null,
   } as never).eq('id', user.id)
 
-  // Meteen eerste sync draaien
-  await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/strava/sync`, { method: 'POST' })
+  // Meteen eerste sync draaien (direct, niet via HTTP — anders gaat de sessie-cookie verloren)
+  if (tokens.refresh_token) {
+    await syncStravaRuns(supabase, user.id, tokens.refresh_token)
+  }
 
   return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/instellingen?strava=gekoppeld`)
 }

@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 import { WorkoutModal } from '@/components/training/WorkoutModal'
 import { TempoZonesCard } from '@/components/training/TempoZonesCard'
 import { RouteThumbnail } from '@/components/training/RouteThumbnail'
+import type { TempoZone } from '@/lib/tempo-zones'
 
 interface Props {
   sessies: (TrainingSession & { session_feedback: unknown[] })[]
@@ -19,6 +20,8 @@ interface Props {
   userId: string
   wilCore: boolean
   heeftFysio: boolean
+  tempoZones?: TempoZone[] | null
+  tempoZonesUpdatedAt?: string | null
 }
 
 // ── Kleuren per intensiteit ────────────────────────────────────────────────────
@@ -115,7 +118,10 @@ function RoosterModal({ sessie, alleSessies, onVerplaatsen, onLatenVervallen, on
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="absolute inset-0 bg-black/60" onClick={onSluiten} />
-      <div className="relative w-full bg-[#1b1b27] rounded-t-3xl shadow-2xl overflow-hidden border-t border-[#2d2d3e]">
+      <div
+        className="relative w-full max-h-[85dvh] overflow-y-auto overscroll-contain bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+      >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-[#2d2d3e] rounded-full" />
@@ -230,7 +236,7 @@ function AgendaWeergave({ sessies, onDatumChange, onVerwijderen, onToggleVoltooi
 }
 
 // ── Hoofdcomponent ─────────────────────────────────────────────────────────────
-export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }: Props) {
+export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio, tempoZones, tempoZonesUpdatedAt }: Props) {
   const supabase = createClient()
   const vandaag = new Date().toISOString().split('T')[0]
   // Volgende maandag — sessies vóór die datum (deze week + verleden) mogen afgevinkt worden
@@ -595,7 +601,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
             </Card>
           )}
 
-          <TempoZonesCard />
+          <TempoZonesCard zones={tempoZones ?? undefined} bijgewerktOp={tempoZonesUpdatedAt} />
 
           {/* ── Weergave-toggle: week-detail vs volledige agenda ─────────────── */}
           <div className="flex gap-1 p-1 bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl">
@@ -934,6 +940,7 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio }
           duur_minuten={workoutSessie.duur_minuten}
           afstand_km={workoutSessie.afstand_km}
           intensiteit={workoutSessie.intensiteit}
+          zones={tempoZones ?? undefined}
           onSluiten={() => setWorkoutSessie(null)}
         />
       )}

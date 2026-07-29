@@ -19,8 +19,8 @@ export const TEMPO_ZONES: TempoZone[] = [
   { label: 'W',  naam: 'Wedstrijdtempo',    pace: '4:27', omschrijving: 'Doeltempo marathon' },
 ]
 
-export function zoekTempoZone(label: string): TempoZone | undefined {
-  return TEMPO_ZONES.find(z => z.label === label.toUpperCase())
+export function zoekTempoZone(label: string, zones: TempoZone[] = TEMPO_ZONES): TempoZone | undefined {
+  return zones.find(z => z.label === label.toUpperCase())
 }
 
 /** Parseert paceString "5:51" (min:sec/km) naar seconden per km */
@@ -29,12 +29,25 @@ export function paceNaarSeconden(pace: string): number {
   return min * 60 + (sec ?? 0)
 }
 
+/** Formatteert seconden per km terug naar "m:ss" */
+export function secondenNaarPace(seconden: number): string {
+  const min = Math.floor(seconden / 60)
+  const sec = Math.round(seconden % 60)
+  return `${min}:${String(sec).padStart(2, '0')}`
+}
+
 /** Vindt alle zone-labels (H, D1, D2, D3, W) die voorkomen in een sessiebeschrijving */
-export function zonesInTekst(tekst: string): TempoZone[] {
+export function zonesInTekst(tekst: string, zones: TempoZone[] = TEMPO_ZONES): TempoZone[] {
   const gevonden = new Set<string>()
   const matches = tekst.match(/\b(H|D1|D2|D3|W)\b/g) ?? []
   matches.forEach(m => gevonden.add(m))
   return Array.from(gevonden)
-    .map(zoekTempoZone)
+    .map(label => zoekTempoZone(label, zones))
     .filter((z): z is TempoZone => Boolean(z))
+}
+
+/** Vult een eventueel onvolledige per-gebruiker zones-set aan met de standaardwaarden */
+export function mergeTempoZones(userZones: TempoZone[] | null | undefined): TempoZone[] {
+  if (!userZones?.length) return TEMPO_ZONES
+  return TEMPO_ZONES.map(std => userZones.find(z => z.label === std.label) ?? std)
 }

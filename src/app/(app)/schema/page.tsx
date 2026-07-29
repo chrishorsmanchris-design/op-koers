@@ -17,7 +17,7 @@ export default async function SchemaPage() {
       .eq('user_id', user.id)
       .eq('actief', true)
       .single(),
-    supabase.from('profiles').select('wil_core, core_per_week, fysio_per_week').eq('id', user.id).single(),
+    supabase.from('profiles').select('wil_core, core_per_week, fysio_per_week, tempo_zones, tempo_zones_updated_at').eq('id', user.id).single(),
     supabase.from('physio_exercises').select('id').eq('user_id', user.id).eq('actief', true),
   ])
 
@@ -28,6 +28,8 @@ export default async function SchemaPage() {
       userId={user.id}
       wilCore={profiel?.wil_core ?? false}
       heeftFysio={(fysioOefeningen?.length ?? 0) > 0}
+      tempoZones={(profiel as Record<string, unknown>)?.tempo_zones as never ?? null}
+      tempoZonesUpdatedAt={(profiel as Record<string, unknown>)?.tempo_zones_updated_at as string ?? null}
     />
   )
 }

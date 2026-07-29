@@ -1,4 +1,4 @@
-import { TempoZone, zoekTempoZone, zonesInTekst } from './tempo-zones'
+import { TempoZone, TEMPO_ZONES, zoekTempoZone, zonesInTekst } from './tempo-zones'
 
 export interface WorkoutBlok {
   titel: string
@@ -33,7 +33,11 @@ function bepaalSoort(tekst: string): string {
  * Werkt op basis van patronen die in het PDF-schema voorkomen; valt netjes
  * terug op één blok met de volledige tekst als niets herkend wordt.
  */
-export function parseWorkout(beschrijving: string, duurMinuten?: number | null): GeparsedWorkout {
+export function parseWorkout(
+  beschrijving: string,
+  duurMinuten?: number | null,
+  zones: TempoZone[] = TEMPO_ZONES
+): GeparsedWorkout {
   const soort = bepaalSoort(beschrijving)
   const blokken: WorkoutBlok[] = []
 
@@ -48,17 +52,17 @@ export function parseWorkout(beschrijving: string, duurMinuten?: number | null):
     blokken.push({
       titel: 'Warming-up',
       detail: '10-15 min rustig inlopen',
-      zones: [zoekTempoZone('D1')].filter((z): z is TempoZone => Boolean(z)),
+      zones: [zoekTempoZone('D1', zones)].filter((z): z is TempoZone => Boolean(z)),
     })
     blokken.push({
       titel: `Hoofdset: ${herhalingen} × ${afstand}`,
       detail: rustMatch ? `Rust tussendoor: ${rustMatch[1]}` : undefined,
-      zones: zoneMatch ? zonesInTekst(zoneMatch[1]) : [],
+      zones: zoneMatch ? zonesInTekst(zoneMatch[1], zones) : [],
     })
     blokken.push({
       titel: 'Cooldown',
       detail: 'Rustig uitlopen',
-      zones: [zoekTempoZone('H')].filter((z): z is TempoZone => Boolean(z)),
+      zones: [zoekTempoZone('H', zones)].filter((z): z is TempoZone => Boolean(z)),
     })
     return { soort, blokken }
   }
@@ -74,7 +78,7 @@ export function parseWorkout(beschrijving: string, duurMinuten?: number | null):
         gevonden = true
         blokken.push({
           titel: `${m[1]} min`,
-          zones: zonesInTekst(m[2]),
+          zones: zonesInTekst(m[2], zones),
         })
       }
     }
@@ -86,7 +90,7 @@ export function parseWorkout(beschrijving: string, duurMinuten?: number | null):
   if (enkelMatch) {
     blokken.push({
       titel: `${enkelMatch[1]} min`,
-      zones: zonesInTekst(enkelMatch[2]),
+      zones: zonesInTekst(enkelMatch[2], zones),
     })
     return { soort, blokken }
   }
@@ -97,7 +101,7 @@ export function parseWorkout(beschrijving: string, duurMinuten?: number | null):
     blokken.push({
       titel: `${wedstrijdMatch[1]} km`,
       duur_minuten: duurMinuten ?? undefined,
-      zones: zonesInTekst(wedstrijdMatch[2]),
+      zones: zonesInTekst(wedstrijdMatch[2], zones),
     })
     return { soort, blokken }
   }
@@ -106,7 +110,7 @@ export function parseWorkout(beschrijving: string, duurMinuten?: number | null):
   blokken.push({
     titel: beschrijving,
     duur_minuten: duurMinuten ?? undefined,
-    zones: zonesInTekst(beschrijving),
+    zones: zonesInTekst(beschrijving, zones),
   })
   return { soort, blokken }
 }

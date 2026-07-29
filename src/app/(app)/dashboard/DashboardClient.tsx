@@ -139,7 +139,10 @@ function VerplaatsenSheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="absolute inset-0 bg-black/60" onClick={onSluiten} />
-      <div className="relative w-full bg-[#1b1b27] rounded-t-3xl shadow-2xl overflow-hidden border-t border-[#2d2d3e]">
+      <div
+        className="relative w-full max-h-[85dvh] overflow-y-auto overscroll-contain bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+      >
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-[#2d2d3e] rounded-full" />
         </div>
@@ -209,7 +212,10 @@ function RunLogSheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="absolute inset-0 bg-black/60" onClick={onSluiten} />
-      <div className="relative w-full bg-[#1b1b27] rounded-t-3xl shadow-2xl overflow-hidden border-t border-[#2d2d3e]">
+      <div
+        className="relative w-full max-h-[85dvh] overflow-y-auto overscroll-contain bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+      >
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-[#2d2d3e] rounded-full" />
         </div>
@@ -274,6 +280,7 @@ export function DashboardClient({
   const [coachBericht, setCoachBericht] = useState<string | null>(null)
   const [coachLaden, setCoachLaden] = useState(false)
   const [stravaSync, setStravaSync] = useState<'idle' | 'bezig' | 'klaar'>('idle')
+  const [stravaFout, setStravaFout] = useState<string | null>(null)
   const [planAangepast, setPlanAangepast] = useState<string | null>(null)
   const [spreekt, setSpreekt] = useState(false)
   const [geselecteerdeDag, setGeselecteerdeDag] = useState(vandaag)
@@ -286,8 +293,12 @@ export function DashboardClient({
     const laatste = parseInt(localStorage.getItem('strava-last-sync-ts') ?? '0', 10)
     if (nu - laatste < 30 * 60 * 1000) return
     fetch('/api/strava/sync', { method: 'POST' })
-      .then(() => { localStorage.setItem('strava-last-sync-ts', String(nu)); router.refresh() })
-      .catch(() => {})
+      .then(async res => {
+        if (!res.ok) { const d = await res.json().catch(() => null); setStravaFout(d?.error ?? 'Strava-synchronisatie mislukt'); return }
+        localStorage.setItem('strava-last-sync-ts', String(nu))
+        router.refresh()
+      })
+      .catch(() => setStravaFout('Strava-synchronisatie mislukt'))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Coach bericht
@@ -404,11 +415,18 @@ export function DashboardClient({
 
   async function syncStrava() {
     setStravaSync('bezig')
+    setStravaFout(null)
     try {
-      await fetch('/api/strava/sync', { method: 'POST' })
+      const res = await fetch('/api/strava/sync', { method: 'POST' })
+      if (!res.ok) {
+        const d = await res.json().catch(() => null)
+        setStravaFout(d?.error ?? 'Strava-synchronisatie mislukt')
+        setStravaSync('idle')
+        return
+      }
       setStravaSync('klaar')
       setTimeout(() => { setStravaSync('idle'); window.location.reload() }, 1500)
-    } catch { setStravaSync('idle') }
+    } catch { setStravaSync('idle'); setStravaFout('Strava-synchronisatie mislukt') }
   }
 
   function handleFeedbackGesloten(aangepast?: string) {
@@ -477,6 +495,13 @@ export function DashboardClient({
           </button>
         </div>
       </div>
+
+      {stravaFout && (
+        <div className="mx-4 mb-3 px-3 py-2 rounded-xl bg-red-950/60 border border-red-900 text-xs text-red-400 flex items-center justify-between gap-2">
+          <span>⚠️ {stravaFout}</span>
+          <button onClick={() => setStravaFout(null)} className="text-red-400/70 shrink-0">✕</button>
+        </div>
+      )}
 
       {/* ── Week strip ──────────────────────────────────────────────────────── */}
       <div className="px-4 pb-3">
@@ -921,6 +946,7 @@ export function DashboardClient({
           duur_minuten={workoutSessie.duur_minuten}
           afstand_km={workoutSessie.afstand_km}
           intensiteit={workoutSessie.intensiteit}
+          zones={(profiel as Record<string, unknown>)?.tempo_zones as never ?? undefined}
           onSluiten={() => setWorkoutSessie(null)}
         />
       )}

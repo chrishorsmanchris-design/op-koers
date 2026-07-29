@@ -61,7 +61,8 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-end z-50" onClick={() => onSluit()}>
       <div
-        className="bg-[#1b1b27] border-t border-[#2d2d3e] rounded-t-3xl p-6 w-full max-w-lg mx-auto pb-10"
+        className="bg-[#1b1b27] border-t border-[#2d2d3e] rounded-t-3xl p-6 w-full max-w-lg mx-auto pb-10 max-h-[85dvh] overflow-y-auto overscroll-contain"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Handle */}

@@ -1,16 +1,25 @@
 'use client'
 import { useState } from 'react'
 import { ChevronDown, Gauge } from 'lucide-react'
-import { TEMPO_ZONES } from '@/lib/tempo-zones'
+import { TEMPO_ZONES, TempoZone } from '@/lib/tempo-zones'
 import { cn } from '@/lib/utils'
+
+interface Props {
+  zones?: TempoZone[]
+  bijgewerktOp?: string | null
+}
 
 /**
  * Compacte, inklapbare referentiekaart met de looptempo-zones (H/D1/D2/D3/W)
  * waarop het volledige trainingsschema is gebaseerd. Handig naslagwerk zodat
  * de gebruiker altijd weet welk tempo bij welke zone-letter hoort.
+ * Toont de per-gebruiker gekalibreerde zones indien beschikbaar, anders het
+ * standaardschema.
  */
-export function TempoZonesCard() {
+export function TempoZonesCard({ zones, bijgewerktOp }: Props) {
   const [open, setOpen] = useState(false)
+  const actueleZones = zones?.length ? zones : TEMPO_ZONES
+  const isGekalibreerd = !!zones?.length
 
   return (
     <div className="rounded-2xl bg-[#1b1b27] border border-[#2d2d3e] overflow-hidden">
@@ -21,13 +30,20 @@ export function TempoZonesCard() {
         <div className="w-8 h-8 rounded-xl bg-[#f97316]/10 flex items-center justify-center shrink-0">
           <Gauge size={15} className="text-[#f97316]" />
         </div>
-        <p className="flex-1 text-left text-sm font-semibold text-white">Jouw tempozones</p>
+        <div className="flex-1 text-left">
+          <p className="text-sm font-semibold text-white">Jouw tempozones</p>
+          {isGekalibreerd && bijgewerktOp && (
+            <p className="text-[10px] text-[#55556a]">
+              Bijgewerkt op basis van je activiteiten · {new Date(bijgewerktOp).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+            </p>
+          )}
+        </div>
         <ChevronDown size={16} className={cn('text-[#55556a] transition-transform', open && 'rotate-180')} />
       </button>
 
       {open && (
         <div className="px-3.5 pb-3.5 flex flex-col gap-1.5">
-          {TEMPO_ZONES.map(z => (
+          {actueleZones.map(z => (
             <div key={z.label} className="flex items-center gap-3 p-2.5 rounded-xl bg-[#222230]">
               <span className="text-[11px] font-bold text-[#f97316] w-7 shrink-0">{z.label}</span>
               <div className="flex-1 min-w-0">

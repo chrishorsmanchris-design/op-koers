@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getStravaAccessToken } from '@/lib/strava-sync'
 
 function isoWeeknummer(datum: string): number {
   const d = new Date(datum + 'T12:00:00')
@@ -46,18 +47,8 @@ export async function POST(req: NextRequest) {
   if (!profiel?.strava_refresh_token) return NextResponse.json({ ok: true })
 
   // Haal access token op
-  const tokenRes = await fetch('https://www.strava.com/oauth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: process.env.STRAVA_CLIENT_ID?.trim(),
-      client_secret: process.env.STRAVA_CLIENT_SECRET,
-      refresh_token: profiel.strava_refresh_token,
-      grant_type: 'refresh_token',
-    }),
-  })
-  if (!tokenRes.ok) return NextResponse.json({ ok: true })
-  const { access_token } = await tokenRes.json()
+  const access_token = await getStravaAccessToken(profiel.strava_refresh_token)
+  if (!access_token) return NextResponse.json({ ok: true })
 
   // Haal activiteitsdetails op
   const actRes = await fetch(`https://www.strava.com/api/v3/activities/${activityId}`, {

@@ -9,6 +9,7 @@ interface Props {
   duur_minuten: number | null
   afstand_km: number | null
   intensiteit?: string | null
+  zones?: TempoZone[]
   onSluiten: () => void
 }
 
@@ -20,13 +21,16 @@ function ZoneBadge({ zone }: { zone: TempoZone }) {
   )
 }
 
-export function WorkoutModal({ beschrijving, duur_minuten, afstand_km, intensiteit, onSluiten }: Props) {
-  const workout = parseWorkout(beschrijving, duur_minuten)
+export function WorkoutModal({ beschrijving, duur_minuten, afstand_km, intensiteit, zones, onSluiten }: Props) {
+  const workout = parseWorkout(beschrijving, duur_minuten, zones)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="absolute inset-0 bg-black/60" onClick={onSluiten} />
-      <div className="relative w-full max-h-[85vh] overflow-y-auto bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]">
+      <div
+        className="relative w-full max-h-[85dvh] overflow-y-auto overscroll-contain bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+      >
         <div className="flex justify-center pt-3 pb-1 sticky top-0 bg-[#1b1b27]">
           <div className="w-10 h-1 bg-[#2d2d3e] rounded-full" />
         </div>
