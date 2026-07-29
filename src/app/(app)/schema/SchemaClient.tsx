@@ -119,7 +119,7 @@ function RoosterModal({ sessie, alleSessies, onVerplaatsen, onLatenVervallen, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-end">
-      <div className="absolute inset-0 bg-black/60" style={{ touchAction: 'none' }} onClick={onSluiten} onTouchMove={(e) => e.preventDefault()} />
+      <div className="absolute inset-0 bg-black/60" onClick={onSluiten} />
       <div
         className="relative w-full max-h-[85dvh] overflow-y-auto overscroll-contain bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]"
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
