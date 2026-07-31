@@ -168,6 +168,20 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['recurring_activities']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['recurring_activities']['Insert']>
       }
+      sport_activities: {
+        Row: {
+          id: string
+          user_id: string
+          datum: string
+          sport: string
+          duur_minuten: number
+          intensiteit: 'licht' | 'gemiddeld' | 'zwaar'
+          notitie: string | null
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['sport_activities']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['sport_activities']['Insert']>
+      }
     }
   }
 }
@@ -182,3 +196,4 @@ export type PhysioExercise = Database['public']['Tables']['physio_exercises']['R
 export type PhysioSession = Database['public']['Tables']['physio_sessions']['Row']
 export type PhysioFeedback = Database['public']['Tables']['physio_feedback']['Row']
 export type RecurringActivity = Database['public']['Tables']['recurring_activities']['Row']
+export type SportActivity = Database['public']['Tables']['sport_activities']['Row']

@@ -14,6 +14,9 @@ import { WorkoutModal } from '@/components/training/WorkoutModal'
 import { RaceCountdownHero } from '@/components/training/RaceCountdownHero'
 import { ConsistencyRing } from '@/components/training/ConsistencyRing'
 import { WeerBadge } from '@/components/training/WeerBadge'
+import { BelastingKaart } from '@/components/training/BelastingKaart'
+import { SportActiviteitModal } from '@/components/training/SportActiviteitModal'
+import type { BelastingAnalyse } from '@/lib/belasting'
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
 import { useSheetMaxHeight } from '@/hooks/useSheetMaxHeight'
 
@@ -27,6 +30,7 @@ interface Props {
   vandaag: string
   weekStart: string
   activiteiten: RecurringActivity[]
+  belasting: BelastingAnalyse
 }
 
 // ── Kleur per trainingstype/intensiteit ───────────────────────────────────────
@@ -272,7 +276,7 @@ function RunLogSheet({
 // ── Hoofdcomponent ─────────────────────────────────────────────────────────────
 export function DashboardClient({
   profiel, sessies: initSessies, alleSessies, fysioOefeningen,
-  fysioSessies, doel, vandaag, weekStart, activiteiten,
+  fysioSessies, doel, vandaag, weekStart, activiteiten, belasting,
 }: Props) {
   const supabase = createClient()
   const router = useRouter()
@@ -283,6 +287,7 @@ export function DashboardClient({
   const [weekOverzichtOpen, setWeekOverzichtOpen] = useState(false)
   const weekOverzichtRef = useRef<HTMLDivElement>(null)
   const [toonRunLog, setToonRunLog] = useState(false)
+  const [toonSportLog, setToonSportLog] = useState(false)
   const [coachBericht, setCoachBericht] = useState<string | null>(null)
   const [coachLaden, setCoachLaden] = useState(false)
   const [stravaSync, setStravaSync] = useState<'idle' | 'bezig' | 'klaar'>('idle')
@@ -486,9 +491,13 @@ export function DashboardClient({
 
         {/* Acties */}
         <div className="flex items-center gap-2">
-          <button onClick={() => setToonRunLog(true)}
+          <button onClick={() => setToonRunLog(true)} aria-label="Loop loggen"
             className="w-8 h-8 rounded-xl bg-[#1b1b27] border border-[#2d2d3e] flex items-center justify-center text-[#8888a8]">
             <Plus size={15} />
+          </button>
+          <button onClick={() => setToonSportLog(true)} aria-label="Andere sport loggen"
+            className="w-8 h-8 rounded-xl bg-[#1b1b27] border border-[#2d2d3e] flex items-center justify-center text-[#8888a8]">
+            <Dumbbell size={14} />
           </button>
           {heeftStrava && (
             <button onClick={syncStrava} disabled={stravaSync !== 'idle'}
@@ -896,6 +905,11 @@ export function DashboardClient({
         </div>
       )}
 
+      {/* ── Belastingwaarschuwing ────────────────────────────────────────────── */}
+      <div className="mx-4 mb-6 empty:hidden">
+        <BelastingKaart analyse={belasting} compact />
+      </div>
+
       {/* ── Coach bericht ────────────────────────────────────────────────────── */}
       {(coachBericht || coachLaden) && (
         <div className="mx-4 mb-6 bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
@@ -972,6 +986,12 @@ export function DashboardClient({
             setToonRunLog(false)
           }}
           onSluiten={() => setToonRunLog(false)}
+        />
+      )}
+      {toonSportLog && (
+        <SportActiviteitModal
+          vandaag={vandaag}
+          onSluiten={opgeslagen => { setToonSportLog(false); if (opgeslagen) router.refresh() }}
         />
       )}
     </div>

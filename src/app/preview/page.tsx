@@ -1,4 +1,5 @@
 import { DashboardClient } from '@/app/(app)/dashboard/DashboardClient'
+import { analyseerBelasting } from '@/lib/belasting'
 
 const vandaag = new Date().toISOString().split('T')[0]
 const weekStart = (() => {
@@ -47,6 +48,16 @@ export default function PreviewPage() {
         vandaag={vandaag}
         weekStart={weekStart}
         activiteiten={[]}
+        belasting={analyseerBelasting(
+          mockSessies.map(s => ({ ...s, voltooid: true })),
+          // Bewust een overbelast scenario, zodat de belastingkaart in de
+          // preview altijd zichtbaar is om op te controleren.
+          [-7, -6, -5, -4, -3, -2, -1, 0].map(o => ({
+            datum: d(o), sport: o % 2 ? 'Padel' : 'Hockey',
+            duur_minuten: 90, intensiteit: (o % 2 ? 'gemiddeld' : 'zwaar') as 'gemiddeld' | 'zwaar',
+          })),
+          vandaag,
+        )}
       />
     </div>
   )

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { analyseerBelasting } from '@/lib/belasting'
 
 export const maxDuration = 30
 
@@ -34,6 +35,8 @@ export async function GET(req: NextRequest) {
     { data: activiteiten },
     { data: recenteFysio },
     { data: recenteCore },
+    { data: belastingSessies },
+    { data: sportActiviteiten },
   ] = await Promise.all([
     supabase.from('profiles').select('naam, wil_core, fysio_per_week, core_per_week').eq('id', user.id).single(),
     supabase.from('goals').select('naam, datum, tijdsdoel').eq('user_id', user.id).eq('actief', true).single(),
@@ -51,7 +54,19 @@ export async function GET(req: NextRequest) {
     supabase.from('training_sessions').select('datum').eq('user_id', user.id)
       .eq('type', 'core').eq('voltooid', true)
       .gte('datum', achtentwintigDagenGeleden).order('datum', { ascending: false }),
+    // Voor de belasting-/herstelanalyse: alle voltooide inspanning van 28 dagen
+    supabase.from('training_sessions')
+      .select('datum, type, duur_minuten, afstand_km, intensiteit, voltooid')
+      .eq('user_id', user.id).eq('voltooid', true)
+      .gte('datum', achtentwintigDagenGeleden).lte('datum', vandaag),
+    supabase.from('sport_activities')
+      .select('datum, sport, duur_minuten, intensiteit')
+      .eq('user_id', user.id)
+      .gte('datum', achtentwintigDagenGeleden).lte('datum', vandaag),
   ])
+
+  const belasting = analyseerBelasting(belastingSessies ?? [], sportActiviteiten ?? [], vandaag)
+  const sportenDezeWeek = (sportActiviteiten ?? []).filter(a => a.datum >= getMaandag(vandaag))
 
   const naam = profiel?.naam?.split(' ')[0] ?? 'Atleet'
   const voltooid = recenteSessies?.filter(s => s.voltooid) ?? []
@@ -109,6 +124,13 @@ export async function GET(req: NextRequest) {
     doel ? `Doel: ${doel.naam} over ${dagenTotDoel} dagen (tijdsdoel: ${doel.tijdsdoel ?? 'finishen'})` : '',
     `Laatste 14 dagen: ${voltooid.length} trainingen voltooid, ${overgeslagen.length} overgeslagen`,
     `Km deze week: ${kmDezeWeek.toFixed(1)} km`,
+    sportenDezeWeek.length
+      ? `Andere sporten deze week: ${sportenDezeWeek.map(a => `${a.sport} (${a.duur_minuten}min, ${a.intensiteit})`).join(', ')}`
+      : '',
+    `Totale belasting: ${belasting.acuut} punten deze week vs ${belasting.chronisch} gemiddeld${belasting.ratio !== null ? ` (${belasting.ratio}×)` : ''} · ${belasting.rustdagen} rustdagen in 7 dagen · ${belasting.streak} dagen op rij gesport`,
+    belasting.niveau !== 'ok'
+      ? `Herstelrisico: ${belasting.niveau === 'hoog' ? 'HOOG' : 'verhoogd'} — ${belasting.waarschuwingen.join('; ')}`
+      : '',
     vandaagLoop
       ? `Geplande training vandaag: ${vandaagLoop.beschrijving} (${vandaagLoop.duur_minuten}min${vandaagLoop.afstand_km ? `, ${vandaagLoop.afstand_km}km` : ''}, ${vandaagLoop.intensiteit})`
       : 'Geen looptraining gepland vandaag',
@@ -133,6 +155,14 @@ export async function GET(req: NextRequest) {
   ].filter(Boolean).join('\n')
 
   const alerts: string[] = []
+
+  // 0. Overbelasting — telt zwaarder dan alle andere signalen, want hier ligt
+  //    het blessurerisico. Staat daarom vóór de rest in de lijst (max 2 alerts).
+  if (belasting.niveau === 'hoog') {
+    alerts.push(`🛑 Te weinig herstel: ${belasting.waarschuwingen[0]}`)
+  } else if (belasting.niveau === 'let_op') {
+    alerts.push(`⚖️ Let op je herstel: ${belasting.waarschuwingen[0]}`)
+  }
 
   // 1. Geen lange run in 14+ dagen
   const langeLopen = recenteSessies?.filter(s => s.voltooid && s.type === 'hardlopen' && (s.afstand_km ?? 0) >= 14) ?? []
@@ -188,6 +218,7 @@ export async function GET(req: NextRequest) {
 REGELS:
 - Motiverend maar realistisch — refereer aan WERKELIJKE data, verzin niets
 - Als er een alert is: verwerk die in je bericht (herinnering core/fysio, gemiste runs etc.)
+- Herstel gaat vóór alles: is het herstelrisico HOOG, adviseer dan expliciet rust of een lichte hersteltraining, ook als er een zware training gepland staat. Noem daarbij de andere sporten (padel, hockey, ...) als die meetellen — die belasten het lichaam net zo goed.
 - Als je weet op welke dag de atleet gewoonlijk core of fysio doet, EN vandaag die dag is: herinner er proactief aan
 - Als de atleet core/fysio lang niet gedaan heeft: noem het kort en concreet
 - Als er geen bijzonderheden zijn: focus op de geplande training of motivatie voor de dag

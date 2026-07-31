@@ -7,7 +7,9 @@ export default async function ActiviteitenPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: sessies }, { data: fysioSessies }, { data: coreSessies }, { data: profiel }] = await Promise.all([
+  const vandaag = new Date().toISOString().split('T')[0]
+
+  const [{ data: sessies }, { data: fysioSessies }, { data: coreSessies }, { data: profiel }, { data: sportActiviteiten }] = await Promise.all([
     supabase
       .from('training_sessions')
       .select('id, datum, type, beschrijving, duur_minuten, afstand_km, intensiteit, voltooid, overgeslagen, week_nummer')
@@ -32,6 +34,12 @@ export default async function ActiviteitenPage() {
       .order('datum', { ascending: false })
       .limit(100),
     supabase.from('profiles').select('naam, strava_refresh_token').eq('id', user.id).single(),
+    supabase
+      .from('sport_activities')
+      .select('id, datum, sport, duur_minuten, intensiteit, notitie')
+      .eq('user_id', user.id)
+      .order('datum', { ascending: false })
+      .limit(200),
   ])
 
   return (
@@ -39,7 +47,9 @@ export default async function ActiviteitenPage() {
       sessies={sessies ?? []}
       fysioSessies={fysioSessies ?? []}
       coreSessies={coreSessies ?? []}
+      sportActiviteiten={sportActiviteiten ?? []}
       heeftStrava={!!(profiel?.strava_refresh_token)}
+      vandaag={vandaag}
     />
   )
 }

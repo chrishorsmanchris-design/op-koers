@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
+import { analyseerBelasting } from '@/lib/belasting'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -19,7 +20,12 @@ export default async function DashboardPage() {
   drieWekenLater.setDate(maandag.getDate() + 21)
   const eindStr = drieWekenLater.toISOString().split('T')[0]
 
-  const [{ data: profiel }, { data: sessies }, { data: fysioOefeningen }, { data: doelen }, { data: activiteiten }, { data: alleSessies }, { data: fysioSessies }] = await Promise.all([
+  // Voor de belasting-/herstelanalyse: 28 dagen historie van álle inspanning.
+  const achtentwintigTerug = new Date(vandaag)
+  achtentwintigTerug.setDate(vandaag.getDate() - 27)
+  const belastingStart = achtentwintigTerug.toISOString().split('T')[0]
+
+  const [{ data: profiel }, { data: sessies }, { data: fysioOefeningen }, { data: doelen }, { data: activiteiten }, { data: alleSessies }, { data: fysioSessies }, { data: belastingSessies }, { data: sportActiviteiten }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('training_sessions')
       .select('*, session_feedback(*)')
@@ -52,6 +58,17 @@ export default async function DashboardPage() {
       .gte('datum', maandagStr)
       .lte('datum', eindStr)
       .eq('voltooid', true),
+    supabase.from('training_sessions')
+      .select('datum, type, duur_minuten, afstand_km, intensiteit, voltooid')
+      .eq('user_id', user.id)
+      .eq('voltooid', true)
+      .gte('datum', belastingStart)
+      .lte('datum', vandaagStr),
+    supabase.from('sport_activities')
+      .select('id, datum, sport, duur_minuten, intensiteit')
+      .eq('user_id', user.id)
+      .gte('datum', belastingStart)
+      .lte('datum', vandaagStr),
   ])
 
   if (profiel && !(profiel as Record<string, unknown>).onboarding_voltooid) {
@@ -69,6 +86,7 @@ export default async function DashboardPage() {
       vandaag={vandaagStr}
       weekStart={maandagStr}
       activiteiten={activiteiten ?? []}
+      belasting={analyseerBelasting(belastingSessies ?? [], sportActiviteiten ?? [], vandaagStr)}
     />
   )
 }
