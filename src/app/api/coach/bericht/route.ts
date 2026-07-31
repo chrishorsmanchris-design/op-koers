@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
     sportenDezeWeek.length
       ? `Andere sporten deze week: ${sportenDezeWeek.map(a => `${a.sport} (${a.duur_minuten}min, ${a.intensiteit})`).join(', ')}`
       : '',
-    `Totale belasting: ${belasting.acuut} punten deze week vs ${belasting.chronisch} gemiddeld${belasting.ratio !== null ? ` (${belasting.ratio}×)` : ''} · ${belasting.rustdagen} rustdagen in 7 dagen · ${belasting.streak} dagen op rij gesport${belasting.rustdagenGemist > 0 ? ` · ${belasting.rustdagenGemist} geplande rustdag(en) uit het schema gevuld met andere sport` : ''}`,
+    `Totale belasting: ${belasting.acuut} punten deze week vs ${belasting.chronisch} gemiddeld${belasting.ratio !== null ? ` (${belasting.ratio}×)` : ''} · ${belasting.rustdagen} rustdagen in 7 dagen · ${belasting.streak} dagen op rij gesport${belasting.rustdagenGemist > 0 ? ` · ${belasting.rustdagenGemist} geplande rustdag(en) uit het schema gevuld met andere sport` : ''}${belasting.dubbeleDagen > 0 ? ` · ${belasting.dubbeleDagen} dag(en) met zowel een training als een andere sport` : ''}`,
     belasting.niveau !== 'ok'
       ? `Herstelrisico: ${belasting.niveau === 'hoog' ? 'HOOG' : 'verhoogd'} — ${belasting.waarschuwingen.join('; ')}`
       : '',

@@ -50,6 +50,8 @@ export interface BelastingAnalyse {
   rustdagen: number
   /** Geplande rustdagen uit het schema die je tóch met sport gevuld hebt (7 dagen). */
   rustdagenGemist: number
+  /** Dagen met zowel een training uit het schema als een andere sport (7 dagen). */
+  dubbeleDagen: number
   /** Aantal dagen achter elkaar getraind, eindigend op de laatste trainingsdag. */
   streak: number
   /** Aandeel van de weekbelasting dat NIET uit het loopschema komt (0–1). */
@@ -169,6 +171,16 @@ export function analyseerBelasting(
   const rustdagen = laatste7.filter(d => d.isRustdag).length
   const rustdagenGemist = laatste7.filter(d => d.geplandRust && !d.isRustdag).length
 
+  // Dubbele dagen: schema-training én een andere sport op dezelfde dag (zoals
+  // 's ochtends lopen en 's avonds hockeyen). Die dag telt niet als gemiste
+  // rustdag — het schema plande er immers wél een training — maar hij is wel
+  // twee keer zo zwaar als bedoeld.
+  const laatste7Datums = new Set(laatste7.map(d => d.datum))
+  const sportDatums = new Set(sporten.filter(a => laatste7Datums.has(a.datum)).map(a => a.datum))
+  const dubbeleDagen = sessies.filter(s =>
+    s.voltooid && s.type !== 'rust' && sportDatums.has(s.datum)
+  ).reduce((set, s) => set.add(s.datum), new Set<string>()).size
+
   // Streak: dagen achter elkaar getraind, geteld vanaf de laatste trainingsdag
   // terug. We starten bij vandaag; is vandaag (nog) rust, dan kijken we vanaf
   // gisteren, zodat de streak van gisteren niet meteen op 0 valt.
@@ -198,6 +210,14 @@ export function analyseerBelasting(
     verhoog('hoog')
   } else if (rustdagenGemist === 1) {
     waarschuwingen.push('Een geplande rustdag gevuld met een andere sport')
+    verhoog('let_op')
+  }
+
+  if (dubbeleDagen >= 2) {
+    waarschuwingen.push(`${dubbeleDagen}× een training én een andere sport op dezelfde dag`)
+    verhoog('hoog')
+  } else if (dubbeleDagen === 1) {
+    waarschuwingen.push('Een training én een andere sport op dezelfde dag')
     verhoog('let_op')
   }
 
@@ -241,7 +261,7 @@ export function analyseerBelasting(
   }
 
   return {
-    niveau, acuut, chronisch, ratio, rustdagen, rustdagenGemist, streak,
+    niveau, acuut, chronisch, ratio, rustdagen, rustdagenGemist, dubbeleDagen, streak,
     aandeelExtraSport, dagen, waarschuwingen, advies,
   }
 }

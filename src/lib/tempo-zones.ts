@@ -15,8 +15,10 @@ export const TEMPO_ZONES: TempoZone[] = [
   { label: 'H',  naam: 'Herstel',           pace: '6:41', omschrijving: 'Zeer rustig, herstellend tempo' },
   { label: 'D1', naam: 'Rustige duurloop',  pace: '5:51', omschrijving: 'Comfortabel, gesprekstempo' },
   { label: 'D2', naam: 'Tempo duurloop',    pace: '5:12', omschrijving: 'Gecontroleerd stevig' },
-  { label: 'D3', naam: 'Drempeltempo',      pace: '4:41', omschrijving: 'Net onder wedstrijdtempo' },
-  { label: 'W',  naam: 'Wedstrijdtempo',    pace: '4:27', omschrijving: 'Doeltempo marathon' },
+  { label: 'D3', naam: 'Drempeltempo',      pace: '4:41', omschrijving: 'Net onder je snelste tempo' },
+  // W = weerstand (niet wedstrijd): het hoogste tempo uit de pace-tabel van het
+  // schema. De pace zelf komt onveranderd uit die tabel.
+  { label: 'W',  naam: 'Weerstand',         pace: '4:27', omschrijving: 'Hoogste tempo uit je schema' },
 ]
 
 export function zoekTempoZone(label: string, zones: TempoZone[] = TEMPO_ZONES): TempoZone | undefined {
@@ -46,8 +48,16 @@ export function zonesInTekst(tekst: string, zones: TempoZone[] = TEMPO_ZONES): T
     .filter((z): z is TempoZone => Boolean(z))
 }
 
-/** Vult een eventueel onvolledige per-gebruiker zones-set aan met de standaardwaarden */
+/**
+ * Vult een eventueel onvolledige per-gebruiker zones-set aan met de standaard.
+ * Alleen de pace is persoonlijk — naam en omschrijving komen altijd uit de
+ * standaard, anders blijven oude benamingen hangen in het opgeslagen JSON zodra
+ * we ze hier corrigeren.
+ */
 export function mergeTempoZones(userZones: TempoZone[] | null | undefined): TempoZone[] {
   if (!userZones?.length) return TEMPO_ZONES
-  return TEMPO_ZONES.map(std => userZones.find(z => z.label === std.label) ?? std)
+  return TEMPO_ZONES.map(std => {
+    const eigen = userZones.find(z => z.label === std.label)
+    return eigen ? { ...std, pace: eigen.pace } : std
+  })
 }

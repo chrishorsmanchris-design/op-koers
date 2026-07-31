@@ -73,11 +73,28 @@ export function BelastingKaart({ analyse, compact = false }: { analyse: Belastin
       )}
 
       {!compact && (
-        <p className="text-[10px] text-[#55556a] mt-3 leading-relaxed">
-          Belastingpunten = duur × intensiteit, over al je sporten samen.
-          Deze week {analyse.acuut}, gemiddeld {analyse.chronisch} per week
-          {analyse.ratio !== null && ` (${analyse.ratio}×)`}.
-        </p>
+        <>
+          {/* Expliciet tonen wat er tegen je schema gecheckt is, ook als er niks
+              mis is — anders weet je niet of de check überhaupt werkt. */}
+          <div className="mt-3 pt-3 border-t border-[#2d2d3e] flex flex-col gap-1">
+            <p className="text-[10px] font-semibold text-[#55556a] uppercase tracking-wide">Vergeleken met je schema</p>
+            <p className="text-[11px] text-[#8888a8]">
+              {analyse.rustdagenGemist === 0
+                ? '✓ Geplande rustdagen ook echt gerust'
+                : `✕ ${analyse.rustdagenGemist} geplande rustdag${analyse.rustdagenGemist === 1 ? '' : 'en'} tóch gesport`}
+            </p>
+            <p className="text-[11px] text-[#8888a8]">
+              {analyse.dubbeleDagen === 0
+                ? '✓ Geen training en andere sport op dezelfde dag'
+                : `✕ ${analyse.dubbeleDagen}× training én andere sport op één dag`}
+            </p>
+          </div>
+          <p className="text-[10px] text-[#55556a] mt-3 leading-relaxed">
+            Belastingpunten = duur × intensiteit, over al je sporten samen.
+            Deze week {analyse.acuut}, gemiddeld {analyse.chronisch} per week
+            {analyse.ratio !== null && ` (${analyse.ratio}×)`}.
+          </p>
+        </>
       )}
     </div>
   )
