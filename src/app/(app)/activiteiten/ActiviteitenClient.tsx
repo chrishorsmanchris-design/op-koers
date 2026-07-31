@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { SportActiviteitModal } from '@/components/training/SportActiviteitModal'
 import { BelastingKaart } from '@/components/training/BelastingKaart'
-import { analyseerBelasting } from '@/lib/belasting'
+import { analyseerBelasting, type BelastingSessie } from '@/lib/belasting'
 
 interface Sessie {
   id: string
@@ -38,6 +38,7 @@ interface Props {
   fysioSessies: FysioSessie[]
   coreSessies: CoreSessie[]
   sportActiviteiten: SportActiviteit[]
+  belastingSessies: BelastingSessie[]
   heeftStrava: boolean
   vandaag: string
 }
@@ -103,7 +104,7 @@ function isDezWeek(datum: string): boolean {
 }
 
 export function ActiviteitenClient({
-  sessies, fysioSessies, coreSessies, sportActiviteiten, heeftStrava, vandaag,
+  sessies, fysioSessies, coreSessies, sportActiviteiten, belastingSessies, heeftStrava, vandaag,
 }: Props) {
   const router = useRouter()
   const supabase = createClient()
@@ -114,8 +115,8 @@ export function ActiviteitenClient({
   const [sporten, setSporten] = useState(sportActiviteiten)
 
   const analyse = useMemo(
-    () => analyseerBelasting(sessies, sporten, vandaag),
-    [sessies, sporten, vandaag]
+    () => analyseerBelasting(belastingSessies, sporten, vandaag),
+    [belastingSessies, sporten, vandaag]
   )
 
   async function verwijderSport(id: string) {

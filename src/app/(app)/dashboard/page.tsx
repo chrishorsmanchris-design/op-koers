@@ -58,10 +58,12 @@ export default async function DashboardPage() {
       .gte('datum', maandagStr)
       .lte('datum', eindStr)
       .eq('voltooid', true),
+    // Bewust ZONDER voltooid-filter: niet-voltooide sessies leveren geen
+    // belastingpunten op, maar de geplande rustdagen uit het schema hebben we
+    // wel nodig om te zien of je herstel daadwerkelijk genomen is.
     supabase.from('training_sessions')
       .select('datum, type, duur_minuten, afstand_km, intensiteit, voltooid')
       .eq('user_id', user.id)
-      .eq('voltooid', true)
       .gte('datum', belastingStart)
       .lte('datum', vandaagStr),
     supabase.from('sport_activities')

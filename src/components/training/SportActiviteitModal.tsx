@@ -70,7 +70,7 @@ export function SportActiviteitModal({ vandaag, onSluiten }: Props) {
 
   // Schermvullend i.p.v. bottom sheet: geen dvh/scroll-lock-trucs nodig.
   return (
-    <div className="fixed inset-0 z-50 bg-[#111118] flex flex-col">
+    <div className="fixed inset-0 z-[60] bg-[#111118] flex flex-col">
       <div
         className="flex items-center gap-3 px-4 pb-3 shrink-0 border-b border-[#2d2d3e]"
         style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}

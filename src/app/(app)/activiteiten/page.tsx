@@ -9,7 +9,13 @@ export default async function ActiviteitenPage() {
 
   const vandaag = new Date().toISOString().split('T')[0]
 
-  const [{ data: sessies }, { data: fysioSessies }, { data: coreSessies }, { data: profiel }, { data: sportActiviteiten }] = await Promise.all([
+  const belastingStart = (() => {
+    const d = new Date(vandaag + 'T12:00:00')
+    d.setDate(d.getDate() - 27)
+    return d.toISOString().split('T')[0]
+  })()
+
+  const [{ data: sessies }, { data: fysioSessies }, { data: coreSessies }, { data: profiel }, { data: sportActiviteiten }, { data: belastingSessies }] = await Promise.all([
     supabase
       .from('training_sessions')
       .select('id, datum, type, beschrijving, duur_minuten, afstand_km, intensiteit, voltooid, overgeslagen, week_nummer')
@@ -40,6 +46,14 @@ export default async function ActiviteitenPage() {
       .eq('user_id', user.id)
       .order('datum', { ascending: false })
       .limit(200),
+    // Voor de belastingkaart: 28 dagen inclusief niet-voltooide sessies en de
+    // rustdagen die het schema zelf inplant.
+    supabase
+      .from('training_sessions')
+      .select('datum, type, duur_minuten, afstand_km, intensiteit, voltooid')
+      .eq('user_id', user.id)
+      .gte('datum', belastingStart)
+      .lte('datum', vandaag),
   ])
 
   return (
@@ -48,6 +62,7 @@ export default async function ActiviteitenPage() {
       fysioSessies={fysioSessies ?? []}
       coreSessies={coreSessies ?? []}
       sportActiviteiten={sportActiviteiten ?? []}
+      belastingSessies={belastingSessies ?? []}
       heeftStrava={!!(profiel?.strava_refresh_token)}
       vandaag={vandaag}
     />

@@ -49,7 +49,12 @@ export default function PreviewPage() {
         weekStart={weekStart}
         activiteiten={[]}
         belasting={analyseerBelasting(
-          mockSessies.map(s => ({ ...s, voltooid: true })),
+          [
+            ...mockSessies.map(s => ({ ...s, voltooid: true })),
+            // Geplande rustdagen uit het schema, zodat de preview ook laat zien
+            // wat er gebeurt als je die met een andere sport volzet.
+            ...[-5, -2].map(o => ({ datum: d(o), type: 'rust', duur_minuten: null, afstand_km: null, intensiteit: null, voltooid: false })),
+          ],
           // Bewust een overbelast scenario, zodat de belastingkaart in de
           // preview altijd zichtbaar is om op te controleren.
           [-7, -6, -5, -4, -3, -2, -1, 0].map(o => ({

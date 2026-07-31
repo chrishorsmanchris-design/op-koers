@@ -28,7 +28,7 @@ export function WorkoutModal({ beschrijving, duur_minuten, afstand_km, intensite
   // want `inset-0` sizeert zichzelf al op de viewport en er is geen achterliggende
   // pagina die kan "meelekken" — dit scherm scrolt gewoon als een normale pagina.
   return (
-    <div className="fixed inset-0 z-50 bg-[#111118] flex flex-col">
+    <div className="fixed inset-0 z-[60] bg-[#111118] flex flex-col">
       <div
         className="flex items-center gap-3 px-4 pb-3 shrink-0 border-b border-[#2d2d3e]"
         style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}

@@ -41,12 +41,21 @@ export function BelastingKaart({ analyse, compact = false }: { analyse: Belastin
           )
         })}
       </div>
+      {/* Een dagletter in accentkleur = het schema plande hier rust, maar er is
+          tóch gesport. Dat is precies het patroon dat je wilt zien. */}
       <div className="flex gap-1 mb-3">
-        {laatste14.map(d => (
-          <span key={d.datum} className="flex-1 text-center text-[9px] text-[#55556a]">
-            {DAGLETTER[new Date(d.datum + 'T12:00:00').getDay()]}
-          </span>
-        ))}
+        {laatste14.map(d => {
+          const gemist = d.geplandRust && !d.isRustdag
+          return (
+            <span
+              key={d.datum}
+              title={gemist ? 'Geplande rustdag, toch gesport' : undefined}
+              className={cn('flex-1 text-center text-[9px]', gemist ? cn(stijl.accent, 'font-bold') : 'text-[#55556a]')}
+            >
+              {DAGLETTER[new Date(d.datum + 'T12:00:00').getDay()]}
+            </span>
+          )
+        })}
       </div>
 
       {analyse.waarschuwingen.length > 0 && (

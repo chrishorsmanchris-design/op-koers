@@ -55,9 +55,10 @@ export async function GET(req: NextRequest) {
       .eq('type', 'core').eq('voltooid', true)
       .gte('datum', achtentwintigDagenGeleden).order('datum', { ascending: false }),
     // Voor de belasting-/herstelanalyse: alle voltooide inspanning van 28 dagen
+    // Zonder voltooid-filter: de geplande rustdagen tellen mee in de analyse.
     supabase.from('training_sessions')
       .select('datum, type, duur_minuten, afstand_km, intensiteit, voltooid')
-      .eq('user_id', user.id).eq('voltooid', true)
+      .eq('user_id', user.id)
       .gte('datum', achtentwintigDagenGeleden).lte('datum', vandaag),
     supabase.from('sport_activities')
       .select('datum, sport, duur_minuten, intensiteit')
@@ -127,7 +128,7 @@ export async function GET(req: NextRequest) {
     sportenDezeWeek.length
       ? `Andere sporten deze week: ${sportenDezeWeek.map(a => `${a.sport} (${a.duur_minuten}min, ${a.intensiteit})`).join(', ')}`
       : '',
-    `Totale belasting: ${belasting.acuut} punten deze week vs ${belasting.chronisch} gemiddeld${belasting.ratio !== null ? ` (${belasting.ratio}×)` : ''} · ${belasting.rustdagen} rustdagen in 7 dagen · ${belasting.streak} dagen op rij gesport`,
+    `Totale belasting: ${belasting.acuut} punten deze week vs ${belasting.chronisch} gemiddeld${belasting.ratio !== null ? ` (${belasting.ratio}×)` : ''} · ${belasting.rustdagen} rustdagen in 7 dagen · ${belasting.streak} dagen op rij gesport${belasting.rustdagenGemist > 0 ? ` · ${belasting.rustdagenGemist} geplande rustdag(en) uit het schema gevuld met andere sport` : ''}`,
     belasting.niveau !== 'ok'
       ? `Herstelrisico: ${belasting.niveau === 'hoog' ? 'HOOG' : 'verhoogd'} — ${belasting.waarschuwingen.join('; ')}`
       : '',

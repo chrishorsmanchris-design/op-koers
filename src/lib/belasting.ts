@@ -34,6 +34,8 @@ export interface DagBelasting {
   datum: string
   punten: number
   isRustdag: boolean
+  /** Het schema had voor deze dag rust ingepland. */
+  geplandRust: boolean
 }
 
 export interface BelastingAnalyse {
@@ -46,6 +48,8 @@ export interface BelastingAnalyse {
   ratio: number | null
   /** Aantal rustdagen in de laatste 7 dagen. */
   rustdagen: number
+  /** Geplande rustdagen uit het schema die je tóch met sport gevuld hebt (7 dagen). */
+  rustdagenGemist: number
   /** Aantal dagen achter elkaar getraind, eindigend op de laatste trainingsdag. */
   streak: number
   /** Aandeel van de weekbelasting dat NIET uit het loopschema komt (0–1). */
@@ -116,6 +120,18 @@ export function belastingPerDag(
   const punten = new Map<string, number>()
   for (let i = aantalDagen - 1; i >= 0; i--) punten.set(dagenTerug(vandaag, i), 0)
 
+  // Rustdagen zoals het schema ze bedoeld heeft. Die staan als losse sessie met
+  // type 'rust' in het plan; ze tellen alleen als het schema die dag verder
+  // niets te doen gaf. Zo weten we of je een geplande hersteldag écht gebruikt
+  // hebt, of hem hebt volgezet met padel of hockey.
+  const heeftRustPlan = new Set<string>()
+  const heeftTrainingPlan = new Set<string>()
+  sessies.forEach(s => {
+    if (!punten.has(s.datum)) return
+    if (s.type === 'rust') heeftRustPlan.add(s.datum)
+    else heeftTrainingPlan.add(s.datum)
+  })
+
   sessies.forEach(s => {
     if (!s.voltooid) return
     if (!punten.has(s.datum)) return
@@ -130,6 +146,7 @@ export function belastingPerDag(
     datum,
     punten: p,
     isRustdag: p < RUSTDAG_DREMPEL,
+    geplandRust: heeftRustPlan.has(datum) && !heeftTrainingPlan.has(datum),
   }))
 }
 
@@ -150,6 +167,7 @@ export function analyseerBelasting(
   const ratio = heeftHistorie ? Math.round((acuut / chronisch) * 100) / 100 : null
 
   const rustdagen = laatste7.filter(d => d.isRustdag).length
+  const rustdagenGemist = laatste7.filter(d => d.geplandRust && !d.isRustdag).length
 
   // Streak: dagen achter elkaar getraind, geteld vanaf de laatste trainingsdag
   // terug. We starten bij vandaag; is vandaag (nog) rust, dan kijken we vanaf
@@ -171,6 +189,17 @@ export function analyseerBelasting(
   const RANG: BelastingNiveau[] = ['ok', 'let_op', 'hoog']
   let rang = 0
   const verhoog = (n: BelastingNiveau) => { rang = Math.max(rang, RANG.indexOf(n)) }
+
+  // Het schema plant zelf al herstel in. Vul je die dagen met een andere sport,
+  // dan draai je feitelijk een zwaardere week dan het schema bedoeld heeft —
+  // ook al heb je geen enkele training overgeslagen.
+  if (rustdagenGemist >= 2) {
+    waarschuwingen.push(`${rustdagenGemist} geplande rustdagen gevuld met een andere sport`)
+    verhoog('hoog')
+  } else if (rustdagenGemist === 1) {
+    waarschuwingen.push('Een geplande rustdag gevuld met een andere sport')
+    verhoog('let_op')
+  }
 
   if (rustdagen === 0) {
     waarschuwingen.push('Geen enkele rustdag in de afgelopen 7 dagen')
@@ -203,14 +232,16 @@ export function analyseerBelasting(
   }
 
   let advies: string | null = null
-  if (niveau === 'hoog') {
+  if (niveau === 'hoog' && rustdagenGemist > 0) {
+    advies = 'Je schema plant rustdagen niet voor niets in — die zijn nu opgegaan aan andere sport. Neem vandaag echt rust of maak er een korte hersteltraining van.'
+  } else if (niveau === 'hoog') {
     advies = 'Neem vandaag rust of maak er een korte hersteltraining van. Je herstel loopt achter op je belasting.'
   } else if (niveau === 'let_op') {
     advies = 'Plan de komende dagen bewust een rustdag in, of vervang een training door een rustige duurloop.'
   }
 
   return {
-    niveau, acuut, chronisch, ratio, rustdagen, streak,
+    niveau, acuut, chronisch, ratio, rustdagen, rustdagenGemist, streak,
     aandeelExtraSport, dagen, waarschuwingen, advies,
   }
 }
