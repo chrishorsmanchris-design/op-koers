@@ -26,9 +26,18 @@ export async function getStravaAccessToken(refreshToken: string): Promise<string
 
 /**
  * Vindt (of maakt) de training_session die bij een specifieke Strava-activiteit hoort.
- * Dedupeert eerst op het exacte Strava activity-ID (zodat herhaalde syncs nooit
- * dubbele sessies aanmaken), en koppelt anders aan een geplande sessie op dezelfde
- * datum, of maakt een nieuwe spontane sessie aan.
+ *
+ * Strava is leidend: zodra een activiteit aan een geplande sessie gekoppeld is,
+ * overschrijven we afstand en duur met wat er écht gelopen is. De geplande waarden
+ * ("18 km") zijn een voornemen; de Strava-waarden zijn een feit.
+ *
+ * Dedupeert op het exacte Strava activity-ID. Let op: die dedupe alléén is niet
+ * genoeg — de sync wordt vanaf meerdere plekken tegelijk getriggerd (dashboard én
+ * activiteitenpagina), dus twee syncs kunnen allebei stap 1 passeren voordat één
+ * van beide klaar is. Daarom vangt stap 3 een unique-violation op de database-index
+ * (user_id, runkeeper_id) af en pakt dan alsnog de sessie die de andere sync
+ * aanmaakte. Zonder die index blijft de race bestaan; zie
+ * supabase/migration_strava_uniek.sql.
  */
 export async function vindOfMaakSessie(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,7 +50,16 @@ export async function vindOfMaakSessie(
 ): Promise<string | null> {
   const activityId = String(run.id)
 
-  // Stap 1: is deze exacte activiteit al eerder gesynct? Dan nooit opnieuw aanmaken.
+  const werkelijk = {
+    voltooid: true,
+    overgeslagen: false,
+    afstand_km: afstandKm,
+    duur_minuten: duurMin,
+    runkeeper_id: activityId,
+  }
+
+  // Stap 1: is deze exacte activiteit al eerder gesynct? Dan nooit opnieuw aanmaken,
+  // wel bijwerken — Strava corrigeert afstand/duur soms na afloop.
   const { data: reedsGesynct } = await supabase
     .from('training_sessions')
     .select('id')
@@ -49,48 +67,66 @@ export async function vindOfMaakSessie(
     .eq('runkeeper_id', activityId)
     .limit(1)
 
-  if (reedsGesynct?.length) return reedsGesynct[0].id
+  if (reedsGesynct?.length) {
+    const sessieId = reedsGesynct[0].id
+    await supabase.from('training_sessions')
+      .update(werkelijk as never).eq('id', sessieId)
+    return sessieId
+  }
 
-  // Stap 2: koppel aan een geplande, nog niet gesynchroniseerde sessie op dezelfde datum
+  // Stap 2: koppel aan een geplande, nog niet gesynchroniseerde sessie op dezelfde
+  // datum. Of de gebruiker hem zelf al afgevinkt heeft maakt niet uit — juist dán
+  // moeten we koppelen in plaats van een tweede rij aanmaken. Bij meerdere kandidaten
+  // pakken we de sessie waarvan de geplande afstand het dichtst bij de werkelijke
+  // ligt, zodat een dubbele loopdag niet de verkeerde sessie claimt.
   const { data: sessies } = await supabase
     .from('training_sessions')
-    .select('id')
+    .select('id, afstand_km')
     .eq('user_id', userId)
     .eq('datum', datum)
     .eq('type', 'hardlopen')
     .is('runkeeper_id', null)
-    .limit(1)
 
   if (sessies?.length) {
-    const sessieId = sessies[0].id
-    await supabase.from('training_sessions').update({
-      voltooid: true,
-      runkeeper_id: activityId,
-    } as never).eq('id', sessieId)
-    return sessieId
+    const beste = [...sessies].sort((a, b) =>
+      Math.abs((a.afstand_km ?? 0) - afstandKm) - Math.abs((b.afstand_km ?? 0) - afstandKm)
+    )[0]
+    await supabase.from('training_sessions')
+      .update(werkelijk as never).eq('id', beste.id)
+    return beste.id
   }
 
   // Stap 3: geen match — maak een nieuwe spontane sessie aan
-  const { data: nieuw } = await supabase
+  const { data: nieuw, error } = await supabase
     .from('training_sessions')
     .insert({
       user_id: userId,
       datum,
       type: 'hardlopen',
       beschrijving: (run.name as string) ?? `Spontane run — ${afstandKm} km`,
-      duur_minuten: duurMin,
-      afstand_km: afstandKm,
       intensiteit: 'makkelijk',
-      voltooid: true,
-      overgeslagen: false,
-      runkeeper_id: activityId,
       week_nummer: isoWeeknummer(datum),
       volgorde: 0,
+      ...werkelijk,
     } as never)
     .select('id')
     .single()
 
-  return nieuw ? (nieuw as Record<string, string>).id : null
+  if (nieuw) return (nieuw as Record<string, string>).id
+
+  // 23505 = unique_violation: een parallelle sync was ons net voor. Geen fout —
+  // pak gewoon de sessie die zij heeft aangemaakt.
+  if (error?.code === '23505') {
+    const { data: gewonnen } = await supabase
+      .from('training_sessions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('runkeeper_id', activityId)
+      .limit(1)
+    if (gewonnen?.length) return gewonnen[0].id
+  }
+
+  return null
 }
 
 /**

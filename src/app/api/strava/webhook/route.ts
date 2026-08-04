@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { getStravaAccessToken, vindOfMaakSessie } from '@/lib/strava-sync'
 
 // GET: Strava webhook validatie
@@ -27,7 +27,18 @@ export async function POST(req: NextRequest) {
   const athleteId = body.owner_id as number
   const activityId = body.object_id as number
 
-  const supabase = await createClient()
+  // Strava roept ons aan zonder ingelogde gebruiker, dus zonder sessie-cookie.
+  // Met de anon-client blokkeert RLS (auth.uid() = user_id) élke lees- en
+  // schrijfactie hier stilletjes — de webhook deed feitelijk niets. Daarom de
+  // service-role client, net als bij de cronjobs.
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('Strava-webhook: SUPABASE_SERVICE_ROLE_KEY ontbreekt')
+    return NextResponse.json({ ok: true })
+  }
+  const supabase = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
 
   // Vind de gebruiker op basis van Strava athlete ID
   const { data: profiel } = await supabase

@@ -743,8 +743,11 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio, 
                 )
               }
 
-              // Gesynchroniseerde/gelogde activiteit (Strava/Runkeeper): neutrale kaartstijl
-              if (sessie.runkeeper_id) {
+              // Neutrale kaartstijl alleen voor runs die buiten het schema om zijn
+              // gelopen (geen goal_id). Een geplande sessie die Strava heeft
+              // ingevuld blijft een gewone schemakaart, want daar wil je nog
+              // steeds feedback op kunnen geven.
+              if (sessie.runkeeper_id && !sessie.goal_id) {
                 const routePolyline = (sessie.session_feedback?.[0] as { route_polyline?: string | null } | undefined)?.route_polyline
                 return (
                   <div
@@ -836,6 +839,16 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio, 
                             {sessieEmoji(sessie)} {sessie.beschrijving}
                           </p>
                           <div className="flex items-center gap-1 shrink-0">
+                            {/* Duur en afstand hieronder komen dan van Strava, niet
+                                uit het schema — dat mag je zien. */}
+                            {sessie.runkeeper_id && (
+                              <span
+                                title="Afstand en tijd komen van Strava"
+                                className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-[#fc4c02]/15 text-[#fc4c02]"
+                              >
+                                Strava
+                              </span>
+                            )}
                             {isGedaan && <CheckCircle2 size={14} className="text-green-500" />}
                             {isOvergeslagen && <XCircle size={14} className="text-[#a09990]" />}
                           </div>

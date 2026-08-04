@@ -303,10 +303,18 @@ export function DashboardClient({
     const nu = Date.now()
     const laatste = parseInt(localStorage.getItem('strava-last-sync-ts') ?? '0', 10)
     if (nu - laatste < 30 * 60 * 1000) return
+    // Stempel vóór de fetch, niet erna: anders passeert een tweede mount (of een
+    // tweede tab) dezelfde check terwijl de eerste sync nog loopt, en draaien er
+    // twee syncs tegelijk over dezelfde Strava-activiteiten.
+    localStorage.setItem('strava-last-sync-ts', String(nu))
     fetch('/api/strava/sync', { method: 'POST' })
       .then(async res => {
-        if (!res.ok) { const d = await res.json().catch(() => null); setStravaFout(d?.error ?? 'Strava-synchronisatie mislukt'); return }
-        localStorage.setItem('strava-last-sync-ts', String(nu))
+        if (!res.ok) {
+          const d = await res.json().catch(() => null)
+          localStorage.removeItem('strava-last-sync-ts')
+          setStravaFout(d?.error ?? 'Strava-synchronisatie mislukt')
+          return
+        }
         router.refresh()
       })
       .catch(() => setStravaFout('Strava-synchronisatie mislukt'))
