@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import webpush from 'web-push'
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { kalibreerTempoZones } from '@/lib/tempo-kalibratie'
 
 export const maxDuration = 60
 
@@ -16,7 +17,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Ongeautoriseerd' }, { status: 401 })
   }
 
-  const supabase = await createClient()
+  // Service-role client: een cron heeft geen sessiecookie, dus RLS zou een
+  // gewone client volledig blokkeren — de select op profiles gaf dan stilletjes
+  // niets terug en er ging nooit een samenvatting de deur uit.
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({
+      error: 'SUPABASE_SERVICE_ROLE_KEY ontbreekt in Vercel omgevingsvariabelen.',
+      verstuurd: 0,
+    }, { status: 500 })
+  }
+  const supabase = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+
+  // Tempozone-kalibratie draait mee in deze cron (Vercel Hobby staat er maar twee toe).
+  // Eerst kalibreren, dan pas de samenvatting: zo horen beide pushberichten bij
+  // dezelfde week en gaat een zonewijziging niet verloren als de review faalt.
+  const kalibratie = await kalibreerTempoZones(supabase)
 
   // Week: maandag t/m vandaag (zondag)
   const nu = new Date()
@@ -31,7 +49,7 @@ export async function GET(req: NextRequest) {
     .select('id, naam, push_subscription')
     .not('push_subscription', 'is', null)
 
-  if (!profielen?.length) return NextResponse.json({ verstuurd: 0 })
+  if (!profielen?.length) return NextResponse.json({ verstuurd: 0, kalibratie })
 
   let verstuurd = 0
 
@@ -74,5 +92,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ verstuurd, totaal: profielen.length, week: { start: weekStart, eind: weekEind } })
+  return NextResponse.json({
+    verstuurd,
+    totaal: profielen.length,
+    week: { start: weekStart, eind: weekEind },
+    kalibratie,
+  })
 }
