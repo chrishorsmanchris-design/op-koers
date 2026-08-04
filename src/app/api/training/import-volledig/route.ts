@@ -220,23 +220,33 @@ export async function POST() {
       }
     }
 
+    // Fase 1 begint op de maandag van de HUIDIGE week, dus een deel daarvan ligt
+    // al in het verleden. De opruimactie hierboven raakt alleen datum >= vandaag,
+    // want voltooide trainingen mogen nooit verdwijnen. Zonder deze filter voegde
+    // elke her-import de al verstreken dagen van deze week er nóg een keer bij —
+    // vandaar dat er dagen waren met twee, drie of vier identieke sessies.
+    // Wat we invoegen moet exact hetzelfde bereik beslaan als wat we weggooien.
+    const teBewaren = alleSessies.filter(
+      s => ((s as Record<string, unknown>).datum as string) >= vandaagStr
+    )
+
     // Invoegen in batches
-    for (let i = 0; i < alleSessies.length; i += 100) {
+    for (let i = 0; i < teBewaren.length; i += 100) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await supabase.from('training_sessions').insert(alleSessies.slice(i, i + 100) as any)
+      const { error } = await supabase.from('training_sessions').insert(teBewaren.slice(i, i + 100) as any)
       if (error) return NextResponse.json({ error: `Invoegfout: ${error.message}` }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
-      aantalSessies: alleSessies.length,
+      aantalSessies: teBewaren.length,
       fase1Weken: prePlanWeken,
       fase2Weken: 14,
       startDatum: fase1Start.toISOString().split('T')[0],
       marathonDatum: doel.datum,
       bericht: prePlanWeken > 0
-        ? `${alleSessies.length} sessies aangemaakt: ${prePlanWeken} weken opbouwfase + 14 weken PDF-schema (${fase1Start.toISOString().split('T')[0]} t/m ${doel.datum})`
-        : `${alleSessies.length} sessies aangemaakt: 14 weken PDF-schema (${fase2Start.toISOString().split('T')[0]} t/m ${doel.datum})`,
+        ? `${teBewaren.length} sessies aangemaakt: ${prePlanWeken} weken opbouwfase + 14 weken PDF-schema (${fase1Start.toISOString().split('T')[0]} t/m ${doel.datum})`
+        : `${teBewaren.length} sessies aangemaakt: 14 weken PDF-schema (${fase2Start.toISOString().split('T')[0]} t/m ${doel.datum})`,
     })
 
   } catch (err) {
