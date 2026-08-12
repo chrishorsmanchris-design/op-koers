@@ -63,11 +63,14 @@ export async function POST() {
     // Aantal pre-plan weken (fase 1)
     const prePlanWeken = Math.max(0, Math.round((fase2Start.getTime() - fase1Start.getTime()) / (7 * 86400000)))
 
-    // Verwijder alleen niet-voltooide toekomstige sessies — bewaar trainingshistorie
+    // Verwijder alleen toekomstige sessies waar je nog niets mee gedaan hebt.
+    // Voltooid = je historie. Overgeslagen = een bewuste registratie dat je hem
+    // gemist hebt; die hoort net zo goed bewaard te blijven.
     const vandaagStr = new Date().toISOString().split('T')[0]
     await supabase.from('training_sessions').delete()
       .eq('user_id', user.id)
       .eq('voltooid', false)
+      .eq('overgeslagen', false)
       .gte('datum', vandaagStr)
 
     const alleSessies: object[] = []
@@ -230,23 +233,50 @@ export async function POST() {
       s => ((s as Record<string, unknown>).datum as string) >= vandaagStr
     )
 
+    // De opruimactie hierboven spaart voltooide en overgeslagen sessies. Zouden we
+    // daarna klakkeloos de hele periode terugzetten, dan komt er op elke dag die je
+    // al afgevinkt had een tweede, identieke sessie bij — precies wat er op 10
+    // augustus gebeurde. Wat blijft staan moet dus uit de invoeglijst.
+    const { data: blijftStaan } = await supabase
+      .from('training_sessions')
+      .select('datum, type, beschrijving')
+      .eq('user_id', user.id)
+      .gte('datum', vandaagStr)
+
+    const bezetteLoopdagen = new Set<string>()
+    const bezetteSessies = new Set<string>()
+    for (const s of blijftStaan ?? []) {
+      const rij = s as Record<string, unknown>
+      if (rij.type === 'hardlopen') bezetteLoopdagen.add(rij.datum as string)
+      bezetteSessies.add(`${rij.datum}|${rij.type}|${rij.beschrijving}`)
+    }
+
+    const nieuweSessies = teBewaren.filter(s => {
+      const rij = s as Record<string, unknown>
+      // Eén hardloopsessie per dag: staat er al een gelopen of gemiste run, dan
+      // hoort daar geen geplande versie meer naast.
+      if (rij.type === 'hardlopen' && bezetteLoopdagen.has(rij.datum as string)) return false
+      // Core en fysio mogen wel meerdere per dag, dus die vergelijken we op naam.
+      return !bezetteSessies.has(`${rij.datum}|${rij.type}|${rij.beschrijving}`)
+    })
+
     // Invoegen in batches
-    for (let i = 0; i < teBewaren.length; i += 100) {
+    for (let i = 0; i < nieuweSessies.length; i += 100) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await supabase.from('training_sessions').insert(teBewaren.slice(i, i + 100) as any)
+      const { error } = await supabase.from('training_sessions').insert(nieuweSessies.slice(i, i + 100) as any)
       if (error) return NextResponse.json({ error: `Invoegfout: ${error.message}` }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
-      aantalSessies: teBewaren.length,
+      aantalSessies: nieuweSessies.length,
       fase1Weken: prePlanWeken,
       fase2Weken: 14,
       startDatum: fase1Start.toISOString().split('T')[0],
       marathonDatum: doel.datum,
       bericht: prePlanWeken > 0
-        ? `${teBewaren.length} sessies aangemaakt: ${prePlanWeken} weken opbouwfase + 14 weken PDF-schema (${fase1Start.toISOString().split('T')[0]} t/m ${doel.datum})`
-        : `${teBewaren.length} sessies aangemaakt: 14 weken PDF-schema (${fase2Start.toISOString().split('T')[0]} t/m ${doel.datum})`,
+        ? `${nieuweSessies.length} sessies aangemaakt: ${prePlanWeken} weken opbouwfase + 14 weken PDF-schema (${fase1Start.toISOString().split('T')[0]} t/m ${doel.datum})`
+        : `${nieuweSessies.length} sessies aangemaakt: 14 weken PDF-schema (${fase2Start.toISOString().split('T')[0]} t/m ${doel.datum})`,
     })
 
   } catch (err) {
