@@ -863,12 +863,12 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
                     Open <strong className="text-white">Opdrachten</strong> → tabblad Opdrachten → <strong className="text-white">+</strong>.
                   </li>
                   <li>
-                    Zoek <strong className="text-white">Zoek gezondheidsmonsters</strong>. Zet de soort op
+                    Zoek <strong className="text-white">Zoek gezondheidswaarden</strong>. Zet de soort op
                     <strong className="text-white"> Rusthartslag</strong>, sorteer op <em>Begindatum</em>, aflopend, <em>Limiet 1</em>.
                   </li>
                   <li>
-                    Zoek <strong className="text-white">Haal details op van gezondheidsmonsters</strong> en zet het detail op
-                    <strong className="text-white"> Waarde</strong>. Zonder deze stap stuur je het hele meetobject in plaats van het cijfer.
+                    Zoek <strong className="text-white">Haal details op van gezondheidswaarde</strong> en zet het detail op
+                    <strong className="text-white"> Waarde</strong>. Zonder deze stap stuur je het hele meetobject in plaats van het cijfer. Heet het bij jou nog "monsters" in plaats van "waarden"? Dan is het dezelfde actie onder een oudere naam.
                   </li>
                   <li>
                     Zoek <strong className="text-white">Haal inhoud op van URL</strong> en klap hem open met <strong className="text-white">⌄</strong>:
@@ -894,7 +894,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
                   </li>
                 </ol>
                 <p className="mt-2 text-[10px] text-[#55556a] leading-relaxed">
-                  Slaap toevoegen: nog een <em>Zoek gezondheidsmonsters</em> met Slaapanalyse,
+                  Slaap toevoegen: nog een <em>Zoek gezondheidswaarden</em> met Slaapanalyse,
                   en een tweede JSON-veld <code className="text-[10px]">slaapuren</code>.
                 </p>
                 <p className="mt-2 text-[10px] text-[#55556a] leading-relaxed">
