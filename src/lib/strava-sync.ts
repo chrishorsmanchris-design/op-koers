@@ -196,8 +196,17 @@ export async function syncStravaRuns(
     // (200 per 15 min). Dat vraagt om totaal verschillende acties.
     const tekst = await activiteitenRes.text().catch(() => '')
     const limiet = activiteitenRes.headers.get('x-ratelimit-usage')
-    const uitleg =
-      activiteitenRes.status === 401
+    // 403 met resource "Application" gaat NIET over deze gebruiker: Strava heeft
+    // dan de API-applicatie zelf op inactief gezet. Opnieuw koppelen helpt niet;
+    // dat moet je in je Strava-ontwikkelaarsinstellingen oplossen.
+    const appInactief =
+      activiteitenRes.status === 403 &&
+      tekst.includes('"Application"') &&
+      tekst.includes('Inactive')
+
+    const uitleg = appInactief
+      ? 'De Strava-app staat op inactief. Controleer strava.com/settings/api — meestal moet je daar nieuwe API-voorwaarden accepteren. Opnieuw koppelen helpt niet.'
+      : activiteitenRes.status === 401
         ? 'Strava-koppeling is verlopen of ingetrokken — koppel opnieuw via Instellingen.'
         : activiteitenRes.status === 429
           ? `Strava-limiet bereikt${limiet ? ` (gebruik: ${limiet})` : ''} — probeer het over een kwartier opnieuw.`
