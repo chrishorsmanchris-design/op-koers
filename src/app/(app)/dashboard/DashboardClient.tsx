@@ -15,8 +15,10 @@ import { RaceCountdownHero } from '@/components/training/RaceCountdownHero'
 import { ConsistencyRing } from '@/components/training/ConsistencyRing'
 import { WeerBadge } from '@/components/training/WeerBadge'
 import { BelastingKaart } from '@/components/training/BelastingKaart'
+import { HerstelKaart } from '@/components/training/HerstelKaart'
 import { SportActiviteitModal } from '@/components/training/SportActiviteitModal'
 import type { BelastingAnalyse } from '@/lib/belasting'
+import type { HerstelAnalyse } from '@/lib/herstel'
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
 import { useSheetMaxHeight } from '@/hooks/useSheetMaxHeight'
 
@@ -31,6 +33,7 @@ interface Props {
   weekStart: string
   activiteiten: RecurringActivity[]
   belasting: BelastingAnalyse
+  herstel: HerstelAnalyse
 }
 
 // ── Kleur per trainingstype/intensiteit ───────────────────────────────────────
@@ -276,7 +279,7 @@ function RunLogSheet({
 // ── Hoofdcomponent ─────────────────────────────────────────────────────────────
 export function DashboardClient({
   profiel, sessies: initSessies, alleSessies, fysioOefeningen,
-  fysioSessies, doel, vandaag, weekStart, activiteiten, belasting,
+  fysioSessies, doel, vandaag, weekStart, activiteiten, belasting, herstel,
 }: Props) {
   const supabase = createClient()
   const router = useRouter()
@@ -913,8 +916,11 @@ export function DashboardClient({
         </div>
       )}
 
-      {/* ── Belastingwaarschuwing ────────────────────────────────────────────── */}
-      <div className="mx-4 mb-6 empty:hidden">
+      {/* ── Herstel & belasting ──────────────────────────────────────────────── */}
+      {/* Herstel staat bewust bóven belasting: wat je lichaam ervan vindt weegt
+          zwaarder dan wat je het hebt opgelegd. */}
+      <div className="mx-4 mb-6 flex flex-col gap-3 empty:hidden">
+        <HerstelKaart analyse={herstel} compact />
         <BelastingKaart analyse={belasting} compact />
       </div>
 

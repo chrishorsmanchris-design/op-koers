@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
 import { analyseerBelasting } from '@/lib/belasting'
+import { analyseerHerstel } from '@/lib/herstel'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -25,7 +26,11 @@ export default async function DashboardPage() {
   achtentwintigTerug.setDate(vandaag.getDate() - 27)
   const belastingStart = achtentwintigTerug.toISOString().split('T')[0]
 
-  const [{ data: profiel }, { data: sessies }, { data: fysioOefeningen }, { data: doelen }, { data: activiteiten }, { data: alleSessies }, { data: fysioSessies }, { data: belastingSessies }, { data: sportActiviteiten }] = await Promise.all([
+  const negenentwintigTerug = new Date(vandaag)
+  negenentwintigTerug.setDate(vandaag.getDate() - 28)
+  const herstelStart = negenentwintigTerug.toISOString().split('T')[0]
+
+  const [{ data: profiel }, { data: sessies }, { data: fysioOefeningen }, { data: doelen }, { data: activiteiten }, { data: alleSessies }, { data: fysioSessies }, { data: belastingSessies }, { data: sportActiviteiten }, { data: herstelMetingen }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('training_sessions')
       .select('*, session_feedback(*)')
@@ -71,6 +76,14 @@ export default async function DashboardPage() {
       .eq('user_id', user.id)
       .gte('datum', belastingStart)
       .lte('datum', vandaagStr),
+    // Herstelmetingen uit Apple Health. Eén dag ruimer dan de belastinghistorie:
+    // de basislijn in analyseerHerstel loopt 28 dagen terug vanaf vandaag, en die
+    // oudste dag moet er nog nét in vallen.
+    supabase.from('daily_health')
+      .select('datum, rusthartslag, hrv_ms, slaapuren')
+      .eq('user_id', user.id)
+      .gte('datum', herstelStart)
+      .lte('datum', vandaagStr),
   ])
 
   if (profiel && !(profiel as Record<string, unknown>).onboarding_voltooid) {
@@ -89,6 +102,7 @@ export default async function DashboardPage() {
       weekStart={maandagStr}
       activiteiten={activiteiten ?? []}
       belasting={analyseerBelasting(belastingSessies ?? [], sportActiviteiten ?? [], vandaagStr)}
+      herstel={analyseerHerstel(herstelMetingen ?? [], vandaagStr)}
     />
   )
 }

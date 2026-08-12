@@ -2,6 +2,8 @@
 import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { Profile, Goal } from '@/types/database'
+import { HerstelKaart } from '@/components/training/HerstelKaart'
+import type { HerstelAnalyse } from '@/lib/herstel'
 import { TrendingUp, TrendingDown, Minus, Activity, Timer, MapPin, Zap, Heart, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface SessionFeedback {
@@ -36,6 +38,7 @@ interface Props {
   fysioSessies: FysioSessie[]
   profiel: Profile | null
   doel: Goal | null
+  herstel: HerstelAnalyse
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -684,7 +687,7 @@ function TrainingsLog({ sessies }: { sessies: Sessie[] }) {
 
 // ── main component ────────────────────────────────────────────────────────────
 
-export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props) {
+export function AnalyticsClient({ sessies, fysioSessies, profiel, doel, herstel }: Props) {
   const [tab, setTab] = useState<'overzicht' | 'hardlopen' | 'log' | 'herstel' | 'prestaties'>('overzicht')
 
   const maxHartslag = (profiel as Record<string, unknown>)?.max_hartslag as number | null
@@ -1289,6 +1292,12 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel }: Props)
         {/* ── HERSTEL ─────────────────────────────────────────────────────── */}
         {tab === 'herstel' && (
           <>
+            {/* Hier bewust de volledige kaart en niet de compacte: op het
+                dashboard wil je alleen een seintje bij problemen, hier wil je
+                je cijfers zien ook als alles goed gaat. */}
+            <div className="mb-3">
+              <HerstelKaart analyse={herstel} />
+            </div>
             {coreSessies.length === 0 && fysioVoltooid.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-3xl mb-2">🧘</p>

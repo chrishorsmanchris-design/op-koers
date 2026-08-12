@@ -27,6 +27,7 @@ export interface Database {
           beschikbaarheid: { ma: number; di: number; wo: number; do: number; vr: number; za: number; zo: number } | null
           opbouwtempo: 'rustig' | 'stabiel' | 'vliegend' | null
           ziek_geblesseerd: boolean | null
+          health_token: string | null
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
@@ -182,6 +183,21 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['sport_activities']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['sport_activities']['Insert']>
       }
+      daily_health: {
+        Row: {
+          id: string
+          user_id: string
+          datum: string
+          rusthartslag: number | null
+          hrv_ms: number | null
+          slaapuren: number | null
+          bron: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['daily_health']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['daily_health']['Insert']>
+      }
     }
   }
 }
@@ -197,3 +213,4 @@ export type PhysioSession = Database['public']['Tables']['physio_sessions']['Row
 export type PhysioFeedback = Database['public']['Tables']['physio_feedback']['Row']
 export type RecurringActivity = Database['public']['Tables']['recurring_activities']['Row']
 export type SportActivity = Database['public']['Tables']['sport_activities']['Row']
+export type DailyHealth = Database['public']['Tables']['daily_health']['Row']

@@ -4,6 +4,7 @@ import { InstellingenClient } from './InstellingenClient'
 import { AnalyticsClient } from './AnalyticsClient'
 import { Suspense } from 'react'
 import { TabLayout } from './TabLayout'
+import { analyseerHerstel } from '@/lib/herstel'
 
 async function InstellingenData() {
   const supabase = await createClient()
@@ -14,6 +15,11 @@ async function InstellingenData() {
   zesMandenGeleden.setMonth(zesMandenGeleden.getMonth() - 6)
   const vanafDatum = zesMandenGeleden.toISOString().split('T')[0]
 
+  const vandaagStr = new Date().toISOString().split('T')[0]
+  const vierWeken = new Date()
+  vierWeken.setDate(vierWeken.getDate() - 28)
+  const herstelVanaf = vierWeken.toISOString().split('T')[0]
+
   const [
     { data: profiel },
     { data: doelen },
@@ -22,6 +28,7 @@ async function InstellingenData() {
     { data: activiteiten },
     { data: sessies },
     { data: fysioSessies },
+    { data: herstelMetingen },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('goals').select('*').eq('user_id', user.id).order('datum', { ascending: false }),
@@ -38,6 +45,11 @@ async function InstellingenData() {
       .select('datum, voltooid')
       .eq('user_id', user.id)
       .gte('datum', vanafDatum)
+      .order('datum', { ascending: true }),
+    supabase.from('daily_health')
+      .select('datum, rusthartslag, hrv_ms, slaapuren')
+      .eq('user_id', user.id)
+      .gte('datum', herstelVanaf)
       .order('datum', { ascending: true }),
   ])
 
@@ -58,6 +70,7 @@ async function InstellingenData() {
           fysioSessies={fysioSessies ?? []}
           profiel={profiel}
           doel={doelen?.find(d => d.actief) ?? null}
+          herstel={analyseerHerstel(herstelMetingen ?? [], vandaagStr)}
         />
       }
     />

@@ -57,6 +57,27 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   const [notificatiesAan, setNotificatiesAan] = useState(!!profiel?.push_subscription)
   const [notificatiesLaden, setNotificatiesLaden] = useState(false)
   const [notificatieFout, setNotificatieFout] = useState<string | null>(null)
+  const [healthToken, setHealthToken] = useState<string | null>(
+    (profiel as Record<string, unknown>)?.health_token as string | null ?? null
+  )
+  const [healthLaden, setHealthLaden] = useState(false)
+  const [healthGekopieerd, setHealthGekopieerd] = useState<'sleutel' | 'url' | null>(null)
+
+  async function maakHealthSleutel() {
+    setHealthLaden(true)
+    try {
+      const res = await fetch('/api/health/token', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(`Sleutel maken mislukt: ${data.error ?? res.status}`)
+        return
+      }
+      setHealthToken(data.token)
+    } finally {
+      setHealthLaden(false)
+    }
+  }
+
   const [diagnose, setDiagnose] = useState<{
     allesOk: boolean
     checks: Record<string, boolean | string | null>
@@ -772,6 +793,101 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               </Button>
             )}
           </div>
+        </Card>
+
+        {/* Apple Health via Shortcuts.
+            Geen OAuth-knop mogelijk: HealthKit is alleen bereikbaar vanuit een
+            native iOS-app, nooit vanuit een browser. De iPhone stuurt daarom zelf
+            zijn cijfers hierheen met de ingebouwde Shortcuts-app. Gratis, en er
+            gaat niets naar een derde partij. */}
+        <Card className="mt-3">
+          <div className="flex items-center justify-between mb-1">
+            <div>
+              <h3 className="font-semibold text-white">Apple Health</h3>
+              <p className="text-sm text-[#8888a8]">
+                {healthToken
+                  ? '✓ Sleutel actief — stel de Shortcut in op je iPhone'
+                  : 'Rusthartslag, HRV en slaap van je Apple Watch meenemen in je herstel'}
+              </p>
+            </div>
+            {!healthToken && (
+              <Button variant="secondary" size="sm" disabled={healthLaden} onClick={maakHealthSleutel}>
+                <Link size={14} className="mr-2" /> {healthLaden ? '...' : 'Koppelen'}
+              </Button>
+            )}
+          </div>
+
+          {healthToken && (
+            <div className="mt-3 pt-3 border-t border-[#2d2d3e] flex flex-col gap-3">
+              <div>
+                <p className="text-[10px] font-semibold text-[#55556a] uppercase tracking-wide mb-1">
+                  Jouw persoonlijke sleutel
+                </p>
+                <p className="font-mono text-[11px] text-[#8888a8] break-all bg-[#111118] rounded-lg p-2 border border-[#2d2d3e]">
+                  {healthToken}
+                </p>
+                <div className="flex gap-3 mt-2">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(healthToken)
+                      setHealthGekopieerd('sleutel')
+                      setTimeout(() => setHealthGekopieerd(null), 2000)
+                    }}
+                    className="text-xs text-[#f97316] font-medium"
+                  >
+                    {healthGekopieerd === 'sleutel' ? '✓ Gekopieerd' : 'Kopieer sleutel'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/api/health/import`)
+                      setHealthGekopieerd('url')
+                      setTimeout(() => setHealthGekopieerd(null), 2000)
+                    }}
+                    className="text-xs text-[#f97316] font-medium"
+                  >
+                    {healthGekopieerd === 'url' ? '✓ Gekopieerd' : 'Kopieer URL'}
+                  </button>
+                </div>
+              </div>
+
+              <details className="text-sm">
+                <summary className="text-[#f97316] font-medium cursor-pointer text-xs">
+                  Zo zet je de Shortcut op je iPhone →
+                </summary>
+                <ol className="mt-2 flex flex-col gap-1.5 text-[11px] text-[#8888a8] leading-relaxed list-decimal pl-4">
+                  <li>Open de app <strong className="text-white">Opdrachten</strong> (Shortcuts) → tabblad Opdrachten → <strong className="text-white">+</strong>.</li>
+                  <li>Voeg toe: <strong className="text-white">Zoek gezondheidsmonsters</strong> — Soort: <em>Rusthartslag</em>, Sorteer op <em>Begindatum</em>, Aflopend, Limiet 1.</li>
+                  <li>Voeg toe: <strong className="text-white">Tekst</strong> met daarin exact:<br />
+                    <code className="text-[10px] text-white break-all">{'{"rusthartslag":"'}<em>[monster]</em>{'","slaapuren":"'}<em>[slaap]</em>{'"}'}</code><br />
+                    waarbij je op de cursief gedrukte plekken de variabele uit de vorige stap invoegt.
+                  </li>
+                  <li>Voeg toe: <strong className="text-white">Haal inhoud op van URL</strong>. Plak de URL hierboven.
+                    Methode <strong className="text-white">POST</strong>.
+                    Koptekst: <code className="text-[10px] text-white">Authorization</code> = <code className="text-[10px] text-white">Bearer + je sleutel</code>.
+                    Aanvraagtekst: <strong className="text-white">Bestand</strong> → de Tekst uit stap 3.
+                  </li>
+                  <li>Tabblad <strong className="text-white">Automatisering</strong> → + → <strong className="text-white">Tijdstip</strong> → 08:00, dagelijks →
+                    kies deze opdracht → <strong className="text-white">Direct uitvoeren</strong> aan en <strong className="text-white">Melding bij uitvoeren</strong> uit.
+                  </li>
+                </ol>
+                <p className="mt-2 text-[10px] text-[#55556a] leading-relaxed">
+                  De sleutel gaat in een koptekst en niet in de URL: webadressen komen
+                  in logbestanden terecht, kopteksten niet. Hij mag alleen metingen
+                  toevoegen — niets lezen, niets verwijderen.
+                </p>
+              </details>
+
+              <button
+                onClick={async () => {
+                  if (!confirm('Nieuwe sleutel maken? De oude werkt daarna niet meer en je moet hem in de Shortcut vervangen.')) return
+                  await maakHealthSleutel()
+                }}
+                className="text-xs text-[#8888a8] text-left"
+              >
+                Nieuwe sleutel maken (trekt de oude in)
+              </button>
+            </div>
+          )}
         </Card>
       </section>
 

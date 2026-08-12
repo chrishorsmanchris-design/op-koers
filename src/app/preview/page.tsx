@@ -1,5 +1,6 @@
 import { DashboardClient } from '@/app/(app)/dashboard/DashboardClient'
 import { analyseerBelasting } from '@/lib/belasting'
+import { analyseerHerstel } from '@/lib/herstel'
 
 const vandaag = new Date().toISOString().split('T')[0]
 const weekStart = (() => {
@@ -61,6 +62,21 @@ export default function PreviewPage() {
             datum: d(o), sport: o % 2 ? 'Padel' : 'Hockey',
             duur_minuten: 90, intensiteit: (o % 2 ? 'gemiddeld' : 'zwaar') as 'gemiddeld' | 'zwaar',
           })),
+          vandaag,
+        )}
+        // Bewust een scenario met een oplopende rusthartslag: zo is de
+        // herstelkaart in de preview altijd zichtbaar om op te controleren.
+        herstel={analyseerHerstel(
+          Array.from({ length: 29 }, (_, i) => {
+            const offset = -(28 - i)
+            const recent = offset >= -2
+            return {
+              datum: d(offset),
+              rusthartslag: recent ? 58 : 50 + (i % 3),
+              hrv_ms: recent ? 38 : 52 + (i % 5),
+              slaapuren: recent ? 5.8 : 7.4,
+            }
+          }),
           vandaag,
         )}
       />
