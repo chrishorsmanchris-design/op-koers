@@ -257,6 +257,8 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio, 
   const [fout, setFout] = useState('')
   const [foutTekst, setFoutTekst] = useState('')
   const [roosterSessie, setRoosterSessie] = useState<TrainingSession | null>(null)
+  const [koppelSessie, setKoppelSessie] = useState<TrainingSession | null>(null)
+  const [koppelt, setKoppelt] = useState(false)
   const [workoutSessie, setWorkoutSessie] = useState<TrainingSession | null>(null)
   const [weergave, setWeergave] = useState<'week' | 'agenda'>('week')
 
@@ -374,6 +376,64 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio, 
   async function ongedaanMaken(id: string) {
     setSessies(prev => prev.map(s => s.id === id ? { ...s, voltooid: false, overgeslagen: false } : s))
     await supabase.from('training_sessions').update({ voltooid: false, overgeslagen: false } as never).eq('id', id)
+  }
+
+  // Kandidaten om een losse Strava-run aan te hangen: geplande hardloopsessies
+  // binnen een week, nog niet aan een activiteit gekoppeld. Bewust ruim, want
+  // een training een paar dagen later inhalen is normaal.
+  function koppelKandidaten(stravaSessie: TrainingSession) {
+    const dagen = (a: string, b: string) =>
+      Math.round((new Date(a + 'T12:00:00').getTime() - new Date(b + 'T12:00:00').getTime()) / 86400000)
+
+    return sessies
+      .filter(s =>
+        s.type === 'hardlopen' &&
+        s.goal_id &&
+        !s.runkeeper_id &&
+        s.id !== stravaSessie.id &&
+        Math.abs(dagen(s.datum, stravaSessie.datum)) <= 7
+      )
+      .sort((a, b) =>
+        Math.abs(dagen(a.datum, stravaSessie.datum)) - Math.abs(dagen(b.datum, stravaSessie.datum))
+      )
+  }
+
+  async function koppelAanTraining(stravaId: string, planId: string) {
+    setKoppelt(true)
+    try {
+      const res = await fetch('/api/strava/koppel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ strava_sessie_id: stravaId, plan_sessie_id: planId }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setFoutTekst(data?.error ?? 'Koppelen mislukt')
+        return
+      }
+
+      // De losse rij verdwijnt, de geplande sessie neemt de cijfers over.
+      const strava = sessies.find(s => s.id === stravaId)
+      setSessies(prev => prev
+        .filter(s => s.id !== stravaId)
+        .map(s => s.id === planId
+          ? {
+              ...s,
+              runkeeper_id: strava?.runkeeper_id ?? s.runkeeper_id,
+              afstand_km: strava?.afstand_km ?? s.afstand_km,
+              duur_minuten: strava?.duur_minuten ?? s.duur_minuten,
+              voltooid: true,
+              overgeslagen: false,
+            }
+          : s
+        )
+      )
+      setKoppelSessie(null)
+    } catch {
+      setFoutTekst('Koppelen mislukt')
+    } finally {
+      setKoppelt(false)
+    }
   }
 
   async function verwijderSessie(id: string) {
@@ -796,6 +856,16 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio, 
                             </div>
                           </div>
                         </div>
+                        {/* Liep je een geplande training een dag later? Dan hoort
+                            deze run daarbij en niet los in je schema. */}
+                        {koppelKandidaten(sessie).length > 0 && (
+                          <button
+                            onClick={() => setKoppelSessie(sessie)}
+                            className="w-full py-2.5 text-xs font-semibold text-[#f97316] border-t border-[#2d2d3e] hover:bg-[#222230] transition-colors"
+                          >
+                            Koppel aan geplande training
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -948,6 +1018,50 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio, 
           onLatenVervallen={handleLatenVervallen}
           onSluiten={() => setRoosterSessie(null)}
         />
+      )}
+
+      {/* Losse Strava-run aan een geplande training hangen */}
+      {koppelSessie && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setKoppelSessie(null)}>
+          <div
+            className="w-full max-w-md bg-[#16161f] rounded-t-3xl border-t border-[#2d2d3e] p-5 pb-8 max-h-[80vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <h3 className="text-base font-bold text-white">Koppel aan geplande training</h3>
+              <button onClick={() => setKoppelSessie(null)} className="text-[#55556a] shrink-0">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-xs text-[#8888a8] mb-4">
+              {koppelSessie.afstand_km} km in {koppelSessie.duur_minuten ? formatDuur(koppelSessie.duur_minuten) : '–'} op{' '}
+              {dagKorteDatum(koppelSessie.datum)}. Welke training was dit?
+            </p>
+
+            <div className="space-y-2">
+              {koppelKandidaten(koppelSessie).map(kandidaat => (
+                <button
+                  key={kandidaat.id}
+                  disabled={koppelt}
+                  onClick={() => koppelAanTraining(koppelSessie.id, kandidaat.id)}
+                  className="w-full text-left p-3 rounded-xl bg-[#1b1b27] border border-[#2d2d3e] hover:border-[#f97316]/50 transition-colors disabled:opacity-50"
+                >
+                  <p className="text-sm font-semibold text-white mb-0.5">{kandidaat.beschrijving}</p>
+                  <p className="text-xs text-[#55556a]">
+                    {dagKorteDatum(kandidaat.datum)}
+                    {kandidaat.afstand_km ? ` · gepland ${kandidaat.afstand_km} km` : ''}
+                    {kandidaat.overgeslagen ? ' · staat nu op gemist' : ''}
+                  </p>
+                </button>
+              ))}
+            </div>
+
+            <p className="text-[11px] text-[#55556a] mt-4 leading-relaxed">
+              De geplande training neemt je werkelijke afstand en tijd over en gaat op voltooid.
+              Deze losse activiteit verdwijnt uit je schema.
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Workout-detailweergave */}
