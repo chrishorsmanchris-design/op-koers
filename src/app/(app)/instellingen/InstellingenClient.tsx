@@ -854,22 +854,49 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
                 <summary className="text-[#f97316] font-medium cursor-pointer text-xs">
                   Zo zet je de Shortcut op je iPhone →
                 </summary>
-                <ol className="mt-2 flex flex-col gap-1.5 text-[11px] text-[#8888a8] leading-relaxed list-decimal pl-4">
-                  <li>Open de app <strong className="text-white">Opdrachten</strong> (Shortcuts) → tabblad Opdrachten → <strong className="text-white">+</strong>.</li>
-                  <li>Voeg toe: <strong className="text-white">Zoek gezondheidsmonsters</strong> — Soort: <em>Rusthartslag</em>, Sorteer op <em>Begindatum</em>, Aflopend, Limiet 1.</li>
-                  <li>Voeg toe: <strong className="text-white">Tekst</strong> met daarin exact:<br />
-                    <code className="text-[10px] text-white break-all">{'{"rusthartslag":"'}<em>[monster]</em>{'","slaapuren":"'}<em>[slaap]</em>{'"}'}</code><br />
-                    waarbij je op de cursief gedrukte plekken de variabele uit de vorige stap invoegt.
+                <p className="mt-2 text-[11px] text-[#8888a8] leading-relaxed">
+                  Begin met alléén de rusthartslag. Eerst één getal zien aankomen;
+                  slaap erbij is daarna twee extra handelingen.
+                </p>
+                <ol className="mt-2 flex flex-col gap-2 text-[11px] text-[#8888a8] leading-relaxed list-decimal pl-4">
+                  <li>
+                    Open <strong className="text-white">Opdrachten</strong> → tabblad Opdrachten → <strong className="text-white">+</strong>.
                   </li>
-                  <li>Voeg toe: <strong className="text-white">Haal inhoud op van URL</strong>. Plak de URL hierboven.
-                    Methode <strong className="text-white">POST</strong>.
-                    Koptekst: <code className="text-[10px] text-white">Authorization</code> = <code className="text-[10px] text-white">Bearer + je sleutel</code>.
-                    Aanvraagtekst: <strong className="text-white">Bestand</strong> → de Tekst uit stap 3.
+                  <li>
+                    Zoek <strong className="text-white">Zoek gezondheidsmonsters</strong>. Zet de soort op
+                    <strong className="text-white"> Rusthartslag</strong>, sorteer op <em>Begindatum</em>, aflopend, <em>Limiet 1</em>.
                   </li>
-                  <li>Tabblad <strong className="text-white">Automatisering</strong> → + → <strong className="text-white">Tijdstip</strong> → 08:00, dagelijks →
-                    kies deze opdracht → <strong className="text-white">Direct uitvoeren</strong> aan en <strong className="text-white">Melding bij uitvoeren</strong> uit.
+                  <li>
+                    Zoek <strong className="text-white">Haal details op van gezondheidsmonsters</strong> en zet het detail op
+                    <strong className="text-white"> Waarde</strong>. Zonder deze stap stuur je het hele meetobject in plaats van het cijfer.
+                  </li>
+                  <li>
+                    Zoek <strong className="text-white">Haal inhoud op van URL</strong> en klap hem open met <strong className="text-white">⌄</strong>:
+                    <ul className="mt-1 flex flex-col gap-0.5 list-disc pl-4">
+                      <li>URL: de URL hierboven</li>
+                      <li>Methode: <strong className="text-white">POST</strong></li>
+                      <li>Koptekst — sleutel <code className="text-[10px] text-white">Authorization</code>,
+                        waarde <code className="text-[10px] text-white">Bearer</code> + spatie + je sleutel</li>
+                      <li>Aanvraagtekst: <strong className="text-white">JSON</strong> → veld toevoegen, type Tekst,
+                        sleutel <code className="text-[10px] text-white">rusthartslag</code>,
+                        waarde = de variabele <strong className="text-white">Waarde</strong> uit stap 3</li>
+                    </ul>
+                  </li>
+                  <li>
+                    Draai hem met <strong className="text-white">▶︎</strong> en geef toestemming voor Gezondheid.
+                    Goed als je <code className="text-[10px] text-white">{'"success": true'}</code> terugkrijgt.
+                    Staat er <em>Ongeldige sleutel</em>, kijk dan naar de spatie na <code className="text-[10px] text-white">Bearer</code>.
+                  </li>
+                  <li>
+                    Pas als dat werkt: tabblad <strong className="text-white">Automatisering</strong> → + → <strong className="text-white">Tijdstip</strong> →
+                    08:00, dagelijks → kies deze opdracht → <strong className="text-white">Direct uitvoeren</strong> aan,
+                    <strong className="text-white"> Melding bij uitvoeren</strong> uit.
                   </li>
                 </ol>
+                <p className="mt-2 text-[10px] text-[#55556a] leading-relaxed">
+                  Slaap toevoegen: nog een <em>Zoek gezondheidsmonsters</em> met Slaapanalyse,
+                  en een tweede JSON-veld <code className="text-[10px]">slaapuren</code>.
+                </p>
                 <p className="mt-2 text-[10px] text-[#55556a] leading-relaxed">
                   De sleutel gaat in een koptekst en niet in de URL: webadressen komen
                   in logbestanden terecht, kopteksten niet. Hij mag alleen metingen
