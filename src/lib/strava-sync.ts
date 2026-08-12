@@ -8,7 +8,25 @@ function isoWeeknummer(datum: string): number {
   return Math.ceil(((d.getTime() - jaarStart.getTime()) / 86400000 + 1) / 7)
 }
 
-export async function getStravaAccessToken(refreshToken: string): Promise<string | null> {
+/**
+ * Wisselt een refresh token in voor een access token.
+ *
+ * Strava kan bij elke refresh een NIEUW refresh token teruggeven (rotatie). Geven
+ * we dat niet door aan de aanroeper, dan blijft het oude token in de database
+ * staan en faalt elke volgende refresh — de koppeling lijkt dan spontaan kapot.
+ */
+export async function getStravaAccessToken(
+  refreshToken: string
+): Promise<string | null> {
+  const { accessToken } = await haalStravaToken(refreshToken)
+  return accessToken
+}
+
+export async function haalStravaToken(refreshToken: string): Promise<{
+  accessToken: string | null
+  nieuwRefreshToken: string | null
+  fout?: string
+}> {
   const res = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -19,9 +37,21 @@ export async function getStravaAccessToken(refreshToken: string): Promise<string
       grant_type: 'refresh_token',
     }),
   })
-  if (!res.ok) return null
+
+  if (!res.ok) {
+    const tekst = await res.text().catch(() => '')
+    return {
+      accessToken: null,
+      nieuwRefreshToken: null,
+      fout: `Strava token ${res.status}: ${tekst.slice(0, 200)}`,
+    }
+  }
+
   const data = await res.json()
-  return data.access_token ?? null
+  return {
+    accessToken: data.access_token ?? null,
+    nieuwRefreshToken: (data.refresh_token as string | undefined) ?? null,
+  }
 }
 
 /**
@@ -140,15 +170,45 @@ export async function syncStravaRuns(
   userId: string,
   refreshToken: string
 ): Promise<{ gesynct: number; totaal: number; error?: string }> {
-  const accessToken = await getStravaAccessToken(refreshToken)
-  if (!accessToken) return { gesynct: 0, totaal: 0, error: 'Token ophalen mislukt' }
+  const { accessToken, nieuwRefreshToken, fout } = await haalStravaToken(refreshToken)
+  if (!accessToken) {
+    return { gesynct: 0, totaal: 0, error: fout ?? 'Token ophalen mislukt' }
+  }
+
+  // Roteerde Strava het refresh token? Dan meteen opslaan, anders werkt de
+  // volgende sync niet meer.
+  if (nieuwRefreshToken && nieuwRefreshToken !== refreshToken) {
+    await supabase
+      .from('profiles')
+      .update({ strava_refresh_token: nieuwRefreshToken } as never)
+      .eq('id', userId)
+  }
 
   const na = Math.floor(Date.now() / 1000) - 90 * 24 * 60 * 60
   const activiteitenRes = await fetch(
     `https://www.strava.com/api/v3/athlete/activities?after=${na}&per_page=50`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
-  if (!activiteitenRes.ok) return { gesynct: 0, totaal: 0, error: 'Activiteiten ophalen mislukt' }
+
+  if (!activiteitenRes.ok) {
+    // Zonder de status erbij is dit niet te diagnosticeren: 401 betekent dat de
+    // koppeling ingetrokken is, 429 dat we tegen Strava's limiet aanlopen
+    // (200 per 15 min). Dat vraagt om totaal verschillende acties.
+    const tekst = await activiteitenRes.text().catch(() => '')
+    const limiet = activiteitenRes.headers.get('x-ratelimit-usage')
+    const uitleg =
+      activiteitenRes.status === 401
+        ? 'Strava-koppeling is verlopen of ingetrokken — koppel opnieuw via Instellingen.'
+        : activiteitenRes.status === 429
+          ? `Strava-limiet bereikt${limiet ? ` (gebruik: ${limiet})` : ''} — probeer het over een kwartier opnieuw.`
+          : tekst.slice(0, 200)
+    return {
+      gesynct: 0,
+      totaal: 0,
+      error: `Activiteiten ophalen mislukt (${activiteitenRes.status}): ${uitleg}`,
+    }
+  }
+
   const activiteiten = await activiteitenRes.json()
 
   const runs = activiteiten.filter((a: Record<string, unknown>) => a.type === 'Run')
