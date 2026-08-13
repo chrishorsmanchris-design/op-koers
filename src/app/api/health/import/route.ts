@@ -71,11 +71,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Bericht te groot' }, { status: 413 })
   }
 
-  let body: Record<string, unknown>
+  let ontvangen: Record<string, unknown>
   try {
-    body = JSON.parse(ruw || '{}')
+    ontvangen = JSON.parse(ruw || '{}')
   } catch {
     return NextResponse.json({ error: 'Ongeldige JSON' }, { status: 400 })
+  }
+
+  // Veldnamen kleinmaken en streepjes weghalen. In Shortcuts typ je die namen met
+  // de hand op een telefoontoetsenbord dat de eerste letter automatisch een
+  // hoofdletter geeft; "Rusthartslag" afwijzen omdat er een hoofdletter R staat
+  // is een val die niets beschermt.
+  const body: Record<string, unknown> = {}
+  for (const [sleutel, waarde] of Object.entries(ontvangen)) {
+    body[sleutel.toLowerCase().replace(/[\s_-]/g, '')] = waarde
   }
 
   // Service-role: de Shortcut heeft geen sessie-cookie, dus RLS zou hier elke
@@ -108,7 +117,8 @@ export async function POST(req: NextRequest) {
 
   const meting = {
     rusthartslag: binnen(getal(body.rusthartslag), 25, 130),
-    hrv_ms: binnen(getal(body.hrv_ms) ?? getal(body.hrv), 1, 400),
+    // hrvms: 'hrv_ms' is hierboven al genormaliseerd tot 'hrvms'.
+    hrv_ms: binnen(getal(body.hrvms) ?? getal(body.hrv), 1, 400),
     slaapuren: binnen(slaapuren !== null ? Math.round(slaapuren * 100) / 100 : null, 0, 24),
   }
 
@@ -116,7 +126,13 @@ export async function POST(req: NextRequest) {
     // Een lege post is bijna altijd een Shortcut die niets uit Health kreeg. Dat
     // als "ok" wegschrijven zou een rij zonder waarden opleveren die de analyse
     // wél als meetdag telt.
-    return NextResponse.json({ error: 'Geen bruikbare meetwaarden ontvangen' }, { status: 400 })
+    // De ontvangen veldnamen teruggeven: in Shortcuts zie je dat antwoord direct
+    // onder de actie staan, en dan is een typefout in één oogopslag duidelijk.
+    return NextResponse.json({
+      error: 'Geen bruikbare meetwaarden ontvangen',
+      ontvangen_velden: Object.keys(ontvangen),
+      verwacht: ['rusthartslag', 'hrv_ms', 'slaapuren'],
+    }, { status: 400 })
   }
 
   // Bestaande waarden niet met null overschrijven: draait de Shortcut 's ochtends
