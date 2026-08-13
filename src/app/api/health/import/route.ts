@@ -115,10 +115,16 @@ export async function POST(req: NextRequest) {
     (getal(body.slaapminuten) !== null ? getal(body.slaapminuten)! / 60 : null) ??
     (getal(body.slaapseconden) !== null ? getal(body.slaapseconden)! / 3600 : null)
 
+  // Afronden vóór het opslaan: Apple Health levert HRV als 47.3259996414423, en
+  // rusthartslag lang niet altijd als rond getal. Beide kolommen zijn INTEGER, dus
+  // zonder deze afronding weigert Postgres de rij. Die decimalen zijn bovendien
+  // schijnnauwkeurigheid — een HRV van 47,3 versus 47 zegt niets over je herstel.
+  const heel = (n: number | null) => (n === null ? null : Math.round(n))
+
   const meting = {
-    rusthartslag: binnen(getal(body.rusthartslag), 25, 130),
+    rusthartslag: heel(binnen(getal(body.rusthartslag), 25, 130)),
     // hrvms: 'hrv_ms' is hierboven al genormaliseerd tot 'hrvms'.
-    hrv_ms: binnen(getal(body.hrvms) ?? getal(body.hrv), 1, 400),
+    hrv_ms: heel(binnen(getal(body.hrvms) ?? getal(body.hrv), 1, 400)),
     slaapuren: binnen(slaapuren !== null ? Math.round(slaapuren * 100) / 100 : null, 0, 24),
   }
 
