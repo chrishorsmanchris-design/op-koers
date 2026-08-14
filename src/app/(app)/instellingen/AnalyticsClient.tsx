@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils'
 import type { Profile, Goal } from '@/types/database'
 import { HerstelKaart } from '@/components/training/HerstelKaart'
 import type { HerstelAnalyse } from '@/lib/herstel'
+import { EfficientieKaart } from '@/components/training/EfficientieKaart'
+import type { EfficientieAnalyse } from '@/lib/efficientie'
 import { TrendingUp, TrendingDown, Minus, Activity, Timer, MapPin, Zap, Heart, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface SessionFeedback {
@@ -39,6 +41,7 @@ interface Props {
   profiel: Profile | null
   doel: Goal | null
   herstel: HerstelAnalyse
+  efficientie: EfficientieAnalyse
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -687,7 +690,7 @@ function TrainingsLog({ sessies }: { sessies: Sessie[] }) {
 
 // ── main component ────────────────────────────────────────────────────────────
 
-export function AnalyticsClient({ sessies, fysioSessies, profiel, doel, herstel }: Props) {
+export function AnalyticsClient({ sessies, fysioSessies, profiel, doel, herstel, efficientie }: Props) {
   const [tab, setTab] = useState<'overzicht' | 'hardlopen' | 'log' | 'herstel' | 'prestaties'>('overzicht')
 
   const maxHartslag = (profiel as Record<string, unknown>)?.max_hartslag as number | null
@@ -1297,6 +1300,9 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel, herstel 
                 je cijfers zien ook als alles goed gaat. */}
             <div className="mb-3">
               <HerstelKaart analyse={herstel} />
+            </div>
+            <div className="mb-3">
+              <EfficientieKaart analyse={efficientie} />
             </div>
             {coreSessies.length === 0 && fysioVoltooid.length === 0 ? (
               <div className="text-center py-12">

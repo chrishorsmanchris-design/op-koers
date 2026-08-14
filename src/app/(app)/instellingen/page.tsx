@@ -5,6 +5,28 @@ import { AnalyticsClient } from './AnalyticsClient'
 import { Suspense } from 'react'
 import { TabLayout } from './TabLayout'
 import { analyseerHerstel } from '@/lib/herstel'
+import { analyseerEfficientie, type EfficientieRun } from '@/lib/efficientie'
+
+/**
+ * Zet voltooide hardloopsessies om naar de vorm die de efficiëntie-analyse wil.
+ * Strava's gemeten afstand en duur gaan vóór de geplande waarden: het gaat om
+ * wat je werkelijk liep, niet om wat er in het schema stond.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function loopRuns(sessies: any[]): EfficientieRun[] {
+  return sessies
+    .filter(s => s.type === 'hardlopen' && s.voltooid)
+    .map(s => {
+      const fb = s.session_feedback?.[0]
+      return {
+        datum: s.datum,
+        intensiteit: s.intensiteit,
+        afstand_km: fb?.werkelijke_afstand ?? s.afstand_km,
+        duur_minuten: fb?.werkelijke_duur ?? s.duur_minuten,
+        hartslag_gem: fb?.hartslag_gem ?? null,
+      }
+    })
+}
 
 async function InstellingenData() {
   const supabase = await createClient()
@@ -71,6 +93,7 @@ async function InstellingenData() {
           profiel={profiel}
           doel={doelen?.find(d => d.actief) ?? null}
           herstel={analyseerHerstel(herstelMetingen ?? [], vandaagStr)}
+          efficientie={analyseerEfficientie(loopRuns(sessies ?? []), vandaagStr)}
         />
       }
     />
