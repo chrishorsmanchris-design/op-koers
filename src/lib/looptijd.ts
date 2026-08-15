@@ -16,9 +16,38 @@
  * anderhalve graad is ruis met een uitroepteken erbij.
  */
 
-/** Buiten deze uren plant niemand vrijwillig een duurloop. */
-const VROEGSTE_UUR = 6
-const LAATSTE_EIND_UUR = 22
+/**
+ * Wanneer je kúnt lopen, per dag van de week. Zonder dit zou de kaart je op een
+ * hete dag steevast naar zes uur 's ochtends sturen — technisch het koelste
+ * moment, en precies het advies dat je negeert. Een advies dat je niet opvolgt
+ * is geen advies.
+ */
+export interface Loopvenster24 {
+  /** Vroegste uur waarop je kunt vertrekken. */
+  van: number
+  /** Laatste uur waarop je binnen wilt zijn. */
+  tot: number
+}
+
+export type Looptijden = Record<string, Loopvenster24>
+
+/** getDay() telt vanaf zondag; deze volgorde moet daarmee overeenkomen. */
+export const DAGSLEUTELS = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'] as const
+
+/** Ruim genomen: liever een te breed venster dan een gebruiker die niets ziet. */
+export const STANDAARD_VENSTER: Loopvenster24 = { van: 7, tot: 21 }
+
+export function vensterVoorDatum(
+  looptijden: Looptijden | null | undefined,
+  datum: string,
+): Loopvenster24 {
+  const dag = DAGSLEUTELS[new Date(datum + 'T12:00:00').getDay()]
+  const v = looptijden?.[dag]
+  if (!v || typeof v.van !== 'number' || typeof v.tot !== 'number' || v.tot <= v.van) {
+    return STANDAARD_VENSTER
+  }
+  return v
+}
 
 /** Onder dit verschil tussen het beste en slechtste moment valt er niets te kiezen. */
 const RELEVANT_VERSCHIL = 3
@@ -55,6 +84,8 @@ export interface LooptijdAdvies {
   slechtste: Loopvenster
   /** Is het verschil groot genoeg om er iets over te zeggen? */
   maaktUit: boolean
+  /** Het venster paste niet om de sessie heen; er viel dus niets te kiezen. */
+  vensterTeKrap: boolean
   waarschuwing: string | null
 }
 
@@ -112,21 +143,41 @@ function score(v: Loopvenster): number {
  * @param vanafUur Niet eerder dan dit uur adviseren — voor vandaag is dat het
  *                 huidige uur, want een advies voor vanochtend 7 uur is 's
  *                 middags om 3 uur alleen maar wrijving.
+ * @param venster  De uren waarop deze gebruiker die dag daadwerkelijk kan lopen.
  */
 export function beoordeelLooptijd(
   uren: UurWeer[],
   duurMin: number | null,
   vanafUur: number,
+  venster: Loopvenster24 = STANDAARD_VENSTER,
 ): LooptijdAdvies | null {
   const lengte = Math.max(1, Math.ceil((duurMin ?? 60) / 60))
-  const vroegste = Math.max(VROEGSTE_UUR, vanafUur)
+  const vroegste = Math.max(venster.van, vanafUur)
 
   const vensters: Loopvenster[] = []
-  for (let start = vroegste; start + lengte <= LAATSTE_EIND_UUR; start++) {
+  for (let start = vroegste; start + lengte <= venster.tot; start++) {
     const v = maakVenster(uren, start, lengte)
     if (v) vensters.push(v)
   }
-  if (vensters.length === 0) return null
+
+  // Past de sessie niet binnen je venster, dan valt er niets te kiezen. Toch de
+  // temperatuur laten zien is nuttiger dan een lege kaart: je gaat hoe dan ook,
+  // dus je wilt weten wat je te wachten staat.
+  const vensterTeKrap = vensters.length === 0
+  if (vensterTeKrap) {
+    const heel = maakVenster(uren, vroegste, Math.max(1, venster.tot - vroegste))
+    if (!heel) return null
+    return {
+      beste: heel,
+      slechtste: heel,
+      maaktUit: false,
+      vensterTeKrap: true,
+      waarschuwing:
+        heel.hitte === 'gevaarlijk' || heel.tempoverliesPct >= MELD_VANAF_PCT
+          ? `Binnen jouw tijden is er geen koeler moment te vinden. Reken op ongeveer ${heel.tempoverliesPct}% tempoverlies en loop op gevoel.`
+          : null,
+    }
+  }
 
   const gesorteerd = [...vensters].sort((a, b) => score(a) - score(b))
   const beste = gesorteerd[0]
@@ -143,5 +194,11 @@ export function beoordeelLooptijd(
       `Reken op ongeveer ${beste.tempoverliesPct}% tempoverlies door de warmte. Dat is geen slechte dag, dat is natuurkunde: loop op gevoel of op hartslag in plaats van op de klok.`
   }
 
-  return { beste, slechtste, maaktUit: verschil >= RELEVANT_VERSCHIL, waarschuwing }
+  return {
+    beste,
+    slechtste,
+    maaktUit: verschil >= RELEVANT_VERSCHIL,
+    vensterTeKrap: false,
+    waarschuwing,
+  }
 }

@@ -741,7 +741,11 @@ export function DashboardClient({
                   !geselecteerdeSessie.voltooid &&
                   !geselecteerdeSessie.overgeslagen &&
                   geselecteerdeSessie.type === 'hardlopen' && (
-                    <LoopmomentKaart sessie={geselecteerdeSessie} vandaag={vandaag} />
+                    <LoopmomentKaart
+                      sessie={geselecteerdeSessie}
+                      vandaag={vandaag}
+                      looptijden={profiel?.looptijden ?? null}
+                    />
                   )}
               </div>
             </div>

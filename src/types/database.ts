@@ -28,6 +28,8 @@ export interface Database {
           opbouwtempo: 'rustig' | 'stabiel' | 'vliegend' | null
           ziek_geblesseerd: boolean | null
           health_token: string | null
+          /** Per weekdag het uurvenster waarin je kunt lopen, bv. { ma: { van: 17, tot: 21 } }. */
+          looptijden: Record<string, { van: number; tot: number }> | null
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>

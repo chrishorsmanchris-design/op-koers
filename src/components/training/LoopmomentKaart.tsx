@@ -1,12 +1,17 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Thermometer, CloudRain, Clock } from 'lucide-react'
-import { beoordeelLooptijd, uurTekst, type LooptijdAdvies, type UurWeer } from '@/lib/looptijd'
+import {
+  beoordeelLooptijd, uurTekst, vensterVoorDatum,
+  type LooptijdAdvies, type Looptijden, type UurWeer,
+} from '@/lib/looptijd'
 import { cn } from '@/lib/utils'
 
 interface Props {
   sessie: { datum: string; duur_minuten: number | null }
   vandaag: string
+  /** Wanneer deze gebruiker per weekdag kan lopen; null = het ruime standaardvenster. */
+  looptijden: Looptijden | null
 }
 
 /** Zelfde vaste punt als het tankplan: geen locatiepopup voor één temperatuur. */
@@ -20,7 +25,7 @@ const KLEUR: Record<string, string> = {
   gevaarlijk: 'text-red-400',
 }
 
-export function LoopmomentKaart({ sessie, vandaag }: Props) {
+export function LoopmomentKaart({ sessie, vandaag, looptijden }: Props) {
   const [advies, setAdvies] = useState<LooptijdAdvies | null>(null)
   const [nu, setNu] = useState<number | null>(null)
 
@@ -57,29 +62,29 @@ export function LoopmomentKaart({ sessie, vandaag }: Props) {
         // uur telt nog mee: je kunt over vijf minuten de deur uit.
         const huidigUur = datum === vandaag ? new Date().getHours() : 0
         setNu(uren.find(u => u.uur === huidigUur)?.gevoel ?? null)
-        setAdvies(beoordeelLooptijd(uren, duur, huidigUur))
+        setAdvies(beoordeelLooptijd(uren, duur, huidigUur, vensterVoorDatum(looptijden, datum)))
       })
       .catch(() => {})
 
     return () => { afgebroken = true }
-  }, [datum, duur, vandaag])
+  }, [datum, duur, vandaag, looptijden])
 
   if (!advies) return null
 
-  const { beste, slechtste, maaktUit, waarschuwing } = advies
+  const { beste, slechtste, maaktUit, vensterTeKrap, waarschuwing } = advies
   const kleur = KLEUR[beste.hitte] ?? 'text-[#8888a8]'
 
   return (
     <div className="mt-3 bg-[#222230] rounded-2xl p-3">
       <div className="flex items-center gap-2 mb-1.5">
         <Clock size={13} className={kleur} />
-        {maaktUit ? (
-          <p className="text-xs font-bold text-white">
-            Beste moment: {uurTekst(beste.startUur)}–{uurTekst(beste.eindUur)}
-          </p>
-        ) : (
-          <p className="text-xs font-bold text-white">Het tijdstip maakt vandaag weinig uit</p>
-        )}
+        <p className="text-xs font-bold text-white">
+          {vensterTeKrap
+            ? `Binnen jouw tijden: ${uurTekst(beste.startUur)}–${uurTekst(beste.eindUur)}`
+            : maaktUit
+              ? `Beste moment: ${uurTekst(beste.startUur)}–${uurTekst(beste.eindUur)}`
+              : 'Het tijdstip maakt weinig uit'}
+        </p>
       </div>
 
       <div className="flex items-center gap-3 text-[11px] text-[#8888a8]">

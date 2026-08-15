@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
 import type { Goal, Profile, Vacation, PreviousResult, RecurringActivity } from '@/types/database'
+import type { Looptijden } from '@/lib/looptijd'
 import { cn } from '@/lib/utils'
 import { Plus, Trash2, LogOut, Link } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -29,6 +30,34 @@ const TIJDSTIPPEN = [
   { value: 'middag', label: 'Middag' },
   { value: 'avond', label: 'Avond' },
 ]
+
+const LOOPDAGEN = [
+  { key: 'ma', label: 'Ma' }, { key: 'di', label: 'Di' }, { key: 'wo', label: 'Wo' },
+  { key: 'do', label: 'Do' }, { key: 'vr', label: 'Vr' },
+  { key: 'za', label: 'Za' }, { key: 'zo', label: 'Zo' },
+] as const
+
+/**
+ * Hele uren volstaan. De weersverwachting komt per uur binnen, dus een venster
+ * van 17:30 tot 20:45 zou een precisie suggereren die er niet is.
+ */
+function UurKeuze({
+  waarde, onKies, min = 4, max = 23,
+}: { waarde: number; onKies: (uur: number) => void; min?: number; max?: number }) {
+  const opties: number[] = []
+  for (let u = min; u <= max; u++) opties.push(u)
+  return (
+    <select
+      value={waarde}
+      onChange={e => onKies(Number(e.target.value))}
+      className="bg-[#222230] border border-[#2d2d3e] rounded-xl px-2 py-1.5 text-sm text-white focus:outline-none focus:border-[#f97316] tabular-nums"
+    >
+      {opties.map(u => (
+        <option key={u} value={u}>{String(u).padStart(2, '0')}:00</option>
+      ))}
+    </select>
+  )
+}
 
 type NieuweActiviteit = {
   naam: string
@@ -88,6 +117,17 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   const [beschikbaarheid, setBeschikbaarheid] = useState<Record<string, number>>(
     (profiel as Record<string, unknown>)?.beschikbaarheid as Record<string, number> ?? defaultBeschikbaarheid
   )
+  // Doordeweeks na werk, in het weekend overdag. Een standaard die voor de
+  // meeste mensen klopt is beter dan een leeg formulier, want een leeg formulier
+  // betekent dat de weerkaart zes uur 's ochtends blijft adviseren.
+  const defaultLooptijden: Looptijden = {
+    ma: { van: 17, tot: 21 }, di: { van: 17, tot: 21 }, wo: { van: 17, tot: 21 },
+    do: { van: 17, tot: 21 }, vr: { van: 17, tot: 21 },
+    za: { van: 9, tot: 18 }, zo: { van: 9, tot: 18 },
+  }
+  const [looptijden, setLooptijden] = useState<Looptijden>(
+    (profiel as Record<string, unknown>)?.looptijden as Looptijden ?? defaultLooptijden
+  )
   const [opbouwtempo, setOpbouwtempo] = useState<'rustig' | 'stabiel' | 'vliegend'>(
     ((profiel as Record<string, unknown>)?.opbouwtempo as 'rustig' | 'stabiel' | 'vliegend') ?? 'stabiel'
   )
@@ -129,6 +169,7 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
     if (!user) { setPlanLaden(false); return }
     await supabase.from('profiles').update({
       beschikbaarheid,
+      looptijden,
       opbouwtempo,
       ziek_geblesseerd: ziekGeblesseerd,
     } as never).eq('id', user.id)
@@ -416,6 +457,52 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
               {Object.values(beschikbaarheid).reduce((a, b) => a + b, 0)}u per week
             </span>
             {' · '}Voor een marathon raden we 4–6u training per week aan.
+          </p>
+        </Card>
+
+        {/* Looptijden */}
+        <Card className="mb-3">
+          <p className="text-sm font-semibold text-white mb-1">🕐 Wanneer kun je lopen?</p>
+          <p className="text-xs text-[#8888a8] mb-4">
+            Hierbinnen zoekt de app het koelste moment van de dag. Zonder deze tijden
+            stuurt hij je op een hete dag naar zes uur &apos;s ochtends — technisch het
+            juiste antwoord, en precies het advies dat je negeert.
+          </p>
+          <div className="flex flex-col gap-2.5">
+            {LOOPDAGEN.map(({ key, label }) => {
+              const v = looptijden[key] ?? { van: 7, tot: 21 }
+              return (
+                <div key={key} className="flex items-center gap-2">
+                  <span className="text-sm text-white w-11 shrink-0">{label}</span>
+                  <UurKeuze
+                    waarde={v.van}
+                    max={v.tot - 1}
+                    onKies={van => setLooptijden(p => ({ ...p, [key]: { ...v, van } }))}
+                  />
+                  <span className="text-[#55556a] text-xs">tot</span>
+                  <UurKeuze
+                    waarde={v.tot}
+                    min={v.van + 1}
+                    onKies={tot => setLooptijden(p => ({ ...p, [key]: { ...v, tot } }))}
+                  />
+                  <button
+                    onClick={() => setLooptijden(p => {
+                      const nieuw = { ...p }
+                      for (const d of LOOPDAGEN) nieuw[d.key] = { ...v }
+                      return nieuw
+                    })}
+                    className="ml-auto text-[10px] text-[#55556a] shrink-0 px-1.5 py-1 rounded-lg active:bg-[#2d2d3e]"
+                    title="Deze tijden voor alle dagen gebruiken"
+                  >
+                    alle
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs text-[#55556a] mt-3 border-t border-[#2d2d3e] pt-3">
+            Past je training niet binnen het venster, dan toont de app gewoon de
+            temperatuur — je gaat dan toch, dus je wilt weten wat je te wachten staat.
           </p>
         </Card>
 
