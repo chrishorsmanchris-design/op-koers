@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
 import type { Goal, Profile, Vacation, PreviousResult, RecurringActivity } from '@/types/database'
-import type { Looptijden } from '@/lib/looptijd'
+import { normaliseerUren, urenTekst, type Looptijden } from '@/lib/looptijd'
 import { cn } from '@/lib/utils'
 import { Plus, Trash2, LogOut, Link } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -38,24 +38,50 @@ const LOOPDAGEN = [
 ] as const
 
 /**
- * Hele uren volstaan. De weersverwachting komt per uur binnen, dus een venster
- * van 17:30 tot 20:45 zou een precisie suggereren die er niet is.
+ * Hele uren volstaan. De weersverwachting komt per uur binnen, dus 17:30 tot
+ * 20:45 zou een precisie suggereren die er niet is.
  */
-function UurKeuze({
-  waarde, onKies, min = 4, max = 23,
-}: { waarde: number; onKies: (uur: number) => void; min?: number; max?: number }) {
-  const opties: number[] = []
-  for (let u = min; u <= max; u++) opties.push(u)
+const ROOSTER_UREN = Array.from({ length: 16 }, (_, i) => i + 6) // 06:00 t/m 21:00
+
+const urenVoorDag = (v: Looptijden[string] | undefined) => normaliseerUren(v) ?? []
+
+/**
+ * Uurblokjes in plaats van een schuifbalk, omdat een werkdag zelden één blok is:
+ * voor werktijd, in de lunchpauze, en 's avonds weer. Vegen werkt ook — dat is
+ * op een telefoon sneller dan zestien keer tikken.
+ */
+function UurRooster({
+  uren, onZet,
+}: { uren: number[]; onZet: (uur: number, aan: boolean) => void }) {
+  const [verf, setVerf] = useState<boolean | null>(null)
+  const stop = () => setVerf(null)
+
   return (
-    <select
-      value={waarde}
-      onChange={e => onKies(Number(e.target.value))}
-      className="bg-[#222230] border border-[#2d2d3e] rounded-xl px-2 py-1.5 text-sm text-white focus:outline-none focus:border-[#f97316] tabular-nums"
-    >
-      {opties.map(u => (
-        <option key={u} value={u}>{String(u).padStart(2, '0')}:00</option>
-      ))}
-    </select>
+    <div className="flex gap-[2px] flex-1" onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop}>
+      {ROOSTER_UREN.map(u => {
+        const aan = uren.includes(u)
+        return (
+          <button
+            key={u}
+            aria-label={`${String(u).padStart(2, '0')}:00`}
+            aria-pressed={aan}
+            onPointerDown={e => {
+              // Zonder dit vangt het eerste blokje alle vingerbewegingen af en
+              // vuurt onPointerEnter nooit op de buren — vegen doet dan niets.
+              e.currentTarget.releasePointerCapture(e.pointerId)
+              const nieuw = !aan
+              setVerf(nieuw)
+              onZet(u, nieuw)
+            }}
+            onPointerEnter={() => { if (verf !== null) onZet(u, verf) }}
+            className={cn(
+              'flex-1 h-7 rounded-md transition-colors touch-none',
+              aan ? 'bg-[#f97316]' : 'bg-[#2d2d3e]'
+            )}
+          />
+        )
+      })}
+    </div>
   )
 }
 
@@ -120,10 +146,11 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   // Doordeweeks na werk, in het weekend overdag. Een standaard die voor de
   // meeste mensen klopt is beter dan een leeg formulier, want een leeg formulier
   // betekent dat de weerkaart zes uur 's ochtends blijft adviseren.
+  const werkdag = [7, 8, 12, 17, 18, 19, 20]
+  const vrijedag = [9, 10, 11, 12, 13, 14, 15, 16, 17]
   const defaultLooptijden: Looptijden = {
-    ma: { van: 17, tot: 21 }, di: { van: 17, tot: 21 }, wo: { van: 17, tot: 21 },
-    do: { van: 17, tot: 21 }, vr: { van: 17, tot: 21 },
-    za: { van: 9, tot: 18 }, zo: { van: 9, tot: 18 },
+    ma: werkdag, di: werkdag, wo: werkdag, do: werkdag, vr: werkdag,
+    za: vrijedag, zo: vrijedag,
   }
   const [looptijden, setLooptijden] = useState<Looptijden>(
     (profiel as Record<string, unknown>)?.looptijden as Looptijden ?? defaultLooptijden
@@ -468,41 +495,58 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             stuurt hij je op een hete dag naar zes uur &apos;s ochtends — technisch het
             juiste antwoord, en precies het advies dat je negeert.
           </p>
-          <div className="flex flex-col gap-2.5">
+          {/* Uurlabels, uitgelijnd met de blokjes eronder. Niet elk uur een cijfer:
+              zestien getallen naast elkaar op een telefoon leest niemand. */}
+          <div className="flex gap-[2px] mb-1 pl-[3.25rem]">
+            {ROOSTER_UREN.map(u => (
+              <span key={u} className="flex-1 text-center text-[9px] text-[#55556a] tabular-nums">
+                {u % 3 === 0 ? u : ''}
+              </span>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             {LOOPDAGEN.map(({ key, label }) => {
-              const v = looptijden[key] ?? { van: 7, tot: 21 }
+              const dagUren = urenVoorDag(looptijden[key])
               return (
-                <div key={key} className="flex items-center gap-2">
-                  <span className="text-sm text-white w-11 shrink-0">{label}</span>
-                  <UurKeuze
-                    waarde={v.van}
-                    max={v.tot - 1}
-                    onKies={van => setLooptijden(p => ({ ...p, [key]: { ...v, van } }))}
-                  />
-                  <span className="text-[#55556a] text-xs">tot</span>
-                  <UurKeuze
-                    waarde={v.tot}
-                    min={v.van + 1}
-                    onKies={tot => setLooptijden(p => ({ ...p, [key]: { ...v, tot } }))}
-                  />
-                  <button
-                    onClick={() => setLooptijden(p => {
-                      const nieuw = { ...p }
-                      for (const d of LOOPDAGEN) nieuw[d.key] = { ...v }
-                      return nieuw
-                    })}
-                    className="ml-auto text-[10px] text-[#55556a] shrink-0 px-1.5 py-1 rounded-lg active:bg-[#2d2d3e]"
-                    title="Deze tijden voor alle dagen gebruiken"
-                  >
-                    alle
-                  </button>
+                <div key={key}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-white w-11 shrink-0">{label}</span>
+                    <UurRooster
+                      uren={dagUren}
+                      onZet={(uur, aan) => setLooptijden(p => {
+                        const huidig = urenVoorDag(p[key])
+                        const nieuw = aan
+                          ? [...new Set([...huidig, uur])].sort((a, b) => a - b)
+                          : huidig.filter(x => x !== uur)
+                        return { ...p, [key]: nieuw }
+                      })}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pl-[3.25rem]">
+                    <span className="text-[10px] text-[#55556a] tabular-nums">
+                      {urenTekst(dagUren)}
+                    </span>
+                    <button
+                      onClick={() => setLooptijden(p => {
+                        const nieuw = { ...p }
+                        for (const d of LOOPDAGEN) nieuw[d.key] = [...dagUren]
+                        return nieuw
+                      })}
+                      className="ml-auto text-[10px] text-[#55556a] px-1.5 rounded active:bg-[#2d2d3e]"
+                      title="Deze uren voor alle dagen gebruiken"
+                    >
+                      alle
+                    </button>
+                  </div>
                 </div>
               )
             })}
           </div>
           <p className="text-xs text-[#55556a] mt-3 border-t border-[#2d2d3e] pt-3">
-            Past je training niet binnen het venster, dan toont de app gewoon de
-            temperatuur — je gaat dan toch, dus je wilt weten wat je te wachten staat.
+            Vegen werkt: houd ingedrukt en sleep over meerdere uren. Past je training
+            nergens binnen, dan toont de app gewoon de temperatuur van je langste vrije
+            blok — je gaat dan toch, dus je wilt weten wat je te wachten staat.
           </p>
         </Card>
 

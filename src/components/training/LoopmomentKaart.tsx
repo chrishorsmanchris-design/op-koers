@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Thermometer, CloudRain, Clock } from 'lucide-react'
 import {
-  beoordeelLooptijd, uurTekst, vensterVoorDatum,
+  beoordeelLooptijd, uurTekst, urenVoorDatum,
   type LooptijdAdvies, type Looptijden, type UurWeer,
 } from '@/lib/looptijd'
 import { cn } from '@/lib/utils'
@@ -62,7 +62,7 @@ export function LoopmomentKaart({ sessie, vandaag, looptijden }: Props) {
         // uur telt nog mee: je kunt over vijf minuten de deur uit.
         const huidigUur = datum === vandaag ? new Date().getHours() : 0
         setNu(uren.find(u => u.uur === huidigUur)?.gevoel ?? null)
-        setAdvies(beoordeelLooptijd(uren, duur, huidigUur, vensterVoorDatum(looptijden, datum)))
+        setAdvies(beoordeelLooptijd(uren, duur, huidigUur, urenVoorDatum(looptijden, datum)))
       })
       .catch(() => {})
 
