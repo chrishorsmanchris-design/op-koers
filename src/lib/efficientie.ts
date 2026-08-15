@@ -23,6 +23,8 @@ export interface EfficientieRun {
   afstand_km: number | null
   duur_minuten: number | null
   hartslag_gem: number | null
+  /** Alleen gevuld bij lange lopen: 'ja' | 'deels' | 'nee'. */
+  getankt?: string | null
 }
 
 export interface EfficientiePunt {
@@ -33,6 +35,7 @@ export interface EfficientiePunt {
   hartslag: number
   /** Seconden per kilometer, voor de leesbaarheid in de kaart. */
   tempoSec: number
+  getankt: string | null
 }
 
 export type EfficientieRichting = 'onbekend' | 'beter' | 'stabiel' | 'slechter' | 'zorg'
@@ -52,6 +55,8 @@ export interface EfficientieAnalyse {
   recentTempoSec: number | null
   basisTempoSec: number | null
   punten: EfficientiePunt[]
+  /** Runs die buiten de vergelijking bleven omdat er niet getankt is. */
+  ongetanktAantal: number
   uitleg: string
   advies: string | null
 }
@@ -110,6 +115,7 @@ function naarPunt(run: EfficientieRun): EfficientiePunt | null {
     afstandKm: afstand,
     hartslag,
     tempoSec: (duur * 60) / afstand,
+    getankt: run.getankt ?? null,
   }
 }
 
@@ -120,11 +126,17 @@ export function analyseerEfficientie(
   const recentVanaf = dagenTerug(vandaag, RECENT_DAGEN)
   const basisVanaf = dagenTerug(vandaag, BASIS_DAGEN)
 
-  const punten = runs
+  const alle = runs
     .map(naarPunt)
     .filter((p): p is EfficientiePunt => p !== null)
     .filter(p => p.datum >= basisVanaf && p.datum <= vandaag)
     .sort((a, b) => a.datum.localeCompare(b.datum))
+
+  // Een lange loop zonder eten of drinken heeft een verhoogde hartslag bij
+  // hetzelfde tempo. Die run meetellen betekent honger meten in plaats van
+  // conditie, dus hij gaat eruit — en de kaart zegt hardop dát hij eruit ging.
+  const ongetanktAantal = alle.filter(p => p.getankt === 'nee').length
+  const punten = alle.filter(p => p.getankt !== 'nee')
 
   const recent = punten.filter(p => p.datum > recentVanaf)
   const basis = punten.filter(p => p.datum <= recentVanaf)
@@ -141,15 +153,20 @@ export function analyseerEfficientie(
     recentTempoSec: recent.length ? Math.round(gemiddelde(recent.map(p => p.tempoSec))!) : null,
     basisTempoSec: basis.length ? Math.round(gemiddelde(basis.map(p => p.tempoSec))!) : null,
     punten,
+    ongetanktAantal,
     advies: null,
   }
+
+  const tankNoot = ongetanktAantal
+    ? ` ${ongetanktAantal} ${ongetanktAantal === 1 ? 'run telt' : 'runs tellen'} niet mee: daar is niet getankt, en dan meet je honger in plaats van conditie.`
+    : ''
 
   if (recent.length < MIN_RUNS || basis.length < MIN_RUNS || !recentIndex || !basisIndex) {
     const tekort = recent.length < MIN_RUNS ? 'de afgelopen vier weken' : 'de weken daarvoor'
     return {
       ...leeg,
       richting: 'onbekend',
-      uitleg: `Nog te weinig rustige duurlopen mét hartslagdata in ${tekort}. Vanaf ${MIN_RUNS} per periode kan de vergelijking gemaakt worden.`,
+      uitleg: `Nog te weinig rustige duurlopen mét hartslagdata in ${tekort}. Vanaf ${MIN_RUNS} per periode kan de vergelijking gemaakt worden.${tankNoot}`,
     }
   }
 
@@ -186,5 +203,5 @@ export function analyseerEfficientie(
     uitleg = `Je hartslag-tempoverhouding is onveranderd. ${feiten}`
   }
 
-  return { ...leeg, richting, veranderingPct, uitleg, advies }
+  return { ...leeg, richting, veranderingPct, uitleg: uitleg + tankNoot, advies }
 }

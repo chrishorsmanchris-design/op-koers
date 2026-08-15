@@ -5,8 +5,20 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import type { TrainingSession } from '@/types/database'
 import { X } from 'lucide-react'
+import { maakTankplan } from '@/lib/tanken'
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
 import { useSheetMaxHeight } from '@/hooks/useSheetMaxHeight'
+
+/**
+ * Alleen bij lange lopen vragen. Bij een sessie van 40 minuten is "heb je
+ * getankt?" zinloos, en een vraag die niets toevoegt kost je het antwoord op de
+ * vragen die dat wel doen.
+ */
+const TANK_OPTIES = [
+  { value: 'ja', label: 'Volgens plan', emoji: '✅' },
+  { value: 'deels', label: 'Deels', emoji: '🤏' },
+  { value: 'nee', label: 'Niets', emoji: '🚫' },
+]
 
 const RATINGS = [
   { value: 'te_zwaar', label: 'Te zwaar', emoji: '😮‍💨', kleur: 'border-red-500 bg-red-500/10 text-red-400' },
@@ -24,7 +36,14 @@ interface Props {
 export function FeedbackModal({ sessie, onSluit }: Props) {
   const supabase = createClient()
   const [rating, setRating] = useState('')
+  const [getankt, setGetankt] = useState('')
   const [notitie, setNotitie] = useState('')
+
+  // Dezelfde drempel als het tankplan op het dashboard, uit dezelfde functie:
+  // anders vraagt de app naar iets waarvoor ze geen advies gaf, of andersom.
+  const vraagTanken =
+    sessie.type === 'hardlopen' &&
+    maakTankplan(sessie.duur_minuten, null)?.niveau === 'tanken'
   const [laden, setLaden] = useState(false)
   const [bevestiging, setBevestiging] = useState<string | null>(null)
 
@@ -38,6 +57,7 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
       session_id: sessie.id,
       user_id: user.id,
       rating: rating as never,
+      getankt: (vraagTanken && getankt ? getankt : null) as never,
       notitie: notitie || null,
     })
 
@@ -98,6 +118,35 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
             </button>
           ))}
         </div>
+
+        {vraagTanken && (
+          <div className="mb-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#55556a] mb-2">
+              Onderweg getankt?
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {TANK_OPTIES.map(o => (
+                <button
+                  key={o.value}
+                  onClick={() => setGetankt(g => (g === o.value ? '' : o.value))}
+                  className={cn(
+                    'flex flex-col items-center gap-1 py-2.5 rounded-2xl border-2 transition-all',
+                    getankt === o.value
+                      ? 'border-[#38bdf8] bg-[#38bdf8]/10 text-[#38bdf8]'
+                      : 'border-[#2d2d3e] text-[#55556a]'
+                  )}
+                >
+                  <span className="text-xl">{o.emoji}</span>
+                  <span className="text-xs font-medium">{o.label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-[#55556a] mt-2 leading-relaxed">
+              Een lege maag verhoogt je hartslag bij hetzelfde tempo. Zonder dit
+              antwoord leest de efficiëntiekaart zo&apos;n run als conditieverlies.
+            </p>
+          </div>
+        )}
 
         <textarea
           value={notitie}

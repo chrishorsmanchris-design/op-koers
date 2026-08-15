@@ -24,6 +24,7 @@ function loopRuns(sessies: any[]): EfficientieRun[] {
         afstand_km: fb?.werkelijke_afstand ?? s.afstand_km,
         duur_minuten: fb?.werkelijke_duur ?? s.duur_minuten,
         hartslag_gem: fb?.hartslag_gem ?? null,
+        getankt: fb?.getankt ?? null,
       }
     })
 }

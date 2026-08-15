@@ -101,6 +101,8 @@ export interface Database {
           session_id: string
           user_id: string
           rating: 'te_zwaar' | 'zwaar' | 'goed' | 'beter_dan_verwacht' | 'topdag'
+          /** Alleen gevraagd bij lange lopen; null betekent "niet van toepassing". */
+          getankt: 'ja' | 'deels' | 'nee' | null
           notitie: string | null
           hartslag_gem: number | null
           hartslag_max: number | null

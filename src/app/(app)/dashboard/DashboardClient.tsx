@@ -16,6 +16,7 @@ import { ConsistencyRing } from '@/components/training/ConsistencyRing'
 import { WeerBadge } from '@/components/training/WeerBadge'
 import { BelastingKaart } from '@/components/training/BelastingKaart'
 import { HerstelKaart } from '@/components/training/HerstelKaart'
+import { TankKaart } from '@/components/training/TankKaart'
 import { SportActiviteitModal } from '@/components/training/SportActiviteitModal'
 import type { BelastingAnalyse } from '@/lib/belasting'
 import type { HerstelAnalyse } from '@/lib/herstel'
@@ -384,6 +385,17 @@ export function DashboardClient({
       .filter(s => s.datum >= weekStart && s.datum <= dagen[6] && s.type !== 'rust' && !s.overgeslagen)
       .sort((a, b) => a.datum.localeCompare(b.datum))
   }, [sessies, weekStart, dagen])
+
+  // De eerstvolgende loop die lang genoeg is om onderweg iets nodig te hebben.
+  // Vooruit kijken en niet terug: een tankplan voor gisteren helpt niemand.
+  const tankSessie = useMemo(() => {
+    return sessies
+      .filter(s =>
+        s.type === 'hardlopen' && !s.voltooid && !s.overgeslagen &&
+        s.datum >= vandaag && (s.duur_minuten ?? 0) >= 60
+      )
+      .sort((a, b) => a.datum.localeCompare(b.datum))[0] ?? null
+  }, [sessies, vandaag])
 
   const aantalGemistDezeWeek = useMemo(() => {
     return sessies.filter(s =>
@@ -922,6 +934,7 @@ export function DashboardClient({
       <div className="mx-4 mb-6 flex flex-col gap-3 empty:hidden">
         <HerstelKaart analyse={herstel} compact />
         <BelastingKaart analyse={belasting} compact />
+        <TankKaart sessie={tankSessie} />
       </div>
 
       {/* ── Coach bericht ────────────────────────────────────────────────────── */}
