@@ -13,7 +13,7 @@ import { FeedbackModal } from '@/components/training/FeedbackModal'
 import { WorkoutModal } from '@/components/training/WorkoutModal'
 import { RaceCountdownHero } from '@/components/training/RaceCountdownHero'
 import { ConsistencyRing } from '@/components/training/ConsistencyRing'
-import { WeerBadge } from '@/components/training/WeerBadge'
+import { LoopmomentKaart } from '@/components/training/LoopmomentKaart'
 import { BelastingKaart } from '@/components/training/BelastingKaart'
 import { HerstelKaart } from '@/components/training/HerstelKaart'
 import { TankKaart } from '@/components/training/TankKaart'
@@ -730,9 +730,19 @@ export function DashboardClient({
                         <span className="text-xs font-semibold text-white">{geselecteerdeSessie.afstand_km} km</span>
                       </div>
                     )}
-                    {geselecteerdeDag === vandaag && !geselecteerdeSessie.voltooid && <WeerBadge />}
                   </div>
                 )}
+
+                {/* Warmte is de enige weersfactor die de training echt verandert,
+                    en twee uur eerder vertrekken is een grotere ingreep dan wat
+                    je ook aan het schema sleutelt. Daarom vóór de sessie, niet
+                    achteraf in een weerbericht. */}
+                {geselecteerdeDag >= vandaag &&
+                  !geselecteerdeSessie.voltooid &&
+                  !geselecteerdeSessie.overgeslagen &&
+                  geselecteerdeSessie.type === 'hardlopen' && (
+                    <LoopmomentKaart sessie={geselecteerdeSessie} vandaag={vandaag} />
+                  )}
               </div>
             </div>
 
