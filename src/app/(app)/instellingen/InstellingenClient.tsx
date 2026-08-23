@@ -1,11 +1,13 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { createClient } from '@/lib/supabase/client'
 import type { Goal, Profile, Vacation, PreviousResult, RecurringActivity } from '@/types/database'
-import { normaliseerUren, urenTekst, type Looptijden } from '@/lib/looptijd'
+import {
+  normaliseerUren, urenTekst, urenBeschikbaar, beschikbaarheidUit, type Looptijden,
+} from '@/lib/looptijd'
 import { cn } from '@/lib/utils'
 import { Plus, Trash2, LogOut, Link } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -51,8 +53,8 @@ const urenVoorDag = (v: Looptijden[string] | undefined) => normaliseerUren(v) ??
  * op een telefoon sneller dan zestien keer tikken.
  */
 function UurRooster({
-  uren, onZet,
-}: { uren: number[]; onZet: (uur: number, aan: boolean) => void }) {
+  uren, onZet, uit = false,
+}: { uren: number[]; onZet: (uur: number, aan: boolean) => void; uit?: boolean }) {
   const [verf, setVerf] = useState<boolean | null>(null)
   const stop = () => setVerf(null)
 
@@ -63,6 +65,7 @@ function UurRooster({
         return (
           <button
             key={u}
+            disabled={uit}
             aria-label={`${String(u).padStart(2, '0')}:00`}
             aria-pressed={aan}
             onPointerDown={e => {
@@ -76,7 +79,7 @@ function UurRooster({
             onPointerEnter={() => { if (verf !== null) onZet(u, verf) }}
             className={cn(
               'flex-1 h-7 rounded-md transition-colors touch-none',
-              aan ? 'bg-[#f97316]' : 'bg-[#2d2d3e]'
+              uit ? 'bg-[#242432] opacity-40' : aan ? 'bg-[#f97316]' : 'bg-[#2d2d3e]'
             )}
           />
         )
@@ -140,22 +143,45 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
   } | null>(null)
   const [diagnoseLaden, setDiagnoseLaden] = useState(false)
 
-  const defaultBeschikbaarheid = { ma: 2, di: 0, wo: 2, do: 3, vr: 2, za: 3, zo: 0 }
-  const [beschikbaarheid, setBeschikbaarheid] = useState<Record<string, number>>(
-    (profiel as Record<string, unknown>)?.beschikbaarheid as Record<string, number> ?? defaultBeschikbaarheid
-  )
   // Doordeweeks na werk, in het weekend overdag. Een standaard die voor de
   // meeste mensen klopt is beter dan een leeg formulier, want een leeg formulier
   // betekent dat de weerkaart zes uur 's ochtends blijft adviseren.
   const werkdag = [7, 8, 12, 17, 18, 19, 20]
   const vrijedag = [9, 10, 11, 12, 13, 14, 15, 16, 17]
-  const defaultLooptijden: Looptijden = {
-    ma: werkdag, di: werkdag, wo: werkdag, do: werkdag, vr: werkdag,
-    za: vrijedag, zo: vrijedag,
-  }
+
+  /**
+   * Heeft dit profiel nog geen uurrooster, dan bouwen we er een uit het oude
+   * beschikbaarheidsveld. Alleen het onderscheid dat daarin zat is te redden —
+   * welke dagen op nul stonden — maar dat is precies het onderscheid dat de
+   * gebruiker bewust heeft gemaakt. Een standaardrooster dat zeven dagen
+   * aanvinkt zou zijn rustdagen stilletjes ongedaan maken.
+   */
+  const oudeBeschikbaarheid =
+    (profiel as Record<string, unknown>)?.beschikbaarheid as Record<string, number> | null
+  const defaultLooptijden: Looptijden = Object.fromEntries(
+    LOOPDAGEN.map(({ key }) => {
+      const basis = key === 'za' || key === 'zo' ? vrijedag : werkdag
+      const oud = oudeBeschikbaarheid?.[key]
+      return [key, oud !== undefined && oud <= 0 ? [] : basis]
+    })
+  )
   const [looptijden, setLooptijden] = useState<Looptijden>(
     (profiel as Record<string, unknown>)?.looptijden as Looptijden ?? defaultLooptijden
   )
+
+  /**
+   * Wat er stond voordat een dag werd uitgezet, zodat "kan wel" het rooster
+   * teruggeeft in plaats van een leeg raster om opnieuw in te tikken.
+   */
+  const onthouden = useRef<Record<string, number[]>>({})
+
+  /**
+   * Afgeleid, geen apart veld meer. Het stond eerst los naast het uurrooster en
+   * dat was dubbelop: wie invult dat hij maandagavond van vijf tot negen vrij is,
+   * heeft daarmee al gezegd hoeveel uur erin past. Twee velden konden elkaar ook
+   * tegenspreken — drie uur beschikbaar op een dag zonder één vrij uur.
+   */
+  const beschikbaarheid = useMemo(() => beschikbaarheidUit(looptijden), [looptijden])
   const [opbouwtempo, setOpbouwtempo] = useState<'rustig' | 'stabiel' | 'vliegend'>(
     ((profiel as Record<string, unknown>)?.opbouwtempo as 'rustig' | 'stabiel' | 'vliegend') ?? 'stabiel'
   )
@@ -450,57 +476,14 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
           </div>
         </Card>
 
-        {/* Beschikbaarheid */}
-        <Card className="mb-3">
-          <p className="text-sm font-semibold text-white mb-1">📅 Beschikbaarheid</p>
-          <p className="text-xs text-[#8888a8] mb-4">
-            Hoeveel tijd heb je per dag beschikbaar om te trainen?
-          </p>
-          <div className="flex flex-col gap-3">
-            {([
-              { key: 'ma', label: 'Maandag' },
-              { key: 'di', label: 'Dinsdag' },
-              { key: 'wo', label: 'Woensdag' },
-              { key: 'do', label: 'Donderdag' },
-              { key: 'vr', label: 'Vrijdag' },
-              { key: 'za', label: 'Zaterdag' },
-              { key: 'zo', label: 'Zondag' },
-            ] as const).map(({ key, label }) => {
-              const val = beschikbaarheid[key] ?? 0
-              return (
-                <div key={key} className="flex items-center gap-3">
-                  <span className="text-sm text-white w-20 shrink-0">{label}</span>
-                  <input
-                    type="range" min={0} max={4} step={0.5}
-                    value={val}
-                    onChange={e => setBeschikbaarheid(prev => ({ ...prev, [key]: parseFloat(e.target.value) }))}
-                    className="flex-1 accent-[#f97316]"
-                  />
-                  <span className={cn(
-                    'text-sm font-semibold w-10 text-right shrink-0',
-                    val === 0 ? 'text-[#55556a]' : 'text-[#f97316]'
-                  )}>
-                    {val === 0 ? '—' : `${val}u`}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-          <p className="text-xs text-[#55556a] mt-3 border-t border-[#2d2d3e] pt-3">
-            Totaal: <span className="font-semibold text-white">
-              {Object.values(beschikbaarheid).reduce((a, b) => a + b, 0)}u per week
-            </span>
-            {' · '}Voor een marathon raden we 4–6u training per week aan.
-          </p>
-        </Card>
-
-        {/* Looptijden */}
+        {/* Beschikbaarheid — één rooster, geen los urenveld ernaast. */}
         <Card className="mb-3">
           <p className="text-sm font-semibold text-white mb-1">🕐 Wanneer kun je lopen?</p>
           <p className="text-xs text-[#8888a8] mb-4">
-            Hierbinnen zoekt de app het koelste moment van de dag. Zonder deze tijden
-            stuurt hij je op een hete dag naar zes uur &apos;s ochtends — technisch het
-            juiste antwoord, en precies het advies dat je negeert.
+            Zet de uren aan waarop je vrij bent. Daaruit volgt allebei: op welke dagen
+            de app traint, en waar hij binnen die dag het koelste moment zoekt. Zonder
+            deze tijden stuurt hij je op een hete dag naar zes uur &apos;s ochtends —
+            technisch het juiste antwoord, en precies het advies dat je negeert.
           </p>
           {/* Uurlabels, uitgelijnd met de blokjes eronder. Niet elk uur een cijfer:
               zestien getallen naast elkaar op een telefoon leest niemand. */}
@@ -515,12 +498,20 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
           <div className="flex flex-col gap-1.5">
             {LOOPDAGEN.map(({ key, label }) => {
               const dagUren = urenVoorDag(looptijden[key])
+              const vrijeDag = dagUren.length === 0
+              const uren = urenBeschikbaar(dagUren)
               return (
                 <div key={key}>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-white w-11 shrink-0">{label}</span>
+                    <span className={cn(
+                      'text-xs w-11 shrink-0',
+                      vrijeDag ? 'text-[#55556a]' : 'text-white'
+                    )}>
+                      {label}
+                    </span>
                     <UurRooster
                       uren={dagUren}
+                      uit={vrijeDag}
                       onZet={(uur, aan) => setLooptijden(p => {
                         const huidig = urenVoorDag(p[key])
                         const nieuw = aan
@@ -532,15 +523,36 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
                   </div>
                   <div className="flex items-center gap-2 pl-[3.25rem]">
                     <span className="text-[10px] text-[#55556a] tabular-nums">
-                      {urenTekst(dagUren)}
+                      {vrijeDag
+                        ? 'rustdag'
+                        : `${urenTekst(dagUren)} · plek voor ${uren}u`}
                     </span>
+                    {/* Een hele dag uitzetten en weer aan, zonder zestien blokjes
+                        aan te tikken. Bij het aanzetten komt terug wat er stond;
+                        wie de dag per ongeluk wist raakt zijn rooster niet kwijt. */}
+                    <button
+                      onClick={() => setLooptijden(p => {
+                        const huidig = urenVoorDag(p[key])
+                        if (huidig.length > 0) {
+                          onthouden.current[key] = huidig
+                          return { ...p, [key]: [] }
+                        }
+                        return { ...p, [key]: onthouden.current[key] ?? werkdag }
+                      })}
+                      className={cn(
+                        'ml-auto text-[10px] px-1.5 py-0.5 rounded active:bg-[#2d2d3e]',
+                        vrijeDag ? 'text-[#f97316]' : 'text-[#55556a]'
+                      )}
+                    >
+                      {vrijeDag ? 'kan wel' : 'kan niet'}
+                    </button>
                     <button
                       onClick={() => setLooptijden(p => {
                         const nieuw = { ...p }
                         for (const d of LOOPDAGEN) nieuw[d.key] = [...dagUren]
                         return nieuw
                       })}
-                      className="ml-auto text-[10px] text-[#55556a] px-1.5 rounded active:bg-[#2d2d3e]"
+                      className="text-[10px] text-[#55556a] px-1.5 py-0.5 rounded active:bg-[#2d2d3e]"
                       title="Deze uren voor alle dagen gebruiken"
                     >
                       alle
@@ -551,9 +563,14 @@ export function InstellingenClient({ profiel, doelen, vakanties: initVakanties, 
             })}
           </div>
           <p className="text-xs text-[#55556a] mt-3 border-t border-[#2d2d3e] pt-3">
-            Vegen werkt: houd ingedrukt en sleep over meerdere uren. Past je training
-            nergens binnen, dan toont de app gewoon de temperatuur van je langste vrije
-            blok — je gaat dan toch, dus je wilt weten wat je te wachten staat.
+            Totaal: <span className="font-semibold text-white">
+              {Object.values(beschikbaarheid).reduce((a, b) => a + b, 0)}u per week
+            </span>
+            {' · '}Voor een marathon raden we 4–6u training per week aan.
+            <br />
+            Vegen werkt: houd ingedrukt en sleep over meerdere uren. &quot;Plek voor&quot; is je
+            langste aaneengesloten blok, niet het totaal — drie losse uren over de dag
+            verspreid zijn geen duurloop van drie uur.
           </p>
         </Card>
 

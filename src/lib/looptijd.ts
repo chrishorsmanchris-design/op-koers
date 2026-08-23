@@ -83,7 +83,7 @@ export function urenTekst(uren: number[]): string {
 }
 
 /** De langste aaneengesloten reeks vrije uren, voor als de sessie nergens past. */
-function langsteBlok(toegestaan: number[]): number[] {
+export function langsteBlok(toegestaan: number[]): number[] {
   let beste: number[] = []
   let huidig: number[] = []
   for (const u of toegestaan) {
@@ -92,6 +92,37 @@ function langsteBlok(toegestaan: number[]): number[] {
     if (huidig.length > beste.length) beste = [...huidig]
   }
   return beste
+}
+
+/**
+ * Langer dan dit plant niemand vanuit een instellingenscherm. Een vrije zaterdag
+ * van 09:00 tot 17:00 is acht aaneengesloten uren, maar "acht uur beschikbaar"
+ * doorgeven aan de planner nodigt uit tot een sessie die niemand wil lopen.
+ */
+const MAX_SESSIE_UREN = 4
+
+/**
+ * Hoeveel uur je op een dag kunt trainen, afgeleid uit wélke uren je vrij bent.
+ *
+ * Dit stond eerst als los veld naast het uurrooster, en dat was dubbelop: wie
+ * invult dat hij maandag van 17:00 tot 21:00 vrij is, heeft daarmee al gezegd
+ * dat er vier uur in past. Erger nog, de twee konden elkaar tegenspreken — drie
+ * uur beschikbaar op een dag zonder één vrij uur.
+ *
+ * Bewust het lángste aaneengesloten blok en niet het totaal. Wie 's ochtends een
+ * uur heeft, in de lunchpauze een uur en 's avonds twee, heeft geen vier uur voor
+ * een duurloop; hij heeft er twee. Het totaal zou hier een sessie plannen die
+ * nergens past.
+ */
+export function urenBeschikbaar(uren: number[]): number {
+  return Math.min(MAX_SESSIE_UREN, langsteBlok([...uren].sort((a, b) => a - b)).length)
+}
+
+/** De hele week ineens, in de vorm die de planner en het AI-schema verwachten. */
+export function beschikbaarheidUit(looptijden: Looptijden): Record<string, number> {
+  const uit: Record<string, number> = {}
+  for (const dag of DAGSLEUTELS) uit[dag] = urenBeschikbaar(normaliseerUren(looptijden[dag]) ?? [])
+  return uit
 }
 
 /** Onder dit verschil tussen het beste en slechtste moment valt er niets te kiezen. */
