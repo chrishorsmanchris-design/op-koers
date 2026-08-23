@@ -948,7 +948,7 @@ export function DashboardClient({
       <div className="mx-4 mb-6 flex flex-col gap-3 empty:hidden">
         <HerstelKaart analyse={herstel} compact />
         <BelastingKaart analyse={belasting} compact />
-        <TankKaart sessie={tankSessie} />
+        <TankKaart sessie={tankSessie} gewichtKg={profiel?.gewicht_kg ?? null} />
       </div>
 
       {/* ── Coach bericht ────────────────────────────────────────────────────── */}

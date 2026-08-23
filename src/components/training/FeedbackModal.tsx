@@ -41,9 +41,11 @@ export function FeedbackModal({ sessie, onSluit }: Props) {
 
   // Dezelfde drempel als het tankplan op het dashboard, uit dezelfde functie:
   // anders vraagt de app naar iets waarvoor ze geen advies gaf, of andersom.
+  const niveau = maakTankplan({
+    duurMin: sessie.duur_minuten, tempC: null, gewichtKg: null,
+  })?.niveau
   const vraagTanken =
-    sessie.type === 'hardlopen' &&
-    maakTankplan(sessie.duur_minuten, null)?.niveau === 'tanken'
+    sessie.type === 'hardlopen' && (niveau === 'lang' || niveau === 'ultra')
   const [laden, setLaden] = useState(false)
   const [bevestiging, setBevestiging] = useState<string | null>(null)
 

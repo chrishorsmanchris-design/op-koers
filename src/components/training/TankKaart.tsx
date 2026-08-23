@@ -1,11 +1,13 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { maakTankplan, tijdTekst, type Tankplan } from '@/lib/tanken'
-import { Droplets, Zap, ChevronDown } from 'lucide-react'
+import { maakTankplan, tijdTekst, bereikTekst } from '@/lib/tanken'
+import { Droplets, Zap, ChevronDown, Beaker } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Props {
   sessie: { datum: string; beschrijving: string; duur_minuten: number | null } | null
+  /** Zonder gewicht blijft het plan staan, maar dan in gram per kilo in plaats van gram. */
+  gewichtKg?: number | null
 }
 
 /**
@@ -16,7 +18,7 @@ interface Props {
 const LAT = 52.3676
 const LON = 4.9041
 
-export function TankKaart({ sessie }: Props) {
+export function TankKaart({ sessie, gewichtKg = null }: Props) {
   const [tempC, setTempC] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
 
@@ -46,14 +48,16 @@ export function TankKaart({ sessie }: Props) {
 
   if (!sessie) return null
 
-  const plan = maakTankplan(sessie.duur_minuten, tempC)
+  const plan = maakTankplan({ duurMin: sessie.duur_minuten, tempC, gewichtKg })
   if (!plan) return null
+
+  const tankt = plan.koolhydratenPerUur !== null
 
   return (
     <div className="bg-[#1b1b27] rounded-3xl border border-[#2d2d3e] p-4">
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs font-bold uppercase tracking-widest text-[#38bdf8]">
-          {plan.niveau === 'tanken' ? 'Tankplan' : 'Drinkplan'}
+          {tankt ? 'Tankplan' : 'Drinkplan'}
         </p>
         <p className="text-[10px] text-[#55556a]">
           {sessie.beschrijving} · {tijdTekst(plan.duurMin)}
@@ -61,26 +65,36 @@ export function TankKaart({ sessie }: Props) {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 mb-3">
+      <div className="grid grid-cols-2 gap-2 mb-2">
         <Vak
           icon={<Droplets size={14} className="text-[#38bdf8]" />}
-          waarde={`${plan.vochtTotaalMl[0]}–${plan.vochtTotaalMl[1]} ml`}
-          label={`${plan.vochtPerUur[0]}–${plan.vochtPerUur[1]} ml per uur`}
+          waarde={bereikTekst(plan.vochtTotaal, 'ml')}
+          label={`${bereikTekst(plan.vochtPerUur, 'ml')} per uur`}
         />
-        {plan.niveau === 'tanken' ? (
+        {tankt && plan.koolhydratenTotaal ? (
           <Vak
             icon={<Zap size={14} className="text-[#f97316]" />}
-            waarde={`${plan.gels} gels`}
-            label={`${plan.koolhydratenGram} g · ${plan.koolhydratenPerUur} g per uur`}
+            waarde={`${plan.gelsOngeveer} gels`}
+            label={`${bereikTekst(plan.koolhydratenTotaal, 'g')} · ${bereikTekst(plan.koolhydratenPerUur!, 'g')} per uur`}
           />
         ) : (
           <Vak
             icon={<Zap size={14} className="text-[#55556a]" />}
-            waarde="Niets nodig"
-            label="Onder 90 minuten"
+            waarde="Weinig nodig"
+            label="Onder 75 minuten is een slok sportdrank genoeg"
           />
         )}
       </div>
+
+      {plan.natriumMgPerUur !== null && (
+        <div className="mb-3">
+          <Vak
+            icon={<Beaker size={14} className="text-[#38bdf8]" />}
+            waarde={`${plan.natriumMgPerUur} mg natrium per uur`}
+            label="Uit sportdrank, zouttabletten of hartige koek"
+          />
+        </div>
+      )}
 
       {plan.momenten.length > 0 && (
         <div className="flex items-center gap-1.5 mb-3 flex-wrap">
@@ -96,9 +110,9 @@ export function TankKaart({ sessie }: Props) {
         </div>
       )}
 
-      {plan.waarschuwing && (
-        <p className="text-xs text-amber-400 leading-relaxed mb-2">{plan.waarschuwing}</p>
-      )}
+      {plan.waarschuwingen.map((w, i) => (
+        <p key={i} className="text-xs text-amber-400 leading-relaxed mb-2">{w}</p>
+      ))}
 
       <button
         onClick={() => setOpen(o => !o)}
@@ -110,15 +124,26 @@ export function TankKaart({ sessie }: Props) {
 
       {open && (
         <div className="mt-2 space-y-2">
-          <p className="text-xs text-[#8888a8] leading-relaxed">{plan.vooraf}</p>
-          <p className="text-xs text-[#8888a8] leading-relaxed">{plan.achteraf}</p>
+          <Blok titel="Vooraf" tekst={plan.vooraf.tekst} />
+          <Blok titel="Achteraf" tekst={plan.achteraf.tekst} />
           <p className="text-[10px] text-[#55556a] leading-relaxed">
             Bereiken, geen doelen: wat je maag verdraagt verschilt per persoon. Begin
             onderaan en bouw op. Dit is óók waarom je in training tankt en niet pas op
-            de wedstrijddag — je darmen moeten het leren.
+            de wedstrijddag — je darmen moeten het leren. Getallen volgen de position
+            stand van ACSM, de Academy of Nutrition and Dietetics en Dietitians of
+            Canada (2016).
           </p>
         </div>
       )}
+    </div>
+  )
+}
+
+function Blok({ titel, tekst }: { titel: string; tekst: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[#55556a] mb-0.5">{titel}</p>
+      <p className="text-xs text-[#8888a8] leading-relaxed">{tekst}</p>
     </div>
   )
 }

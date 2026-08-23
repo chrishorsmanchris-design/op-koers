@@ -28,8 +28,14 @@ export interface Database {
           opbouwtempo: 'rustig' | 'stabiel' | 'vliegend' | null
           ziek_geblesseerd: boolean | null
           health_token: string | null
-          /** Per weekdag het uurvenster waarin je kunt lopen, bv. { ma: { van: 17, tot: 21 } }. */
-          looptijden: Record<string, { van: number; tot: number }> | null
+          /**
+           * Per weekdag de losse uren waarop je kunt lopen, bv. { ma: [7, 12, 18, 19] }.
+           * De oude van-tot-vorm staat er nog in omdat rijen van vóór die wijziging
+           * niet gemigreerd zijn; normaliseerUren() in lib/looptijd.ts vangt beide af.
+           */
+          looptijden: Record<string, number[] | { van: number; tot: number }> | null
+          /** Nodig om het tankplan in gram en milliliter uit te rekenen in plaats van per kilo. */
+          gewicht_kg: number | null
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
