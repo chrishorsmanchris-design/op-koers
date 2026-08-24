@@ -20,6 +20,7 @@ import { TankKaart } from '@/components/training/TankKaart'
 import { SportActiviteitModal } from '@/components/training/SportActiviteitModal'
 import type { BelastingAnalyse } from '@/lib/belasting'
 import type { HerstelAnalyse } from '@/lib/herstel'
+import type { RustAdvies } from '@/lib/rustadvies'
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
 import { useSheetMaxHeight } from '@/hooks/useSheetMaxHeight'
 
@@ -35,6 +36,7 @@ interface Props {
   activiteiten: RecurringActivity[]
   belasting: BelastingAnalyse
   herstel: HerstelAnalyse
+  rustAdvies: RustAdvies
 }
 
 // ── Kleur per trainingstype/intensiteit ───────────────────────────────────────
@@ -280,7 +282,7 @@ function RunLogSheet({
 // ── Hoofdcomponent ─────────────────────────────────────────────────────────────
 export function DashboardClient({
   profiel, sessies: initSessies, alleSessies, fysioOefeningen,
-  fysioSessies, doel, vandaag, weekStart, activiteiten, belasting, herstel,
+  fysioSessies, doel, vandaag, weekStart, activiteiten, belasting, herstel, rustAdvies,
 }: Props) {
   const supabase = createClient()
   const router = useRouter()
@@ -429,6 +431,31 @@ export function DashboardClient({
       setPlanAangepast(data.uitleg)
       setTimeout(() => setPlanAangepast(null), 5000)
     }
+  }
+
+  /**
+   * Verzacht de training van vandaag tot een herstelloop. Bewust géén automaat:
+   * het schema wordt alleen aangepast als je er zelf op tikt. De afstand schalen
+   * we mee op het nieuwe, lagere tempo — anders staat er een herstelloop van 40
+   * minuten met de kilometers van een duurloop erbij.
+   */
+  async function sessieVerzachten(sessie: TrainingSession) {
+    const duur = Math.min(sessie.duur_minuten ?? 40, 40)
+    const afstand = sessie.afstand_km && sessie.duur_minuten
+      ? Math.round((sessie.afstand_km / sessie.duur_minuten) * duur * 0.85 * 10) / 10
+      : null
+
+    const wijziging = {
+      intensiteit: 'herstel' as const,
+      duur_minuten: duur,
+      afstand_km: afstand,
+      beschrijving: `Herstelloop ${duur} min in H — verzacht na een zware dag`,
+    }
+
+    await supabase.from('training_sessions').update(wijziging as never).eq('id', sessie.id)
+    setSessies(prev => prev.map(s => s.id === sessie.id ? { ...s, ...wijziging } : s))
+    setPlanAangepast('Training omgezet naar een herstelloop.')
+    setTimeout(() => setPlanAangepast(null), 5000)
   }
 
   async function sessieVerplaatsen(id: string, nieuwDatum: string) {
@@ -732,6 +759,64 @@ export function DashboardClient({
                     )}
                   </div>
                 )}
+
+                {/* Het schema is weken geleden gemaakt en weet niet wat je gisteren
+                    écht gelopen hebt. Deze melding wel. Hij staat bewust ín de
+                    kaart en niet ergens onderaan: de vraag "moet ik vandaag
+                    rennen?" wordt hier beantwoord, dus hier hoort het antwoord. */}
+                {geselecteerdeDag === vandaag &&
+                  rustAdvies.niveau !== 'geen' &&
+                  !geselecteerdeSessie.voltooid &&
+                  !geselecteerdeSessie.overgeslagen && (
+                    <div className={cn(
+                      'mt-3 rounded-xl border p-3',
+                      rustAdvies.niveau === 'rust'
+                        ? 'bg-red-950/50 border-red-900/70'
+                        : 'bg-amber-950/50 border-amber-900/70'
+                    )}>
+                      <div className="flex items-start gap-2">
+                        <span className="text-sm shrink-0 leading-none mt-0.5">
+                          {rustAdvies.niveau === 'rust' ? '🛑' : '⚠️'}
+                        </span>
+                        <div className="min-w-0">
+                          <p className={cn(
+                            'text-xs font-bold',
+                            rustAdvies.niveau === 'rust' ? 'text-red-400' : 'text-amber-400'
+                          )}>
+                            {rustAdvies.kop}
+                          </p>
+                          <p className={cn(
+                            'text-xs mt-1 leading-relaxed',
+                            rustAdvies.niveau === 'rust' ? 'text-red-300/80' : 'text-amber-300/80'
+                          )}>
+                            {rustAdvies.uitleg}
+                          </p>
+                          {rustAdvies.alternatief && (
+                            <p className={cn(
+                              'text-xs mt-1.5 font-semibold',
+                              rustAdvies.niveau === 'rust' ? 'text-red-300' : 'text-amber-300'
+                            )}>
+                              {rustAdvies.alternatief}
+                            </p>
+                          )}
+                          {geselecteerdeSessie.type === 'hardlopen' && (
+                            <div className="flex flex-wrap gap-2 mt-2.5">
+                              <button
+                                onClick={() => sessieVerzachten(geselecteerdeSessie)}
+                                className="px-2.5 py-1.5 rounded-lg bg-[#222230] border border-[#3d3d50] text-xs font-semibold text-white active:bg-[#2d2d3e] transition-colors">
+                                Maak er een herstelloop van
+                              </button>
+                              <button
+                                onClick={() => setVerplaatsenSessie(geselecteerdeSessie)}
+                                className="px-2.5 py-1.5 rounded-lg bg-[#222230] border border-[#3d3d50] text-xs font-semibold text-[#8888a8] active:bg-[#2d2d3e] transition-colors">
+                                Verplaatsen
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                 {/* Warmte is de enige weersfactor die de training echt verandert,
                     en twee uur eerder vertrekken is een grotere ingreep dan wat

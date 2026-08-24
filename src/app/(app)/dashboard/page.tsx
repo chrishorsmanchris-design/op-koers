@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
 import { analyseerBelasting } from '@/lib/belasting'
 import { analyseerHerstel } from '@/lib/herstel'
+import { bepaalRustAdvies } from '@/lib/rustadvies'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -90,6 +91,29 @@ export default async function DashboardPage() {
     redirect('/onboarding')
   }
 
+  // De training van vandaag naast wat er de afgelopen dagen écht gebeurd is.
+  // Bewust op de server: dezelfde 28-daagse historie die de belastinganalyse
+  // toch al ophaalt, dus dit kost geen extra query.
+  const geplandVandaag = (sessies ?? []).find(s => {
+    const r = s as Record<string, unknown>
+    return r.datum === vandaagStr && r.type !== 'rust' && r.type !== 'core' && !r.overgeslagen
+  }) as Record<string, unknown> | undefined
+
+  const rustAdvies = bepaalRustAdvies({
+    vandaag: vandaagStr,
+    gepland: geplandVandaag
+      ? {
+          type: geplandVandaag.type as string,
+          intensiteit: geplandVandaag.intensiteit as string | null,
+          duur_minuten: geplandVandaag.duur_minuten as number | null,
+          afstand_km: geplandVandaag.afstand_km as number | null,
+        }
+      : null,
+    geplandVoltooid: !!geplandVandaag?.voltooid,
+    sessies: belastingSessies ?? [],
+    sporten: sportActiviteiten ?? [],
+  })
+
   return (
     <DashboardClient
       profiel={profiel}
@@ -103,6 +127,7 @@ export default async function DashboardPage() {
       activiteiten={activiteiten ?? []}
       belasting={analyseerBelasting(belastingSessies ?? [], sportActiviteiten ?? [], vandaagStr)}
       herstel={analyseerHerstel(herstelMetingen ?? [], vandaagStr)}
+      rustAdvies={rustAdvies}
     />
   )
 }

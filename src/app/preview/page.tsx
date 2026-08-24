@@ -1,8 +1,14 @@
 import { DashboardClient } from '@/app/(app)/dashboard/DashboardClient'
 import { analyseerBelasting } from '@/lib/belasting'
 import { analyseerHerstel } from '@/lib/herstel'
+import { bepaalRustAdvies } from '@/lib/rustadvies'
 
 const vandaag = new Date().toISOString().split('T')[0]
+const gisteren = (() => {
+  const dt = new Date(vandaag + 'T12:00:00')
+  dt.setDate(dt.getDate() - 1)
+  return dt.toISOString().split('T')[0]
+})()
 const weekStart = (() => {
   const d = new Date()
   const dow = d.getDay()
@@ -17,7 +23,10 @@ const d = (offset: number) => {
 }
 
 const mockSessies = [
-  { id: '1', datum: d(0), type: 'hardlopen', intensiteit: 'makkelijk', beschrijving: 'Duurloop rustig tempo', duur_minuten: 50, afstand_km: 8, voltooid: true, overgeslagen: false, week_nummer: 8, session_feedback: [], user_id: 'x', created_at: '', goal_id: null },
+  // Gisteren de lange duurloop gelopen — de aanleiding voor het rustadvies
+  // hieronder. Bewust op `gisteren` en niet op d(0): anders valt hij op maandag
+  // samen met de training van vandaag en is de melding niet te zien.
+  { id: '1', datum: gisteren, type: 'hardlopen', intensiteit: 'makkelijk', beschrijving: 'Lange duurloop 25,5 km', duur_minuten: 150, afstand_km: 25.5, voltooid: true, overgeslagen: false, week_nummer: 7, session_feedback: [], user_id: 'x', created_at: '', goal_id: null },
   { id: '2', datum: vandaag, type: 'hardlopen', intensiteit: 'interval', beschrijving: 'Intervaltraining 8×800m op 10K-tempo', duur_minuten: 65, afstand_km: 12, voltooid: false, overgeslagen: false, week_nummer: 8, session_feedback: [], user_id: 'x', created_at: '', goal_id: null },
   { id: '3', datum: d(3), type: 'hardlopen', intensiteit: 'gemiddeld', beschrijving: 'Tempoduurloop 6 km', duur_minuten: 35, afstand_km: 6, voltooid: false, overgeslagen: false, week_nummer: 8, session_feedback: [], user_id: 'x', created_at: '', goal_id: null },
   { id: '4', datum: d(5), type: 'hardlopen', intensiteit: 'zwaar', beschrijving: 'Lange duurloop 18 km', duur_minuten: 105, afstand_km: 18, voltooid: false, overgeslagen: false, week_nummer: 8, session_feedback: [], user_id: 'x', created_at: '', goal_id: null },
@@ -79,6 +88,17 @@ export default function PreviewPage() {
           }),
           vandaag,
         )}
+        // Het scenario waar dit allemaal om begonnen is: gisteren een lange
+        // duurloop gelopen, vandaag staat er een interval gepland.
+        rustAdvies={bepaalRustAdvies({
+          vandaag,
+          gepland: { type: 'hardlopen', intensiteit: 'interval', duur_minuten: 65, afstand_km: 12 },
+          sessies: [{
+            datum: gisteren, type: 'hardlopen', duur_minuten: 150,
+            afstand_km: 25.5, intensiteit: 'makkelijk', voltooid: true,
+          }],
+          sporten: [],
+        })}
       />
     </div>
   )

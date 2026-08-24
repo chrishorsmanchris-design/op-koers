@@ -10,6 +10,8 @@ export type PdfSessie = {
   beschrijving: string
   duur_minuten: number | null
   afstand_km: number | null
+  /** Wedstrijden: nooit automatisch inkorten of terugschalen. */
+  beschermd?: boolean
 }
 
 export const PDF_PLAN: PdfSessie[][] = [
@@ -81,7 +83,7 @@ export const PDF_PLAN: PdfSessie[][] = [
     { dag: 3, type: 'hardlopen', intensiteit: 'makkelijk',  beschrijving: 'Duurloop 75 min in D1',                                                duur_minuten: 75,  afstand_km: 12.8 },
     { dag: 4, type: 'rust',      intensiteit: 'herstel',    beschrijving: 'Rust – geen training',                                                 duur_minuten: null, afstand_km: null },
     { dag: 5, type: 'rust',      intensiteit: 'herstel',    beschrijving: 'Rust – geen training',                                                 duur_minuten: null, afstand_km: null },
-    { dag: 6, type: 'hardlopen', intensiteit: 'gemiddeld',  beschrijving: 'Wedstrijd 15 km in D2-D3 – zoek een leuke lokale wedstrijd',           duur_minuten: 75,  afstand_km: 15.0 },
+    { dag: 6, type: 'hardlopen', intensiteit: 'gemiddeld',  beschrijving: 'Wedstrijd 15 km in D2-D3 – zoek een leuke lokale wedstrijd',           duur_minuten: 75,  afstand_km: 15.0, beschermd: true },
   ],
   // Week 8
   [
@@ -151,6 +153,6 @@ export const PDF_PLAN: PdfSessie[][] = [
     { dag: 3, type: 'hardlopen', intensiteit: 'makkelijk',  beschrijving: 'Activering: 25 min D1 + 5 min D2 + 10 min D1',                         duur_minuten: 40,  afstand_km: 6.8 },
     { dag: 4, type: 'rust',      intensiteit: 'herstel',    beschrijving: 'Rust – geen training',                                                 duur_minuten: null, afstand_km: null },
     { dag: 5, type: 'hardlopen', intensiteit: 'herstel',    beschrijving: 'Activering: 30 min D1 met 3 × 20 sec versnelling (80-90%) – rek daarna je spieren', duur_minuten: 30, afstand_km: 5.1 },
-    { dag: 6, type: 'hardlopen', intensiteit: 'zwaar',      beschrijving: '🏁 MARATHON – geef alles, je hebt 21 weken keihard getraind!',          duur_minuten: 195, afstand_km: 42.2 },
+    { dag: 6, type: 'hardlopen', intensiteit: 'zwaar',      beschrijving: '🏁 MARATHON – geef alles, je hebt 21 weken keihard getraind!',          duur_minuten: 195, afstand_km: 42.2, beschermd: true },
   ],
 ]
