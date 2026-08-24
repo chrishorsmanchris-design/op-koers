@@ -22,8 +22,21 @@
 
 /** Riegel-exponent. 1,06 is de klassieke waarde uit het oorspronkelijke artikel. */
 const RIEGEL_EXPONENT = 1.06
-/** Onder deze afstand is een run te kort om betrouwbaar naar 42 km te vertalen. */
-const MIN_AFSTAND_KM = 5
+/**
+ * Vanaf welke afstand een run bruikbaar is om naar 42 km te vertalen.
+ *
+ * Riegel is een machtsfunctie zonder bovengrens: hoe verder je extrapoleert, hoe
+ * meer de formule je vleit. Een 5 km doorrekenen naar 42 km is ruim acht keer de
+ * afstand, en alles wat de laatste twee uur van een marathon zwaar maakt —
+ * leeggelopen glycogeen, spierschade, warmte — zit niet in die som. Vanaf 10 km
+ * is de sprong nog te overzien.
+ */
+const MIN_AFSTAND_KM = 10
+/**
+ * Wie nog geen 10 km gelopen heeft krijgt liever een voorspelling met een
+ * kanttekening dan helemaal niets — maar dan wel met die kanttekening erbij.
+ */
+const NOOD_AFSTAND_KM = 5
 /** Hoe ver terug we kijken voor je beste prestatie. */
 const VOORSPELLING_WEKEN = 12
 /** En over hoeveel weken we je volume middelen. */
@@ -149,11 +162,18 @@ export function analyseerDoel(
   const doelPace = doelSeconden ? doelSeconden / MARATHON_KM : null
   const wekenTotDoel = Math.max(0, Math.round(dagenTussen(vandaag, doelDatum) / 7))
 
-  const bruikbaar = runs.filter(r =>
-    (r.afstand_km ?? 0) >= MIN_AFSTAND_KM &&
+  const inPeriode = (r: GelopenRun) =>
     (r.duur_minuten ?? 0) > 0 &&
     dagenTussen(r.datum, vandaag) <= VOORSPELLING_WEKEN * 7 &&
-    dagenTussen(r.datum, vandaag) >= 0)
+    dagenTussen(r.datum, vandaag) >= 0
+
+  // Liefst runs van 10 km of langer. Zijn die er niet, dan vallen we terug op
+  // 5 km, maar dan weet de lezer dat de voorspelling op los zand staat.
+  let bruikbaar = runs.filter(r => inPeriode(r) && (r.afstand_km ?? 0) >= MIN_AFSTAND_KM)
+  const korteBasis = bruikbaar.length === 0
+  if (korteBasis) {
+    bruikbaar = runs.filter(r => inPeriode(r) && (r.afstand_km ?? 0) >= NOOD_AFSTAND_KM)
+  }
 
   // Je beste equivalente prestatie, niet je gemiddelde. Rustige duurlopen zijn
   // bewust langzaam; die zeggen niets over wat je kúnt. Door per run de
@@ -185,6 +205,9 @@ export function analyseerDoel(
     recent.reduce((som, r) => som + (r.afstand_km ?? 0), 0) / VOLUME_WEKEN * 10) / 10
 
   const waarschuwingen: string[] = []
+  if (korteBasis && basis) {
+    waarschuwingen.push(`De voorspelling rust op een run van ${basis.afstand_km} km. Dat is ruim acht keer doorgerekend naar de marathon, en zulke sommen vallen altijd te gunstig uit. Loop een keer 10 km of langer stevig door voor een eerlijker beeld.`)
+  }
   if (langsteRunKm > 0 && langsteRunKm < LANGSTE_RUN_KRAP) {
     waarschuwingen.push(`Je langste duurloop is ${Math.round(langsteRunKm)} km. Voor een marathon wil je richting ${LANGSTE_RUN_GOED} km — snelheid over 10 km voorspelt weinig over de laatste tien kilometer van een marathon.`)
   } else if (langsteRunKm >= LANGSTE_RUN_KRAP && langsteRunKm < LANGSTE_RUN_GOED) {
@@ -201,7 +224,7 @@ export function analyseerDoel(
       langsteRunKm, weekKmGemiddeld, wekenTotDoel, waarschuwingen,
       samenvatting: !doelSeconden
         ? 'Je hebt nog geen tijdsdoel ingevuld, dus er valt niets naast te leggen.'
-        : `Nog te weinig runs van ${MIN_AFSTAND_KM} km of langer om een tijd te voorspellen.`,
+        : `Nog te weinig runs van ${NOOD_AFSTAND_KM} km of langer om een tijd te voorspellen.`,
     }
   }
 
@@ -216,21 +239,33 @@ export function analyseerDoel(
   else haalbaarheid = 'onrealistisch'
 
   // Uithoudingsvermogen kan een doel niet redden, maar wel relativeren: ligt je
-  // snelheid op koers terwijl je nooit verder komt dan 18 km, dan is "op koers"
-  // een halve waarheid.
-  if (haalbaarheid === 'op_koers' && langsteRunKm > 0 && langsteRunKm < LANGSTE_RUN_KRAP) {
-    haalbaarheid = 'ambitieus'
-  }
+  // snelheid op koers terwijl je nooit verder komt dan 18 km of nauwelijks
+  // kilometers maakt, dan is "op koers" een halve waarheid. Snelheid over een
+  // korte afstand is de makkelijkste helft van een marathon.
+  const uithoudingKrap =
+    (langsteRunKm > 0 && langsteRunKm < LANGSTE_RUN_KRAP) ||
+    (weekKmGemiddeld > 0 && weekKmGemiddeld < WEEKVOLUME_KRAP) ||
+    korteBasis
+  if (haalbaarheid === 'op_koers' && uithoudingKrap) haalbaarheid = 'ambitieus'
 
   const doelTekst = secondenNaarTijd(doelSeconden)
   const voorspeldTekst = secondenNaarTijd(voorspeldSeconden)
   const verschilMin = Math.round(Math.abs(gat) / 60)
+  // `gat` is voorspelling min doel: positief betekent dat je doel de scherpere
+  // tijd is. Dat onderscheid moet in de zin terug te vinden zijn, anders staat
+  // er "sneller dan je doel" bij een tijd die er 33 seconden boven ligt.
+  const doelIsScherper = gat > 0
+  const verschilTekst = verschilMin < 1
+    ? 'vrijwel gelijk aan'
+    : `${verschilMin} min ${doelIsScherper ? 'langzamer' : 'sneller'} dan`
 
   const samenvatting =
     haalbaarheid === 'op_koers'
-      ? `Je runs wijzen op ${voorspeldTekst}. Dat is ${verschilMin} min sneller dan je doel van ${doelTekst} — je ligt op koers.`
+      ? `Je runs wijzen op ${voorspeldTekst}, ${verschilTekst} je doel van ${doelTekst}. Met ${wekenTotDoel} weken training erbij ligt het binnen bereik.`
     : haalbaarheid === 'ambitieus'
-      ? `Je runs wijzen nu op ${voorspeldTekst}. Je doel van ${doelTekst} ligt ${verschilMin} min sneller: haalbaar met ${wekenTotDoel} weken training, maar het moet wel gebeuren.`
+      ? doelIsScherper
+        ? `Je runs wijzen nu op ${voorspeldTekst}. Je doel van ${doelTekst} ligt ${verschilMin} min sneller: haalbaar met ${wekenTotDoel} weken training, maar het moet wel gebeuren.`
+        : `Je snelheid is er (${voorspeldTekst}), maar die rust op korte afstanden. Voor ${doelTekst} over 42 km moet de basis eronder nog groeien — zie hieronder.`
       : `Je runs wijzen nu op ${voorspeldTekst}, en je doel van ${doelTekst} ligt ${verschilMin} min sneller. Dat is in ${wekenTotDoel} weken meer dan realistisch te winnen is.`
 
   return {
