@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { analyseerBelasting } from '@/lib/belasting'
+import { haalDoelAnalyse } from '@/lib/doeltempo-data'
+import { doelVoorPrompt } from '@/lib/doeltempo'
 
 export const maxDuration = 30
 
@@ -120,9 +122,14 @@ export async function GET(req: NextRequest) {
   const coreDezeWeek = coreD28.filter(s => s.datum >= getMaandag(vandaag)).length
   const heeftFysio = (fysioOefeningen?.length ?? 0) > 0
 
+  // Het ochtendbericht wist wél de datum van de wedstrijd maar niet of de tijd
+  // die eronder staat nog in beeld is. Dat is juist wat je 's ochtends wil horen.
+  const doelAnalyse = doel ? await haalDoelAnalyse(supabase, user.id, doel, vandaag) : null
+
   const context = [
     `Naam: ${naam}`,
-    doel ? `Doel: ${doel.naam} over ${dagenTotDoel} dagen (tijdsdoel: ${doel.tijdsdoel ?? 'finishen'})` : '',
+    doel ? `Doel: ${doel.naam} over ${dagenTotDoel} dagen` : '',
+    doelAnalyse ? doelVoorPrompt(doelAnalyse) : '',
     `Laatste 14 dagen: ${voltooid.length} trainingen voltooid, ${overgeslagen.length} overgeslagen`,
     `Km deze week: ${kmDezeWeek.toFixed(1)} km`,
     sportenDezeWeek.length

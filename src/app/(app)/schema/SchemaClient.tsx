@@ -11,14 +11,17 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { WorkoutModal } from '@/components/training/WorkoutModal'
 import { TempoZonesCard } from '@/components/training/TempoZonesCard'
+import { DoeltempoKaart } from '@/components/training/DoeltempoKaart'
 import { RouteThumbnail } from '@/components/training/RouteThumbnail'
 import type { TempoZone } from '@/lib/tempo-zones'
+import type { DoelAnalyse } from '@/lib/doeltempo'
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
 import { useSheetMaxHeight } from '@/hooks/useSheetMaxHeight'
 
 interface Props {
   sessies: (TrainingSession & { session_feedback: unknown[] })[]
   doel: Goal | null
+  doelAnalyse: DoelAnalyse | null
   userId: string
   wilCore: boolean
   heeftFysio: boolean
@@ -240,7 +243,7 @@ function AgendaWeergave({ sessies, onDatumChange, onVerwijderen, onToggleVoltooi
 }
 
 // ── Hoofdcomponent ─────────────────────────────────────────────────────────────
-export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio, tempoZones, tempoZonesUpdatedAt }: Props) {
+export function SchemaClient({ sessies: initSessies, doel, doelAnalyse, wilCore, heeftFysio, tempoZones, tempoZonesUpdatedAt }: Props) {
   const supabase = createClient()
   const vandaag = new Date().toISOString().split('T')[0]
   // Volgende maandag — sessies vóór die datum (deze week + verleden) mogen afgevinkt worden
@@ -664,6 +667,8 @@ export function SchemaClient({ sessies: initSessies, doel, wilCore, heeftFysio, 
               </div>
             </Card>
           )}
+
+          {doelAnalyse && <DoeltempoKaart analyse={doelAnalyse} />}
 
           <TempoZonesCard zones={tempoZones ?? undefined} bijgewerktOp={tempoZonesUpdatedAt} />
 

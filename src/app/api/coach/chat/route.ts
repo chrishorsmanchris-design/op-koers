@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { haalDoelAnalyse } from '@/lib/doeltempo-data'
+import { doelVoorPrompt } from '@/lib/doeltempo'
 
 export const maxDuration = 30
 
@@ -51,6 +53,12 @@ export async function POST(req: NextRequest) {
     ? Math.ceil((new Date(doel.datum).getTime() - Date.now()) / 86400000)
     : null
 
+  // De coach kreeg "3:15:00" als losse tekst mee en kon daar niets mee: geen
+  // tempo, geen idee of het kansrijk is. Nu krijgt hij het hele beeld.
+  const doelAnalyse = doel
+    ? await haalDoelAnalyse(supabase, user.id, doel, vandaag)
+    : null
+
   const sessiesSamenvatting = (sessies ?? [])
     .slice(0, 14)
     .map(s => {
@@ -66,9 +74,8 @@ export async function POST(req: NextRequest) {
     `Naam: ${naam}`,
     profiel?.km_per_week ? `Wekelijks volume: ${profiel.km_per_week} km/week` : '',
     profiel?.physio_klacht ? `Blessure/klacht: ${profiel.physio_klacht}` : '',
-    doel
-      ? `Doel: ${doel.naam} over ${dagenTotDoel} dagen (tijdsdoel: ${doel.tijdsdoel ?? 'finishen'})`
-      : '',
+    doel ? `Doel: ${doel.naam} over ${dagenTotDoel} dagen` : '',
+    doelAnalyse ? doelVoorPrompt(doelAnalyse) : '',
     `Voltooid: ${voltooid.length} sessies | Overgeslagen: ${overgeslagen.length} sessies (14 dagen)`,
     `Km deze week: ${kmDezeWeek.toFixed(1)} km`,
     `Trainingen laatste 14 dagen:\n${sessiesSamenvatting}`,

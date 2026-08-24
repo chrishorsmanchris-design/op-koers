@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { haalDoelAnalyse } from '@/lib/doeltempo-data'
+import { doelVoorPrompt } from '@/lib/doeltempo'
 
 export const maxDuration = 300
 
@@ -83,12 +85,20 @@ HARTSLAGZONES (gebruik deze als trainingsrichtlijn):
 
     const opbouwtempo = (profiel as Record<string, unknown>)?.opbouwtempo as string | null ?? 'stabiel'
 
+    // Het schema wordt gebouwd om een tijd te halen; dan moet het wel weten welk
+    // tempo daarbij hoort en hoe ver de atleet daar nu vanaf zit.
+    const doelAnalyse = await haalDoelAnalyse(supabase, user.id, doel, vandaag)
+
     const prompt = `Je bent een ervaren atletiekcoach. Maak een professioneel marathon trainingsschema gebaseerd op Hal Higdon / Jack Daniels methode.
 
 VANDAAG (startdatum schema): ${vandaag}
 EERSTE SESSIE: moet op ${vandaag} of de eerstvolgende dag zijn — begin DIRECT, geen weken overslaan.
 ATLEET: huidig volume ${kmPerWeek} km/week | opbouwtempo: ${opbouwtempo}${hartslagInfo}
-DOEL: ${doel.naam} op ${doel.datum} | tijdsdoel: ${doel.tijdsdoel ?? 'finishen'}
+DOEL: ${doel.naam} op ${doel.datum}
+${doelVoorPrompt(doelAnalyse)}
+Stem de tempo-aanwijzingen in de beschrijvingen af op het wedstrijdtempo hierboven.
+Is de beoordeling "onrealistisch", bouw dan een schema richting het tempo dat wél
+haalbaar is en zet niet alsnog het doeltempo in de sessies.
 PERIODE: ${wekenTotDoel} weken VANAF VANDAAG (${vandaag} t/m ${new Date(new Date(vandaag).getTime() + wekenTotDoel * 7 * 86400000).toISOString().split('T')[0]})
 BLESSURE: ${profiel?.physio_klacht || 'geen bekende klachten'}
 VAKANTIES: ${vakanties?.map(v => `${v.start_datum} t/m ${v.eind_datum} (kan trainen: ${v.kan_trainen})`).join('; ') || 'geen'}

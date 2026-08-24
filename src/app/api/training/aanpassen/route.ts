@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import {
+  bepaalWerkelijkeWeken, laatsteWeekMaandagen, recenteOnderbreking,
+  type VoltooideSessie,
+} from '@/lib/werkelijke-weken'
+import { haalDoelAnalyse } from '@/lib/doeltempo-data'
+import { doelVoorPrompt } from '@/lib/doeltempo'
+
+/** Hoeveel volledige weken we terugkijken om een onderbreking te herkennen. */
+const TERUGBLIK_WEKEN = 8
 
 const claude = new Anthropic()
 
@@ -93,6 +102,44 @@ export async function POST(req: NextRequest) {
 
   const feedbackHistorie = recenteFeedback?.map(f => f.rating).join(', ') ?? 'geen'
 
+  // Kom je net terug van een vakantie, ziekte of een periode zonder trainen?
+  // Dan is het schema gebaseerd op een opbouw die je niet gedraaid hebt, en is
+  // jouw eigen oordeel over deze sessie het beste bewijs over je huidige vorm.
+  // Dat verdient een steviger aanpassing dan dezelfde feedback midden in een
+  // ongestoorde trainingsblok.
+  const weekMaandagen = laatsteWeekMaandagen(vandaag, TERUGBLIK_WEKEN)
+  const { data: gelopen } = await supabase
+    .from('training_sessions')
+    .select('datum, type, duur_minuten, afstand_km, intensiteit, session_feedback(rating, werkelijke_duur, werkelijke_afstand)')
+    .eq('user_id', user.id)
+    .eq('voltooid', true)
+    .gte('datum', weekMaandagen[0])
+    .lte('datum', vandaag)
+
+  const voltooideSessies: VoltooideSessie[] = (gelopen ?? []).map(s => {
+    const rij = s as Record<string, unknown>
+    const fb = (rij.session_feedback as Record<string, unknown>[] | null)?.[0]
+    return {
+      datum: rij.datum as string,
+      type: rij.type as string,
+      duur_minuten: rij.duur_minuten as number | null,
+      afstand_km: rij.afstand_km as number | null,
+      intensiteit: rij.intensiteit as string | null,
+      werkelijke_duur: fb?.werkelijke_duur as number | null,
+      werkelijke_afstand: fb?.werkelijke_afstand as number | null,
+      rating: fb?.rating as string | null,
+    }
+  })
+
+  const werkelijkeWeken = bepaalWerkelijkeWeken(voltooideSessies, weekMaandagen, vandaag)
+  const naOnderbreking = recenteOnderbreking(werkelijkeWeken.map(w => w?.punten ?? 0))
+
+  // Verlagen of verhogen kost altijd iets aan de andere kant. Zonder te weten
+  // hoe ver het tijdsdoel nog weg ligt, kiest de coach die afweging blind: bij
+  // een doel dat al onhaalbaar is, is nóg een zware week zinloos, en bij een
+  // doel dat ruim gehaald wordt mag er best een sessie af.
+  const doelAnalyse = await haalDoelAnalyse(supabase, user.id, doel, vandaag)
+
   // Bereken weken en fase
   const dagenTotDoel = Math.ceil(
     (new Date(doel.datum).getTime() - new Date(vandaag).getTime()) / (1000 * 60 * 60 * 24)
@@ -118,7 +165,8 @@ export async function POST(req: NextRequest) {
 Een atleet geeft feedback op een voltooide training. Jouw taak: pas het schema INTELLIGENT aan zodat het doel bereikbaar blijft.
 
 ## CONTEXT
-- Doel: ${doel.naam} op ${doel.datum} (tijdsdoel: ${doel.tijdsdoel ?? 'finishen'})
+- Doel: ${doel.naam} op ${doel.datum}
+${doelVoorPrompt(doelAnalyse)}
 - Weken tot doel: ${wekenTotDoel} weken
 - Huidige fase: ${fase}
 - Huidige week in schema: week ${huidigWeek} van ~${totaalWeken}
@@ -129,7 +177,25 @@ ${voltooide.beschrijving} | ${voltooide.duur_minuten}min | ${voltooide.afstand_k
 
 ## FEEDBACK VANDAAG: "${rating}"
 ## RECENTE FEEDBACK (nieuwste eerst): ${feedbackHistorie}
+## WEEKBELASTING LAATSTE ${TERUGBLIK_WEKEN} WEKEN (oud → nieuw, belastingpunten): ${werkelijkeWeken.map(w => w?.punten ?? 0).join(', ')}
 
+${naOnderbreking ? `## LET OP: TERUGKEER NA EEN ONDERBREKING
+Uit de weekbelasting hierboven blijkt dat de atleet recent een periode niet of
+nauwelijks getraind heeft (vakantie, ziekte, of een drukke periode). Het schema
+gaat uit van een opbouw die niet gedraaid is, dus de geplande volumes zijn
+gebaseerd op een aanname die niet meer klopt.
+
+Weeg de feedback van vandaag daarom ZWAARDER dan je normaal zou doen — dit is
+op dit moment het betrouwbaarste signaal over de werkelijke vorm:
+- Verdubbel de percentages uit de strategie hieronder (een verlaging van 15-20%
+  wordt 30-40%, een verhoging van 5-8% wordt 10-16%).
+- Pas 4-6 sessies aan in plaats van 2-3: de terugkeer moet als opbouwlijn
+  kloppen, niet als losse correctie.
+- Bij "te_zwaar" of "zwaar": bouw de terugkeer expliciet trapsgewijs op en zet
+  de lange duurloop niet meteen terug op schemaniveau.
+- Bij "beter_dan_verwacht" of "topdag": laat de opbouw sneller terugklimmen naar
+  het schema, maar nooit meer dan 30% volumegroei per week.
+` : ''}
 ## AANPASSINGSSTRATEGIE (VERPLICHT VOLGEN)
 
 ${rating === 'te_zwaar' ? `OVERBELASTING GEDETECTEERD:
@@ -156,12 +222,22 @@ ${rating === 'topdag' ? `UITSTEKENDE VORM:
 - Controleer dat de 10%-progressieregel niet wordt overschreden per week
 - Mogelijkheid om eerder marathon-tempo runs in te voegen als fase het toelaat` : ''}
 
+WEEG HET TIJDSDOEL MEE (zie de beoordeling bij CONTEXT):
+- "onrealistisch": het doel is met dit volume niet te halen. Ga NIET compenseren
+  met extra volume — dat vergroot alleen het blessurerisico. Kies voor wat de
+  atleet wél verder brengt (langste duurloop, consistentie) en laat het tempo los.
+- "ambitieus": het kan nog, maar er is geen ruimte om weken te verspelen. Verlaag
+  waar het moet, maar haal het verloren volume echt terug in de weken erna.
+- "op_koers": er is marge. Bij twijfel liever een sessie lichter dan zwaarder.
+- Ontbreekt de uithouding (zie "Let op"), verhoog dan bij voorkeur de lange
+  duurloop en niet de intervalsessies — daar zit het gat.
+
 ALGEMENE REGELS:
 - Bewaar altijd de lange duurloop (long run) in de planning
 - Tapering (laatste 2 weken voor doel) NOOIT verzwaren
 - Beschrijving max 55 tekens
 - Verander ALLEEN sessies die aanpassing vereisen (min=0, max=6 sessies)
-- Het totale resterende volume mag maximaal 5% afwijken van ${totaalGeplandKm.toFixed(1)} km
+- Het totale resterende volume mag maximaal ${naOnderbreking ? 15 : 5}% afwijken van ${totaalGeplandKm.toFixed(1)} km${naOnderbreking ? ' (ruimer dan normaal, omdat de opbouw na de onderbreking echt herzien moet kunnen worden)' : ''}
 
 ## KOMENDE SESSIES (volledig schema, pas maximaal 6 aan):
 ${komendeSessies.map(s =>

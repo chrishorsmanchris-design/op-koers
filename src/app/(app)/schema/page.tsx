@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { SchemaClient } from './SchemaClient'
+import { haalDoelAnalyse } from '@/lib/doeltempo-data'
 
 export default async function SchemaPage() {
   const supabase = await createClient()
@@ -21,10 +22,16 @@ export default async function SchemaPage() {
     supabase.from('physio_exercises').select('id').eq('user_id', user.id).eq('actief', true),
   ])
 
+  const vandaag = new Date().toISOString().split('T')[0]
+  const doelAnalyse = doel
+    ? await haalDoelAnalyse(supabase, user.id, doel, vandaag)
+    : null
+
   return (
     <SchemaClient
       sessies={sessies ?? []}
       doel={doel}
+      doelAnalyse={doelAnalyse}
       userId={user.id}
       wilCore={profiel?.wil_core ?? false}
       heeftFysio={(fysioOefeningen?.length ?? 0) > 0}
