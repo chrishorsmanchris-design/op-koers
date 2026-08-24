@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { planWeek, getMaandag, type Vakantie } from '@/lib/schema-planning'
+import { planWeek, getMaandag, isZwareSessie, type Vakantie, type GeplandeSessie } from '@/lib/schema-planning'
 import { PDF_PLAN } from '@/lib/pdf-plan'
+import { beperkOpbouw } from '@/lib/opbouw'
+import { bepaalWerkelijkeWeken, type VoltooideSessie } from '@/lib/werkelijke-weken'
 
 export const maxDuration = 120
 
@@ -76,6 +78,43 @@ export async function POST() {
     const alleSessies: object[] = []
     let volgorde = 1
 
+    // De hersteldag na een zware zondag valt in de week erná. Zonder deze
+    // doorgifte plant de planner elke maandag alsof er zondag niets gebeurd is.
+    let vorigeDagZwaar = false
+    let vorigeDagZwaarSchema = false
+
+    // Eerst alle weken plannen, dan pas wegschrijven. De opbouwrem hieronder
+    // kijkt naar de weken vóór een week om te bepalen of de sprong te groot is,
+    // en dat kan alleen als het hele plan er in volgorde ligt.
+    const weekPlannen: GeplandeSessie[][] = []
+    // De maandag van elke week, op planvolgorde. Nodig om de weken naast je
+    // werkelijke trainingen te kunnen leggen — óók voor een vakantieweek waarin
+    // niets gepland stond en er dus geen enkele sessie is om de datum uit af te
+    // leiden. Juist die week wil je kunnen meten.
+    const weekMaandagen: string[] = []
+    // Hetzelfde plan, maar zonder vakanties. Dit is de maatstaf voor de rem: hij
+    // mag alleen ingrijpen waar je áchterloopt op wat het schema had opgebouwd.
+    // Zonder deze schaduwversie kan de rem niet zien of een lage week een
+    // vakantie was of gewoon een hersteldweek uit het schema zelf, en gaat hij
+    // ook een ongestoord plan zitten bijschaven.
+    const schemaPlannen: GeplandeSessie[][] = []
+
+    const planBeide = (
+      template: Parameters<typeof planWeek>[0],
+      weekMaandag: Date, weekNr: number,
+    ) => {
+      const gepland = planWeek(template, weekMaandag, geblokkeerd, vakantieArray, weekNr, volgorde, { vorigeDagZwaar })
+      const schema = planWeek(template, weekMaandag, geblokkeerd, [], weekNr, volgorde, { vorigeDagZwaar: vorigeDagZwaarSchema })
+      volgorde += gepland.length
+      // De hersteldag na een zware zondag valt in de week erná. Zonder deze
+      // doorgifte plant de planner elke maandag alsof er zondag niets gebeurd is.
+      vorigeDagZwaar = gepland.some(s => s.dag === 6 && isZwareSessie(s))
+      vorigeDagZwaarSchema = schema.some(s => s.dag === 6 && isZwareSessie(s))
+      weekPlannen.push(gepland)
+      schemaPlannen.push(schema)
+      weekMaandagen.push(weekMaandag.toISOString().split('T')[0])
+    }
+
     // ── Fase 1: opbouwfase op basis van PDF week 1 (niet AI) ────────────────
     // Gebruik PDF week 1 als template zodat de methodiek consistent blijft met het plan.
     // Schaal het volume licht terug voor de eerste weken (85% → 92% → 100%).
@@ -93,29 +132,12 @@ export async function POST() {
           ...s,
           duur_minuten: s.duur_minuten ? Math.round(s.duur_minuten * schaal) : null,
           afstand_km: s.afstand_km ? Math.round(s.afstand_km * schaal * 10) / 10 : null,
+          beschrijving: s.duur_minuten
+            ? `${s.beschrijving} (opbouw ${Math.round(schaal * 100)}%)`
+            : s.beschrijving,
         }))
 
-        const gepland = planWeek(pdfWeek1, weekMaandag, geblokkeerd, vakantieArray, weekNr, volgorde)
-        volgorde += gepland.length
-
-        for (const s of gepland) {
-          alleSessies.push({
-            user_id: user.id,
-            goal_id: doel.id,
-            datum: s.datum,
-            type: s.type,
-            beschrijving: s.duur_minuten
-              ? `${s.beschrijving} (opbouw ${Math.round(schaal * 100)}%)`
-              : s.beschrijving,
-            duur_minuten: s.duur_minuten,
-            afstand_km: s.afstand_km,
-            intensiteit: s.intensiteit,
-            voltooid: false,
-            overgeslagen: false,
-            volgorde: s.volgorde,
-            week_nummer: s.week_nummer,
-          })
-        }
+        planBeide(pdfWeek1, weekMaandag, weekNr)
       }
     }
 
@@ -125,10 +147,48 @@ export async function POST() {
       const weekMaandag = new Date(fase2Start)
       weekMaandag.setDate(weekMaandag.getDate() + i * 7)
 
-      const gepland = planWeek(PDF_PLAN[i], weekMaandag, geblokkeerd, vakantieArray, weekNr, volgorde)
-      volgorde += gepland.length
+      planBeide(PDF_PLAN[i], weekMaandag, weekNr)
+    }
 
-      for (const s of gepland) {
+    // ── Opbouwrem ────────────────────────────────────────────────────────────
+    // Vakanties knippen weken uit het plan, maar het PDF-schema loopt gewoon
+    // door alsof je doorgetraind hebt. Zonder deze rem sta je na twee weken
+    // Kenia meteen weer op 80 km met een duurloop van 28 km. Hier wordt dat
+    // teruggebracht tot wat je lichaam op dat moment aankan.
+    // Wat je werkelijk gedaan hebt in de weken die al voorbij zijn. Het plan
+    // begint bij fase 2 vaak in het verleden, dus een deel van deze weken is al
+    // gelopen — inclusief eventuele vakantieweken. Zonder deze meting neemt de
+    // rem aan dat je gedaan hebt wat er gepland stond, en dat is precies de
+    // aanname die na een vakantie niet klopt: in beide richtingen.
+    const { data: gelopen } = await supabase
+      .from('training_sessions')
+      .select('datum, type, duur_minuten, afstand_km, intensiteit, session_feedback(rating, werkelijke_duur, werkelijke_afstand)')
+      .eq('user_id', user.id)
+      .eq('voltooid', true)
+      .gte('datum', weekMaandagen[0] ?? vandaagStr)
+      .lt('datum', vandaagStr)
+
+    const voltooideSessies: VoltooideSessie[] = (gelopen ?? []).map(s => {
+      const rij = s as Record<string, unknown>
+      const fb = (rij.session_feedback as Record<string, unknown>[] | null)?.[0]
+      return {
+        datum: rij.datum as string,
+        type: rij.type as string,
+        duur_minuten: rij.duur_minuten as number | null,
+        afstand_km: rij.afstand_km as number | null,
+        intensiteit: rij.intensiteit as string | null,
+        werkelijke_duur: fb?.werkelijke_duur as number | null,
+        werkelijke_afstand: fb?.werkelijke_afstand as number | null,
+        rating: fb?.rating as string | null,
+      }
+    })
+
+    const werkelijk = bepaalWerkelijkeWeken(voltooideSessies, weekMaandagen, vandaagStr)
+
+    const { weken: geremdeWeken, aanpassingen } = beperkOpbouw(weekPlannen, schemaPlannen, werkelijk)
+
+    for (const week of geremdeWeken) {
+      for (const s of week) {
         alleSessies.push({
           user_id: user.id,
           goal_id: doel.id,
@@ -267,6 +327,13 @@ export async function POST() {
       if (error) return NextResponse.json({ error: `Invoegfout: ${error.message}` }, { status: 500 })
     }
 
+    // Een teruggeschaalde week is geen detail dat je stilletjes doorvoert: als
+    // er ineens 18 km staat waar het schema 28 km voorschrijft, wil je weten
+    // waarom. Anders lijkt het een bug en zet je hem handmatig terug.
+    const opbouwBericht = aanpassingen.length > 0
+      ? ` ${aanpassingen.length} ${aanpassingen.length === 1 ? 'week is' : 'weken zijn'} teruggeschaald rond je vakanties, zodat je er niet te hard weer instapt.`
+      : ''
+
     return NextResponse.json({
       success: true,
       aantalSessies: nieuweSessies.length,
@@ -274,9 +341,10 @@ export async function POST() {
       fase2Weken: 14,
       startDatum: fase1Start.toISOString().split('T')[0],
       marathonDatum: doel.datum,
-      bericht: prePlanWeken > 0
-        ? `${nieuweSessies.length} sessies aangemaakt: ${prePlanWeken} weken opbouwfase + 14 weken PDF-schema (${fase1Start.toISOString().split('T')[0]} t/m ${doel.datum})`
-        : `${nieuweSessies.length} sessies aangemaakt: 14 weken PDF-schema (${fase2Start.toISOString().split('T')[0]} t/m ${doel.datum})`,
+      opbouwAanpassingen: aanpassingen,
+      bericht: (prePlanWeken > 0
+        ? `${nieuweSessies.length} sessies aangemaakt: ${prePlanWeken} weken opbouwfase + 14 weken PDF-schema (${fase1Start.toISOString().split('T')[0]} t/m ${doel.datum}).`
+        : `${nieuweSessies.length} sessies aangemaakt: 14 weken PDF-schema (${fase2Start.toISOString().split('T')[0]} t/m ${doel.datum}).`) + opbouwBericht,
     })
 
   } catch (err) {
