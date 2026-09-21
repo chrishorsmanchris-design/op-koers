@@ -163,6 +163,34 @@ function weekKm(week: GeplandeSessie[]): number {
   return week.reduce((som, s) => som + (s.afstand_km ?? 0), 0)
 }
 
+/**
+ * Schaalt de minuten in de omschrijving mee met de sessie.
+ *
+ * Zonder dit staat er "80 min D1 gevolgd door 10 min D2" boven een sessie van
+ * 55 minuten. De cijfers kloppen dan onderling wel, maar de tekst die je leest
+ * spreekt ze tegen — en de tekst is wat je meeneemt naar buiten.
+ *
+ * Bij een sessie met herhalingen gaan de herhalingen omlaag en niet de lengte
+ * ervan: een heuveltraining korter maken doe je door minder keer de heuvel op
+ * te lopen, niet door hem halverwege af te breken.
+ */
+export function schaalBeschrijving(tekst: string, factor: number): string {
+  const rond = (n: number, bodem = 1) => Math.max(bodem, Math.round(n * factor))
+
+  // "6 × 2 min" → "4 × 2 min", en net zo goed "8 x 400m" → "5 x 400m". De lengte
+  // van een herhaling blijft staan, en de rust ertussen ook: die horen bij de
+  // vorm van de training, niet bij de omvang.
+  const herhalingen = /(\d+)\s*([×x])\s*(\d+\s*(?:min|m|km)\b)/i
+  if (herhalingen.test(tekst)) {
+    return tekst.replace(herhalingen, (_, n, teken, eenheid) => `${rond(Number(n))} ${teken} ${eenheid}`)
+  }
+
+  // "30-60 min fietsen" → beide grenzen mee.
+  return tekst
+    .replace(/(\d+)\s*-\s*(\d+)\s*min/g, (_, a, b) => `${rond(Number(a))}-${rond(Number(b))} min`)
+    .replace(/(\d+)\s*min/g, (_, n) => `${rond(Number(n))} min`)
+}
+
 /** Schaalt duur en afstand mee. Tempo blijft gelijk, het volume gaat omlaag. */
 function schaal(s: GeplandeSessie, factor: number): GeplandeSessie {
   if (s.type === 'rust' || s.beschermd) return s
@@ -177,6 +205,7 @@ function schaal(s: GeplandeSessie, factor: number): GeplandeSessie {
     ...s,
     duur_minuten: duur,
     afstand_km: s.afstand_km != null ? Math.round(s.afstand_km * echteFactor * 10) / 10 : null,
+    beschrijving: schaalBeschrijving(s.beschrijving, echteFactor),
   }
 }
 
