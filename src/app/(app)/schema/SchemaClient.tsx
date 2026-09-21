@@ -6,7 +6,7 @@ import { cn, formatDuur, dagKorteDatum } from '@/lib/utils'
 import type { Goal, TrainingSession } from '@/types/database'
 import {
   Loader2, RefreshCw, MapPin, Timer, CheckCircle2, XCircle,
-  ChevronLeft, ChevronRight, Calendar, MoveRight, X,
+  ChevronLeft, ChevronRight, Calendar, MoveRight, X, ArrowLeftRight,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { WorkoutModal } from '@/components/training/WorkoutModal'
@@ -180,6 +180,93 @@ function RoosterModal({ sessie, alleSessies, onVerplaatsen, onLatenVervallen, on
   )
 }
 
+// ── Twee trainingen van dag ruilen ─────────────────────────────────────────────
+interface WisselModalProps {
+  sessie: TrainingSession
+  alleSessies: TrainingSession[]
+  onWisselen: (a: TrainingSession, b: TrainingSession) => void
+  onSluiten: () => void
+}
+
+/**
+ * Ruilt twee trainingen van dag, in plaats van er één te verplaatsen.
+ *
+ * Verplaatsen naar een vrije dag bestond al, maar dat is niet wat je wil als je
+ * vandaag geen zin hebt in een hersteltraining terwijl er donderdag een duurloop
+ * staat: dan moeten ze van plaats wisselen, anders staan er donderdag twee. En
+ * omdat Strava op datum koppelt, klopt zonder ruil ook de koppeling niet meer.
+ */
+function WisselModal({ sessie, alleSessies, onWisselen, onSluiten }: WisselModalProps) {
+  useLockBodyScroll()
+  const maxHeight = useSheetMaxHeight()
+
+  // Binnen drie weken rond de sessie: verder ruilen is geen ruil meer maar een
+  // herziening van je schema.
+  const kandidaten = alleSessies
+    .filter(s =>
+      s.id !== sessie.id &&
+      s.type !== 'rust' &&
+      !s.voltooid &&
+      !s.overgeslagen &&
+      Math.abs(
+        (new Date(s.datum + 'T12:00:00').getTime() -
+          new Date(sessie.datum + 'T12:00:00').getTime()) / 86400000) <= 21)
+    .sort((a, b) => a.datum.localeCompare(b.datum))
+
+  const label = (d: string) =>
+    new Date(d + 'T12:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end">
+      <div className="absolute inset-0 bg-black/60" onClick={onSluiten} />
+      <div
+        className="relative w-full overflow-y-auto overscroll-contain bg-[#1b1b27] rounded-t-3xl shadow-2xl border-t border-[#2d2d3e]"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', maxHeight: maxHeight ? `${maxHeight}px` : '85vh' }}
+      >
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-[#2d2d3e] rounded-full" />
+        </div>
+
+        <div className="px-5 pb-safe-or-8 pb-8">
+          <div className="flex justify-between items-start mb-4 mt-1">
+            <div className="min-w-0">
+              <h3 className="font-bold text-white text-base">Wisselen met</h3>
+              <p className="text-sm text-[#8888a8] mt-0.5 leading-snug">
+                <span className="capitalize">{label(sessie.datum)}</span> · {sessie.beschrijving}
+              </p>
+            </div>
+            <button onClick={onSluiten} className="p-1.5 text-[#55556a] -mt-0.5 shrink-0">
+              <X size={18} />
+            </button>
+          </div>
+
+          {kandidaten.length === 0 ? (
+            <p className="text-sm text-[#55556a]">
+              Geen andere openstaande training binnen drie weken om mee te ruilen.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {kandidaten.map(k => (
+                <button
+                  key={k.id}
+                  onClick={() => onWisselen(sessie, k)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-[#222230] border border-[#2d2d3e] text-left active:scale-[0.98] transition-transform"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-[#8888a8] capitalize">{label(k.datum)}</p>
+                    <p className="text-sm font-medium text-white truncate">{k.beschrijving}</p>
+                  </div>
+                  <ArrowLeftRight size={16} className="text-[#55556a] shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Bewerkbare volledige agenda-weergave ───────────────────────────────────────
 interface AgendaWeergaveProps {
   sessies: TrainingSession[]
@@ -260,6 +347,7 @@ export function SchemaClient({ sessies: initSessies, doel, doelAnalyse, wilCore,
   const [fout, setFout] = useState('')
   const [foutTekst, setFoutTekst] = useState('')
   const [roosterSessie, setRoosterSessie] = useState<TrainingSession | null>(null)
+  const [wisselSessie, setWisselSessie] = useState<TrainingSession | null>(null)
   const [koppelSessie, setKoppelSessie] = useState<TrainingSession | null>(null)
   const [koppelt, setKoppelt] = useState(false)
   const [workoutSessie, setWorkoutSessie] = useState<TrainingSession | null>(null)
@@ -463,6 +551,30 @@ export function SchemaClient({ sessies: initSessies, doel, doelAnalyse, wilCore,
     } else {
       markeerOvergeslagen(sessie.id)
     }
+  }
+
+  /**
+   * Ruilt de datum (en het weeknummer) van twee trainingen om.
+   *
+   * De volgorde binnen de dag gaat mee, anders belandt een geruilde sessie
+   * onderaan een dag waar hij bovenaan hoort. Beide updates gaan los naar de
+   * database; ze staan al in de UI voordat het netwerk antwoordt.
+   */
+  async function handleWisselen(a: TrainingSession, b: TrainingSession) {
+    setWisselSessie(null)
+    setSessies(prev => prev.map(s => {
+      if (s.id === a.id) return { ...s, datum: b.datum, week_nummer: b.week_nummer, volgorde: b.volgorde }
+      if (s.id === b.id) return { ...s, datum: a.datum, week_nummer: a.week_nummer, volgorde: a.volgorde }
+      return s
+    }))
+    await Promise.all([
+      supabase.from('training_sessions')
+        .update({ datum: b.datum, week_nummer: b.week_nummer, volgorde: b.volgorde } as never)
+        .eq('id', a.id),
+      supabase.from('training_sessions')
+        .update({ datum: a.datum, week_nummer: a.week_nummer, volgorde: a.volgorde } as never)
+        .eq('id', b.id),
+    ])
   }
 
   async function handleVerplaatsen(id: string, nieuwDatum: string) {
@@ -897,6 +1009,16 @@ export function SchemaClient({ sessies: initSessies, doel, doelAnalyse, wilCore,
                       <span className="text-xl font-bold text-white leading-none">
                         {dagNummerVanDatum(sessie.datum)}
                       </span>
+                      {!isGedaan && !isOvergeslagen && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setWisselSessie(sessie) }}
+                          title="Wisselen met een andere training"
+                          aria-label="Wisselen met een andere training"
+                          className="mt-1 p-1 text-[#55556a] active:scale-90 transition-transform"
+                        >
+                          <ArrowLeftRight size={13} />
+                        </button>
+                      )}
                     </div>
 
                     {/* Sessie content */}
@@ -1022,6 +1144,15 @@ export function SchemaClient({ sessies: initSessies, doel, doelAnalyse, wilCore,
           onVerplaatsen={handleVerplaatsen}
           onLatenVervallen={handleLatenVervallen}
           onSluiten={() => setRoosterSessie(null)}
+        />
+      )}
+
+      {wisselSessie && (
+        <WisselModal
+          sessie={wisselSessie}
+          alleSessies={sessies}
+          onWisselen={handleWisselen}
+          onSluiten={() => setWisselSessie(null)}
         />
       )}
 
