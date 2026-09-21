@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { analyseerBelasting } from '@/lib/belasting'
+import { haalUurWeer } from '@/lib/weer'
+import { beoordeelLooptijd, urenVoorDatum, uurTekst, type Looptijden } from '@/lib/looptijd'
 import { haalDoelAnalyse } from '@/lib/doeltempo-data'
 import { doelVoorPrompt } from '@/lib/doeltempo'
 
@@ -40,7 +42,7 @@ export async function GET(req: NextRequest) {
     { data: belastingSessies },
     { data: sportActiviteiten },
   ] = await Promise.all([
-    supabase.from('profiles').select('naam, wil_core, fysio_per_week, core_per_week').eq('id', user.id).single(),
+    supabase.from('profiles').select('naam, wil_core, fysio_per_week, core_per_week, looptijden').eq('id', user.id).single(),
     supabase.from('goals').select('naam, datum, tijdsdoel').eq('user_id', user.id).eq('actief', true).single(),
     supabase.from('training_sessions')
       .select('type, beschrijving, duur_minuten, afstand_km, intensiteit, voltooid')
@@ -126,6 +128,29 @@ export async function GET(req: NextRequest) {
   // die eronder staat nog in beeld is. Dat is juist wat je 's ochtends wil horen.
   const doelAnalyse = doel ? await haalDoelAnalyse(supabase, user.id, doel, vandaag) : null
 
+  // Wanneer het vandaag het aangenaamst is om te lopen — binnen de uren dat je
+  // kúnt. Een advies om om 07:00 te gaan terwijl je dan op kantoor zit is geen
+  // advies. Staat er niets gepland, dan valt er ook niets te adviseren.
+  let looptip: string | null = null
+  if (vandaagLoop?.type === 'hardlopen') {
+    const uren = await haalUurWeer(vandaag)
+    if (uren.length) {
+      const toegestaan = urenVoorDatum(
+        (profiel as Record<string, unknown>)?.looptijden as Looptijden | null, vandaag)
+      const advies = beoordeelLooptijd(uren, vandaagLoop.duur_minuten, new Date().getHours(), toegestaan)
+      if (advies) {
+        const { beste, maaktUit, vensterTeKrap, waarschuwing } = advies
+        looptip = [
+          `Beste looptijd vandaag: ${uurTekst(beste.startUur)}–${uurTekst(beste.eindUur)}`,
+          `${beste.gevoel}° gevoelstemperatuur, ${beste.regenKans}% kans op regen`,
+          vensterTeKrap ? '(je beschikbare uren zijn krap, dus veel keus is er niet)' : '',
+          maaktUit ? '' : '(het scheelt vandaag weinig welk moment je kiest)',
+          waarschuwing ?? '',
+        ].filter(Boolean).join(' · ')
+      }
+    }
+  }
+
   const context = [
     `Naam: ${naam}`,
     doel ? `Doel: ${doel.naam} over ${dagenTotDoel} dagen` : '',
@@ -142,6 +167,7 @@ export async function GET(req: NextRequest) {
     vandaagLoop
       ? `Geplande training vandaag: ${vandaagLoop.beschrijving} (${vandaagLoop.duur_minuten}min${vandaagLoop.afstand_km ? `, ${vandaagLoop.afstand_km}km` : ''}, ${vandaagLoop.intensiteit})`
       : 'Geen looptraining gepland vandaag',
+    looptip ?? '',
     vandaagAlVoltooid.length > 0
       ? `Al voltooid vandaag: ${vandaagAlVoltooid.map(s => s.type).join(', ')}`
       : '',
@@ -218,21 +244,31 @@ export async function GET(req: NextRequest) {
   try {
     const response = await claude.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 150,
+      max_tokens: 250,
       messages: [{
         role: 'user',
-        content: `Je bent een persoonlijke atletiekcoach. Schrijf een kort, persoonlijk bericht (2-3 zinnen, max 200 tekens) voor vandaag.
+        content: `Je bent de persoonlijke mental coach van deze hardloper. Schrijf het bericht waarmee hij vanochtend wakker wordt: 3-4 zinnen, maximaal 320 tekens.
 
-REGELS:
-- Motiverend maar realistisch — refereer aan WERKELIJKE data, verzin niets
-- Als er een alert is: verwerk die in je bericht (herinnering core/fysio, gemiste runs etc.)
-- Herstel gaat vóór alles: is het herstelrisico HOOG, adviseer dan expliciet rust of een lichte hersteltraining, ook als er een zware training gepland staat. Noem daarbij de andere sporten (padel, hockey, ...) als die meetellen — die belasten het lichaam net zo goed.
-- Als je weet op welke dag de atleet gewoonlijk core of fysio doet, EN vandaag die dag is: herinner er proactief aan
-- Als de atleet core/fysio lang niet gedaan heeft: noem het kort en concreet
-- Als er geen bijzonderheden zijn: focus op de geplande training of motivatie voor de dag
-- Taal: Nederlands. Geen emoji tenzij het echt past.
+TOON — dit is het belangrijkste:
+- Positief, warm en opgewekt. Je bent blij hem te spreken.
+- Geef een oprecht compliment. Er is altijd iets: een training die hij wél gedaan heeft, een week die hij is doorgekomen, een lange duurloop, een reeks dagen achter elkaar, of simpelweg dat hij eraan begint.
+- Zie in alles de positieve kant. Een rustige week is herstel. Een gemiste training is ruimte die hij genomen heeft. Een zware training is bewijs dat hij het aandurft.
+- Spreek hem aan met zijn voornaam en met "je".
+- Eindig met iets wat hem de deur uit krijgt.
 
-Atleetinfo:
+WAT ER VERDER IN MOET:
+- Wat er vandaag op het programma staat, concreet (afstand, duur of soort training).
+- Staat er een looptijd-advies in de gegevens? Noem het beste moment om te gaan lopen en waarom (temperatuur, regen). Dat is binnen zijn beschikbare uren berekend, dus je mag het gewoon aanraden.
+- Is het herstelrisico HOOG: raad dan rust of een lichte sessie aan. Breng dat positief — herstel is training, en hij is slim genoeg om ernaar te luisteren. Dit is de enige reden om van het schema af te wijken.
+
+NOOIT DOEN:
+- Verwijten maken, teleurstelling uitspreken, of benoemen hoeveel hij heeft laten liggen. Geen "maar", geen "je moet", geen "helaas".
+- Cijfers verzinnen. Gebruik alleen wat hieronder staat. Staat er niets over vandaag, schrijf dan over de dag zelf.
+- Overdrijven tot het ongeloofwaardig wordt. Een compliment moet kloppen, anders werkt het averechts.
+
+Taal: Nederlands. Hooguit één emoji, alleen als het echt past.
+
+Gegevens over de atleet:
 ${context}
 
 Geef ALLEEN het bericht terug, geen aanhalingstekens of uitleg.`
