@@ -75,13 +75,73 @@ export async function POST() {
       .eq('overgeslagen', false)
       .gte('datum', vandaagStr)
 
+    // ── Wat er al staat ──────────────────────────────────────────────────────
+    // Dit moet ná de opruimactie hierboven en vóór het plannen. Wat de delete
+    // heeft laten staan is precies wat vast is: voltooide trainingen, bewust
+    // overgeslagen trainingen, en alles wat al voorbij is. Het plan moet zich
+    // daarnaar voegen in plaats van er dwars doorheen te plannen.
+    //
+    // Hier zat de fout die je zag: er stond een hardloopsessie op een dag na een
+    // duurloop van 25 km. De planner plande de hele week alsof hij nog leeg was,
+    // want hij keek alleen naar wat hij zélf had bedacht. Een zware inspanning
+    // die je al gedaan hebt kwam in die berekening niet voor, dus ook de
+    // hersteldag erna niet.
+    const planStart = prePlanWeken > 0 ? fase1Start : fase2Start
+    const planStartStr = planStart.toISOString().split('T')[0]
+    // Eén dag verder terug dan het plan begint: de zondag vóór de eerste maandag
+    // bepaalt of die maandag een hersteldag is.
+    const zondagVoorafStr = new Date(planStart.getTime() - 86400000).toISOString().split('T')[0]
+
+    const { data: bestaandeRijen } = await supabase
+      .from('training_sessions')
+      .select('datum, type, duur_minuten, afstand_km, intensiteit, voltooid, session_feedback(rating, werkelijke_duur, werkelijke_afstand)')
+      .eq('user_id', user.id)
+      .gte('datum', zondagVoorafStr)
+
+    type Bestaand = {
+      datum: string; type: string; voltooid: boolean
+      duur_minuten: number | null; afstand_km: number | null; intensiteit: string | null
+      rating: string | null
+    }
+    const bestaande: Bestaand[] = (bestaandeRijen ?? []).map(r => {
+      const rij = r as Record<string, unknown>
+      const fb = (rij.session_feedback as Record<string, unknown>[] | null)?.[0]
+      return {
+        datum: rij.datum as string,
+        type: rij.type as string,
+        voltooid: Boolean(rij.voltooid),
+        // De werkelijke cijfers gaan voor: een geplande duurloop van 90 minuten
+        // die je na 20 minuten afbrak is geen zware dag.
+        duur_minuten: (fb?.werkelijke_duur as number | null) ?? (rij.duur_minuten as number | null),
+        afstand_km: (fb?.werkelijke_afstand as number | null) ?? (rij.afstand_km as number | null),
+        intensiteit: rij.intensiteit as string | null,
+        rating: (fb?.rating as string | null) ?? null,
+      }
+    })
+
+    const perDatum = new Map<string, Bestaand[]>()
+    for (const r of bestaande) {
+      if (!perDatum.has(r.datum)) perDatum.set(r.datum, [])
+      perDatum.get(r.datum)!.push(r)
+    }
+
+    /** Is dit een inspanning waar een hersteldag bij hoort? */
+    const rijIsZwaar = (r: Bestaand) => isZwareSessie({
+      type: r.type as 'hardlopen' | 'rust' | 'cross',
+      intensiteit: (r.intensiteit ?? 'makkelijk') as 'herstel' | 'makkelijk' | 'gemiddeld' | 'zwaar' | 'interval',
+      duur_minuten: r.duur_minuten,
+      afstand_km: r.afstand_km,
+    })
+
     const alleSessies: object[] = []
     let volgorde = 1
 
     // De hersteldag na een zware zondag valt in de week erná. Zonder deze
     // doorgifte plant de planner elke maandag alsof er zondag niets gebeurd is.
-    let vorigeDagZwaar = false
-    let vorigeDagZwaarSchema = false
+    const zondagVoorafZwaar = (perDatum.get(zondagVoorafStr) ?? [])
+      .some(r => r.voltooid && (r.type === 'hardlopen' || r.type === 'cross') && rijIsZwaar(r))
+    let vorigeDagZwaar = zondagVoorafZwaar
+    let vorigeDagZwaarSchema = zondagVoorafZwaar
 
     // Eerst alle weken plannen, dan pas wegschrijven. De opbouwrem hieronder
     // kijkt naar de weken vóór een week om te bepalen of de sprong te groot is,
@@ -103,13 +163,32 @@ export async function POST() {
       template: Parameters<typeof planWeek>[0],
       weekMaandag: Date, weekNr: number,
     ) => {
-      const gepland = planWeek(template, weekMaandag, geblokkeerd, vakantieArray, weekNr, volgorde, { vorigeDagZwaar })
-      const schema = planWeek(template, weekMaandag, geblokkeerd, [], weekNr, volgorde, { vorigeDagZwaar: vorigeDagZwaarSchema })
+      // Welke dagen van deze week liggen al vast, en op welke daarvan is er al
+      // zwaar gewerkt? Voor alle weken behalve de huidige is dit leeg.
+      const bezetteDagen: number[] = []
+      const gelopenZwaar: number[] = []
+      for (let d = 0; d < 7; d++) {
+        const dag = new Date(weekMaandag)
+        dag.setDate(dag.getDate() + d)
+        const datum = dag.toISOString().split('T')[0]
+        const rijen = perDatum.get(datum) ?? []
+        const loop = rijen.filter(r => r.type === 'hardlopen' || r.type === 'cross')
+        // Voorbij of al bezet met een loopsessie die blijft staan: niets te plannen.
+        if (datum < vandaagStr || loop.length > 0) bezetteDagen.push(d)
+        if (loop.some(r => r.voltooid && rijIsZwaar(r))) gelopenZwaar.push(d)
+      }
+      const vast = { bezetteDagen, gelopenZwaar }
+
+      const gepland = planWeek(template, weekMaandag, geblokkeerd, vakantieArray, weekNr, volgorde, { vorigeDagZwaar, ...vast })
+      const schema = planWeek(template, weekMaandag, geblokkeerd, [], weekNr, volgorde, { vorigeDagZwaar: vorigeDagZwaarSchema, ...vast })
       volgorde += gepland.length
       // De hersteldag na een zware zondag valt in de week erná. Zonder deze
       // doorgifte plant de planner elke maandag alsof er zondag niets gebeurd is.
-      vorigeDagZwaar = gepland.some(s => s.dag === 6 && isZwareSessie(s))
-      vorigeDagZwaarSchema = schema.some(s => s.dag === 6 && isZwareSessie(s))
+      // Ook een zondag die al gelopen is telt hier mee; die staat niet in het
+      // plan omdat er niets meer te plannen viel.
+      const zondagAlZwaar = gelopenZwaar.includes(6)
+      vorigeDagZwaar = zondagAlZwaar || gepland.some(s => s.dag === 6 && isZwareSessie(s))
+      vorigeDagZwaarSchema = zondagAlZwaar || schema.some(s => s.dag === 6 && isZwareSessie(s))
       weekPlannen.push(gepland)
       schemaPlannen.push(schema)
       weekMaandagen.push(weekMaandag.toISOString().split('T')[0])

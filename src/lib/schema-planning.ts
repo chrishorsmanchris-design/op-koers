@@ -71,6 +71,30 @@ function prioriteit(intensiteit: string, type: string): number {
   }
 }
 
+/**
+ * Sorteert sessies op "wie kiest eerst zijn dag". Zware sessies gaan vóór alle
+ * lichte, ongeacht hun intensiteitslabel: de lange duurloop van 170 minuten
+ * staat als 'makkelijk' in het schema en verloor daarmee van elke tempoloop van
+ * veertig minuten, terwijl hij juist de sessie is waar de hele week om draait.
+ */
+function opPrioriteit(a: PlanSessie, b: PlanSessie): number {
+  const zwaar = Number(isZwareSessie(b)) - Number(isZwareSessie(a))
+  if (zwaar !== 0) return zwaar
+  return prioriteit(a.intensiteit, a.type) - prioriteit(b.intensiteit, b.type)
+}
+
+/**
+ * Mag deze sessie op de dag direct ná een zware inspanning?
+ *
+ * Alleen als het herstel is. Het schema zet zelf regelmatig een herstelloop of
+ * een stuk fietsen achter een lange duurloop — dat is actief herstel en hoort
+ * erbij. Een duurloop van vijftig minuten in D2 hoort er niet bij, ook niet als
+ * hij "makkelijk" heet.
+ */
+function magNaZwaar(s: PlanSessie): boolean {
+  return s.type === 'cross' || s.intensiteit === 'herstel'
+}
+
 /** Hoeveel er van een sessie overblijft op een dag waarop je beperkt kunt trainen. */
 const BEPERKT_FACTOR = 0.65
 
@@ -136,16 +160,42 @@ export type PlanWeekOpties = {
    * doorheen glippen.
    */
   vorigeDagZwaar?: boolean
+  /**
+   * Dagen in deze week waar niets meer te plannen valt: al voorbij, al gelopen,
+   * of bewust overgeslagen.
+   */
+  bezetteDagen?: number[]
+  /**
+   * Dagen in deze week waarop al écht een zware inspanning geleverd is. Dit is
+   * het verschil tussen een schema en een trainingsplan: 25 km op donderdag is
+   * geen voornemen meer maar een feit, en de hersteldag erna dus ook niet.
+   * Zonder dit keek de planner alleen naar wat hij zélf had bedacht.
+   */
+  gelopenZwaar?: number[]
 }
 
 /**
  * Plant een weektemplate in op beschikbare dagen.
  *
- * Sessies blijven op hun eigen dag staan tenzij die dag geblokkeerd is. Moet er
- * verplaatst worden, dan zoekt de planner in drie steeds soepelere ringen naar
- * een dag, zodat een sessie nooit stilletjes verdwijnt maar ook nooit onnodig
- * op een hersteldag belandt. Interval/zware sessies gaan als eerste, en komen
- * niet op beperkte (vakantie)dagen als er alternatieven zijn.
+ * Sessies blijven op hun eigen dag staan tenzij die dag geblokkeerd is. Het
+ * plannen gebeurt in twee ronden, en die volgorde is de hele truc:
+ *
+ *   1. Eerst de zware sessies. Zij mogen nooit tegen een andere zware dag aan —
+ *      ook niet tegen een dag waarop je al gelopen hébt, en ook niet over de
+ *      weekgrens heen.
+ *   2. Dán de lichte. Pas op dat moment is bekend waar het herstel moet vallen,
+ *      want dat volgt uit waar de zware sessies wérkelijk staan.
+ *
+ * Voorheen werden de te beschermen hersteldagen vooraf bepaald uit het
+ * template. Zodra een geblokkeerde dag iets liet opschuiven — en met een vaste
+ * hockeydag en een vrije zondag schuift er élke week iets op — beschermde die
+ * berekening dagen waar niets meer stond, en lag de echte hersteldag open voor
+ * de eerste sessie die nergens anders paste.
+ *
+ * Past een sessie niet zonder dat herstel op te eten, dan valt hij weg. Dat is
+ * geen tekortkoming van de planner maar het antwoord: bij vijf beschikbare dagen
+ * en zes sessies is er geen indeling waarin alles kan, en dan is een gemiste
+ * rustige duurloop goedkoper dan een gemiste hersteldag.
  */
 export function planWeek(
   template: PlanSessie[],
@@ -157,78 +207,49 @@ export function planWeek(
   opties: PlanWeekOpties = {}
 ): GeplandeSessie[] {
   const statussen = dagStatussen(weekMaandag, permanentGeblokkeerd, vakanties)
-  const vrijeDagen = [0, 1, 2, 3, 4, 5, 6].filter(d => statussen.get(d) !== 'geblokkeerd')
+  const bezetteDagen = new Set(opties.bezetteDagen ?? [])
+  const vrijeDagen = [0, 1, 2, 3, 4, 5, 6]
+    .filter(d => statussen.get(d) !== 'geblokkeerd' && !bezetteDagen.has(d))
   const beperkteDagen = new Set(vrijeDagen.filter(d => statussen.get(d) === 'beperkt'))
 
   const vorigeDagZwaar = opties.vorigeDagZwaar ?? false
 
-  // Welke dagen bedoelde het schema zwaar? Op basis daarvan bepalen we welke
-  // rustdagen hersteldagen zijn en dus met rust gelaten moeten worden.
-  const zwaarInTemplate = new Set(template.filter(isZwareSessie).map(s => s.dag))
-
-  // Een rustdag die grenst aan een zware dag staat daar niet toevallig: hij
-  // vangt de klap op (erna) of maakt de benen fris (ervoor). Die dagen zijn
-  // geen opvangbak voor sessies die elders niet pasten.
-  const beschermdeRustdagen = new Set<number>(
-    template
-      .filter(s => s.type === 'rust')
-      .filter(s => (s.dag === 0 ? vorigeDagZwaar : zwaarInTemplate.has(s.dag - 1)) || zwaarInTemplate.has(s.dag + 1))
-      .map(s => s.dag)
-  )
-
-  // Sorteer: rust apart, actieve sessies op prioriteit
-  const actief = template
-    .filter(s => s.type !== 'rust')
-    .sort((a, b) => prioriteit(a.intensiteit, a.type) - prioriteit(b.intensiteit, b.type))
-
   const gebruikt = new Set<number>()
-  // Waar de zware sessies daadwerkelijk terechtkomen — niet waar het template ze
-  // wilde. Alleen daarmee kunnen we twee zware dagen op rij echt voorkomen.
-  const zwaarGeplaatst = new Set<number>()
+  // Waar de zware belasting daadwerkelijk ligt. Begint niet leeg: wat er deze
+  // week al gelopen is telt volledig mee, want je benen weten niet of een
+  // inspanning in het schema stond.
+  const zwaarGeplaatst = new Set<number>(opties.gelopenZwaar ?? [])
   const resultaat: GeplandeSessie[] = []
   let teller = volgordeStart
 
-  /** Zou een zware sessie op deze dag direct naast een andere zware dag komen? */
+  /** Grenst deze dag aan een zware dag? Dan mag er geen tweede zware dag naast. */
   const naastZwaar = (dag: number): boolean =>
     (dag === 0 ? vorigeDagZwaar : zwaarGeplaatst.has(dag - 1)) || zwaarGeplaatst.has(dag + 1)
 
-  for (const [index, sessie] of actief.entries()) {
-    const zwaar = isZwareSessie(sessie)
+  /** Is dit de dag ná een zware inspanning? Dan is het een hersteldag. */
+  const naZwaar = (dag: number): boolean =>
+    dag === 0 ? vorigeDagZwaar : zwaarGeplaatst.has(dag - 1)
+
+  const actief = template.filter(s => s.type !== 'rust').sort(opPrioriteit)
+  const zware = actief.filter(isZwareSessie)
+  const lichte = actief.filter(s => !isZwareSessie(s))
+
+  const plaats = (sessie: PlanSessie, toegestaan: (dag: number) => boolean): void => {
+    const beschikbaar = vrijeDagen.filter(d => !gebruikt.has(d) && toegestaan(d))
+    if (beschikbaar.length === 0) return // Valt weg: er is geen dag waar dit kan.
+
+    // Zware en stevige sessies mogen niet op beperkte (vakantie)dagen als er
+    // alternatieven zijn.
     const magNietOpBeperkt = ['interval', 'zwaar', 'gemiddeld'].includes(sessie.intensiteit)
+    const zonderBeperkt = beschikbaar.filter(d => !beperkteDagen.has(d))
+    const kandidaten = magNietOpBeperkt && zonderBeperkt.length > 0 ? zonderBeperkt : beschikbaar
 
-    // Dagen waar een sessie die nog moet komen zijn eigen plek heeft. Die pakken
-    // we niet af zolang er een neutrale dag vrij is — anders verschuift één
-    // geblokkeerde dinsdag de hele week als een rij dominostenen.
-    const geclaimd = new Set(actief.slice(index + 1).map(s => s.dag))
-
-    const beschikbaar = vrijeDagen.filter(d => !gebruikt.has(d))
-
-    const ringen = [
-      // 1. Alles klopt: geen hersteldag, geen zware dag ernaast, niemands plek ingepikt.
-      beschikbaar.filter(d => !beschermdeRustdagen.has(d) && !geclaimd.has(d) && !(zwaar && naastZwaar(d))),
-      // 2. Mag van een ander z'n dag af, maar herstel blijft herstel.
-      beschikbaar.filter(d => !beschermdeRustdagen.has(d) && !(zwaar && naastZwaar(d))),
-      // 3. Alleen nog de hersteldagen over — liever een zware week dan een gat.
-      beschikbaar.filter(d => !beschermdeRustdagen.has(d)),
-      beschikbaar,
-    ]
-
-    let kandidaten = ringen.find(r => r.length > 0) ?? []
-    if (kandidaten.length === 0) continue // Week te vol of alles geblokkeerd
-
-    // Zware sessies mogen niet op beperkte (vakantie) dagen als er alternatieven zijn
-    if (magNietOpBeperkt) {
-      const zonderBeperkt = kandidaten.filter(d => !beperkteDagen.has(d))
-      if (zonderBeperkt.length > 0) kandidaten = zonderBeperkt
-    }
-
-    // Voorkeur: eigen dag, anders dichtstbijzijnde toegestane dag
+    // Voorkeur: eigen dag, anders de dichtstbijzijnde toegestane dag
     const dag = kandidaten.includes(sessie.dag)
       ? sessie.dag
       : [...kandidaten].sort((a, b) => Math.abs(a - sessie.dag) - Math.abs(b - sessie.dag))[0]
 
     gebruikt.add(dag)
-    if (zwaar) zwaarGeplaatst.add(dag)
 
     // Belandt de sessie tóch op een beperkte vakantiedag — en in een week waarin
     // álle dagen beperkt zijn gebeurt dat onvermijdelijk — dan is "voorkeur voor
@@ -238,10 +259,18 @@ export function planWeek(
     // van het hele schema.
     const opBeperkteDag = beperkteDagen.has(dag)
     const aangepast = opBeperkteDag ? beperkteVersie(sessie) : sessie
-    if (opBeperkteDag && zwaar) zwaarGeplaatst.delete(dag)
+    if (isZwareSessie(aangepast)) zwaarGeplaatst.add(dag)
 
     resultaat.push({ ...aangepast, dag, datum: dagDatum(weekMaandag, dag), week_nummer: weekNr, volgorde: teller++ })
   }
+
+  // Ronde 1 — de zware sessies kiezen eerst, en nooit naast elkaar.
+  for (const sessie of zware) plaats(sessie, d => !naastZwaar(d))
+
+  // Ronde 2 — de lichte sessies. Op de dag ná een zware dag mag alleen herstel:
+  // het schema zet daar zelf een herstelloop of een stuk fietsen, geen duurloop.
+  const lichtToegestaan = (sessie: PlanSessie) => (d: number) => !naZwaar(d) || magNaZwaar(sessie)
+  for (const sessie of lichte) plaats(sessie, lichtToegestaan(sessie))
 
   // Rustdagen voor overgebleven vrije dagen
   for (const dag of vrijeDagen.filter(d => !gebruikt.has(d))) {
