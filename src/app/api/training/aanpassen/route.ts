@@ -7,6 +7,7 @@ import {
 } from '@/lib/werkelijke-weken'
 import { haalDoelAnalyse } from '@/lib/doeltempo-data'
 import { doelVoorPrompt } from '@/lib/doeltempo'
+import { maakConsistent } from '@/lib/sessie-aanpassing'
 
 /** Hoeveel volledige weken we terugkijken om een onderbreking te herkennen. */
 const TERUGBLIK_WEKEN = 8
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
     const response = await claude.messages.create({
       model: 'claude-sonnet-4-5', max_tokens: 1000,
       system: 'Je bent een atletiekcoach. Geef altijd geldige JSON terug.',
-      messages: [{ role: 'user', content: `${instructie}\n\nDoel: ${doel.naam} op ${doel.datum}\nKomende sessies:\n${komendeSessies.map(s => JSON.stringify({ id: s.id, datum: s.datum, beschrijving: s.beschrijving, duur_minuten: s.duur_minuten, afstand_km: s.afstand_km, intensiteit: s.intensiteit })).join('\n')}\n\nGeef JSON: {"aanpassingen":[{"id":"...","duur_minuten":0,"afstand_km":0,"intensiteit":"makkelijk","beschrijving":"..."}],"uitleg":"..."}` }],
+      messages: [{ role: 'user', content: `${instructie}\n\nDoel: ${doel.naam} op ${doel.datum}\nKomende sessies:\n${komendeSessies.map(s => JSON.stringify({ id: s.id, datum: s.datum, beschrijving: s.beschrijving, duur_minuten: s.duur_minuten, afstand_km: s.afstand_km, intensiteit: s.intensiteit })).join('\n')}\n\nPas de minuten in de beschrijving aan op de nieuwe duur: een sessie van 60 min mag niet "Lange duurloop 170 min in D1" heten.\n\nGeef JSON: {"aanpassingen":[{"id":"...","duur_minuten":0,"afstand_km":0,"intensiteit":"makkelijk","beschrijving":"..."}],"uitleg":"..."}` }],
     })
     const tekst = response.content[0].type === 'text' ? response.content[0].text : '{}'
     try {
@@ -53,9 +54,9 @@ export async function POST(req: NextRequest) {
       const geldigeIds = new Set(komendeSessies.map(s => s.id))
       const GELDIGE_INTENSITEITEN = new Set(['herstel', 'makkelijk', 'gemiddeld', 'zwaar', 'interval'])
       for (const a of parsed.aanpassingen.filter((a: { id: string }) => geldigeIds.has(a.id))) {
+        const oud = komendeSessies.find(s => s.id === a.id)!
         await supabase.from('training_sessions').update({
-          duur_minuten: a.duur_minuten, afstand_km: a.afstand_km,
-          beschrijving: a.beschrijving,
+          ...maakConsistent(oud, a),
           intensiteit: GELDIGE_INTENSITEITEN.has(a.intensiteit) ? a.intensiteit : undefined,
         } as never).eq('id', a.id).eq('user_id', user.id)
       }
@@ -244,6 +245,10 @@ ${komendeSessies.map(s =>
   `{"id":"${s.id}","datum":"${s.datum}","week":${s.week_nummer},"beschrijving":"${s.beschrijving}","duur_minuten":${s.duur_minuten},"afstand_km":${s.afstand_km},"intensiteit":"${s.intensiteit}","type":"${s.type}"}`
 ).join('\n')}
 
+Pas de minuten in de beschrijving aan op de nieuwe duur: een sessie van 60 min
+mag niet "Lange duurloop 170 min in D1" blijven heten. Laat de afstand het tempo
+van de zone volgen, zodat duur en afstand elkaar niet tegenspreken.
+
 Geef ALLEEN geldige JSON terug:
 {"aanpassingen":[{"id":"<exact id>","duur_minuten":40,"afstand_km":7.0,"intensiteit":"makkelijk","beschrijving":"..."}],"uitleg":"Korte uitleg van de aanpassing en compensatiestrategie (max 150 tekens)"}`
 
@@ -278,12 +283,11 @@ Geef ALLEEN geldige JSON terug:
   const GELDIGE_INTENSITEITEN = new Set(['herstel', 'makkelijk', 'gemiddeld', 'zwaar', 'interval'])
 
   for (const aanpassing of valideAanpassingen) {
+    const oud = komendeSessies.find(s => s.id === aanpassing.id)!
     await supabase
       .from('training_sessions')
       .update({
-        duur_minuten: aanpassing.duur_minuten,
-        afstand_km: aanpassing.afstand_km,
-        beschrijving: aanpassing.beschrijving,
+        ...maakConsistent(oud, aanpassing),
         intensiteit: GELDIGE_INTENSITEITEN.has(aanpassing.intensiteit)
           ? aanpassing.intensiteit
           : undefined,
