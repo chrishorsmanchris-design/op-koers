@@ -114,6 +114,8 @@ export interface Database {
           notitie: string | null
           hartslag_gem: number | null
           hartslag_max: number | null
+          /** Passen per minuut, beide benen. Strava levert het per been; zie lib/cadans.ts. */
+          cadans_spm: number | null
           werkelijke_duur: number | null
           werkelijke_afstand: number | null
           route_polyline: string | null

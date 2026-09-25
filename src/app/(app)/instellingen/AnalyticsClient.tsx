@@ -6,6 +6,8 @@ import { HerstelKaart } from '@/components/training/HerstelKaart'
 import type { HerstelAnalyse } from '@/lib/herstel'
 import { EfficientieKaart } from '@/components/training/EfficientieKaart'
 import type { EfficientieAnalyse } from '@/lib/efficientie'
+import { analyseerCadans, MIN_METINGEN } from '@/lib/cadans'
+import { Footprints } from 'lucide-react'
 import { TrendingUp, TrendingDown, Minus, Activity, Timer, MapPin, Zap, Heart, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface SessionFeedback {
@@ -13,6 +15,7 @@ interface SessionFeedback {
   werkelijke_duur: number | null
   hartslag_gem: number | null
   hartslag_max: number | null
+  cadans_spm: number | null
   rating: string | null
 }
 
@@ -528,6 +531,69 @@ function RacePredictor({ loopSessies }: { loopSessies: Sessie[] }) {
 }
 
 // Hartslag zones
+/**
+ * Cadans afgezet tegen je eigen basislijn, nooit tegen 180. Zie lib/cadans.ts
+ * voor waarom dat getal hier niet voorkomt.
+ */
+function CadansKaart({ loopSessies }: { loopSessies: Sessie[] }) {
+  const analyse = useMemo(() => analyseerCadans(
+    loopSessies.map(s => {
+      const fb = s.session_feedback?.[0]
+      return {
+        datum: s.datum,
+        afstand_km: fb?.werkelijke_afstand ?? s.afstand_km,
+        duur_minuten: fb?.werkelijke_duur ?? s.duur_minuten,
+        cadans_spm: fb?.cadans_spm ?? null,
+      }
+    })
+  ), [loopSessies])
+
+  // Zwijgen tot er genoeg metingen zijn. Een basislijn uit twee lopen is een
+  // getal met een vals air van precisie, en daar stuur je geen techniek op bij.
+  if (!analyse) {
+    const metingen = loopSessies.filter(s => s.session_feedback?.[0]?.cadans_spm).length
+    if (metingen === 0) return null
+    return (
+      <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Footprints size={14} className="text-[#38bdf8]" />
+          <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider">Pasfrequentie</p>
+        </div>
+        <p className="text-xs text-[#8888a8] leading-relaxed">
+          {metingen} van de {MIN_METINGEN} metingen binnen. Vanaf {MIN_METINGEN} lopen
+          met cadansdata kan er een basislijn uit.
+        </p>
+      </div>
+    )
+  }
+
+  const { basis, doel, uitleg, punten } = analyse
+
+  return (
+    <div className="bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Footprints size={14} className="text-[#38bdf8]" />
+        <p className="text-xs font-semibold text-[#55556a] uppercase tracking-wider">Pasfrequentie</p>
+        <span className="ml-auto text-[10px] text-[#55556a]">{punten.length} lopen</span>
+      </div>
+
+      <div className="flex gap-6 mb-3">
+        <div>
+          <p className="text-2xl font-bold text-white">{basis}</p>
+          <p className="text-xs text-[#55556a]">jouw rustige cadans</p>
+        </div>
+        <div className="w-px bg-[#222230]" />
+        <div>
+          <p className="text-2xl font-bold text-[#38bdf8]">{doel.min}–{doel.max}</p>
+          <p className="text-xs text-[#55556a]">doel bij blessuredruk</p>
+        </div>
+      </div>
+
+      <p className="text-xs text-[#8888a8] leading-relaxed">{uitleg}</p>
+    </div>
+  )
+}
+
 function HartslagZones({ loopSessies, maxHR }: { loopSessies: Sessie[]; maxHR: number }) {
   const zones = [
     { label: 'Z1 Herstel', min: 0, max: 0.60, kleur: '#3b82f6' },
@@ -1229,6 +1295,8 @@ export function AnalyticsClient({ sessies, fysioSessies, profiel, doel, herstel,
                 {maxHartslag && maxHartslag > 0 && (
                   <HartslagZones loopSessies={loopSessies} maxHR={maxHartslag} />
                 )}
+
+                <CadansKaart loopSessies={loopSessies} />
 
                 {/* Hartslag gem/max stats */}
                 {hartslagStats && (

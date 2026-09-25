@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import { cadansUitStrava } from '@/lib/cadans'
 
 function isoWeeknummer(datum: string): number {
   const d = new Date(datum + 'T12:00:00')
@@ -231,6 +232,7 @@ export async function syncStravaRuns(
     const hartslagGem = run.average_heartrate ? Math.round(run.average_heartrate as number) : null
     const hartslagMax = run.max_heartrate ? Math.round(run.max_heartrate as number) : null
     const routePolyline = (run.map as Record<string, unknown> | undefined)?.summary_polyline as string | null ?? null
+    const cadans = cadansUitStrava(run.average_cadence as number | undefined)
 
     const sessieId = await vindOfMaakSessie(supabase, userId, run, datum, afstandKm, duurMin)
     if (!sessieId) continue
@@ -248,6 +250,7 @@ export async function syncStravaRuns(
         hartslag_gem: hartslagGem,
         hartslag_max: hartslagMax,
         route_polyline: routePolyline,
+        cadans_spm: cadans,
       } as never).eq('id', bestaandeFeedback.id)
     } else {
       await supabase.from('session_feedback').insert({
@@ -259,6 +262,7 @@ export async function syncStravaRuns(
         hartslag_gem: hartslagGem,
         hartslag_max: hartslagMax,
         route_polyline: routePolyline,
+        cadans_spm: cadans,
         notitie: `Strava sync — ${(run.name as string) ?? ''}`,
       } as never)
     }
