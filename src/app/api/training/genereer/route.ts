@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { haalDoelAnalyse } from '@/lib/doeltempo-data'
 import { doelVoorPrompt } from '@/lib/doeltempo'
+import { herstelAfstand, mergeTempoZones, type TempoZone } from '@/lib/tempo-zones'
 
 export const maxDuration = 300
 
@@ -166,6 +167,11 @@ Geef ALLEEN geldig JSON, geen markdown, geen extra tekst:
     const GELDIGE_TYPES = new Set(['hardlopen', 'rust', 'krachttraining', 'cross', 'core'])
     const GELDIGE_INTENSITEITEN = new Set(['herstel', 'makkelijk', 'gemiddeld', 'zwaar', 'interval'])
 
+    // Je eigen tempo's gaan voor de standaardtabel bij het narekenen hieronder.
+    const eigenZones = mergeTempoZones(
+      (profiel as Record<string, unknown>)?.tempo_zones as TempoZone[] | null
+    )
+
     const sessiesOmOpslaan = schema.sessies
       .filter((s: { datum: string; type: string }) => {
         if (s.datum < vandaag) return false
@@ -186,6 +192,17 @@ Geef ALLEEN geldig JSON, geen markdown, geen extra tekst:
         // Zorg dat type en intensiteit geldige waarden hebben
         if (!GELDIGE_TYPES.has(String(schoon.type))) schoon.type = 'rust'
         if (schoon.intensiteit && !GELDIGE_INTENSITEITEN.has(String(schoon.intensiteit))) schoon.intensiteit = 'makkelijk'
+        // Duur en afstand kwamen hier ongecontroleerd uit het model. Samen leggen
+        // ze een tempo vast, en dat werd nergens nagerekend: zo kon er "90 min,
+        // 6 km" in je schema staan — een kwartier per kilometer. De duur wint,
+        // want die heb je in de hand.
+        if (schoon.type === 'hardlopen') {
+          schoon.afstand_km = herstelAfstand(
+            schoon.duur_minuten as number | null,
+            schoon.afstand_km as number | null,
+            eigenZones,
+          )
+        }
         // Core als type is toegestaan maar valt terug op krachttraining bij DB constraint fout
         return schoon
       })

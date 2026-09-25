@@ -81,6 +81,43 @@ export function zoekTempoZone(label: string, zones: TempoZone[] = TEMPO_ZONES): 
   return zones.find(z => z.label === label.toUpperCase())
 }
 
+/**
+ * De ruimste en de scherpste tempo's die nog een hardloopsessie kunnen zijn.
+ *
+ * Bewust breed, want de uitersten in het schema zijn legitiem: een interval met
+ * wandelpauzes komt op zo'n 6:00 per kilometer uit en een heuveltraining op
+ * 6:40, terwijl de marathon zelf onder de 4:40 duikt. Deze grenzen zijn er niet
+ * om tempo te sturen maar om onmogelijke combinaties te herkennen.
+ */
+const TRAAGSTE_SEC_PER_KM = 9 * 60
+const SNELSTE_SEC_PER_KM = 3 * 60 + 30
+
+/**
+ * Controleert of duur en afstand samen een bestaand tempo opleveren, en
+ * herberekent de afstand als dat niet zo is.
+ *
+ * Een sessie mag een duur en een afstand naast elkaar zetten, maar samen leggen
+ * die twee een tempo vast, en dat tempo moet kunnen. "90 minuten, 6 km" is een
+ * kwartier per kilometer: dat is wandelen, en het staat er alleen omdat niemand
+ * de twee getallen tegen elkaar heeft gehouden.
+ *
+ * Bij twijfel wint de duur. Die heb je in de hand — je gaat een uur lopen — en
+ * de afstand volgt uit hoe hard je loopt. Een afstand die ontbreekt blijft
+ * ontbreken: een tijdsessie zonder afstand is een geldige opdracht.
+ */
+export function herstelAfstand(
+  duurMinuten: number | null | undefined,
+  afstandKm: number | null | undefined,
+  zones: TempoZone[] = TEMPO_ZONES
+): number | null {
+  if (!afstandKm || afstandKm <= 0) return null
+  if (!duurMinuten || duurMinuten <= 0) return afstandKm
+  const secPerKm = (duurMinuten * 60) / afstandKm
+  if (secPerKm <= TRAAGSTE_SEC_PER_KM && secPerKm >= SNELSTE_SEC_PER_KM) return afstandKm
+  const referentie = zoekTempoZone('D1', zones) ?? TEMPO_ZONES[1]
+  return Math.round((duurMinuten * 60) / paceNaarSeconden(referentie.pace) * 10) / 10
+}
+
 /** Parseert paceString "5:51" (min:sec/km) naar seconden per km */
 export function paceNaarSeconden(pace: string): number {
   const [min, sec] = pace.split(':').map(Number)

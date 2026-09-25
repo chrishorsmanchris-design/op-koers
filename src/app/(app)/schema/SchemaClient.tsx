@@ -6,7 +6,7 @@ import { cn, formatDuur, dagKorteDatum } from '@/lib/utils'
 import type { Goal, TrainingSession } from '@/types/database'
 import {
   Loader2, RefreshCw, MapPin, Timer, CheckCircle2, XCircle,
-  ChevronLeft, ChevronRight, Calendar, MoveRight, X, ArrowLeftRight,
+  ChevronLeft, ChevronRight, Calendar, MoveRight, X, ArrowLeftRight, Dumbbell,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { WorkoutModal } from '@/components/training/WorkoutModal'
@@ -407,11 +407,20 @@ export function SchemaClient({ sessies: initSessies, doel, doelAnalyse, wilCore,
   // Week statistieken (alleen trainingsessies, niet rust)
   const weekStats = useMemo(() => {
     const trainingen = weekSessies.filter(s => s.type !== 'rust')
-    const totalKm = trainingen.reduce((sum, s) => sum + (s.afstand_km ?? 0), 0)
-    const totalMin = trainingen.reduce((sum, s) => sum + (s.duur_minuten ?? 0), 0)
+    // De kilometers en de tijd moeten over dezelfde sessies gaan. Stonden ze dat
+    // niet, dan las een week met één heuveltraining van 6 km plus drie keer
+    // fysio als "6 km · 1u 45m": een tempo van bijna een kwartier per kilometer,
+    // omdat het krachtwerk en het fietsen wél in de tijd meetelden en niet in de
+    // afstand. Hardlopen bij hardlopen, de rest apart.
+    const loop = trainingen.filter(s => s.type === 'hardlopen')
+    const totalKm = loop.reduce((sum, s) => sum + (s.afstand_km ?? 0), 0)
+    const totalMin = loop.reduce((sum, s) => sum + (s.duur_minuten ?? 0), 0)
+    const overigMin = trainingen
+      .filter(s => s.type !== 'hardlopen')
+      .reduce((sum, s) => sum + (s.duur_minuten ?? 0), 0)
     const gedaan = trainingen.filter(s => s.voltooid).length
     const open = trainingen.filter(s => !s.voltooid && !s.overgeslagen).length
-    return { totalKm: Math.round(totalKm * 10) / 10, totalMin, gedaan, open, total: trainingen.length }
+    return { totalKm: Math.round(totalKm * 10) / 10, totalMin, overigMin, gedaan, open, total: trainingen.length }
   }, [weekSessies])
 
   // Algehele plan-statistieken (heel schema, niet alleen actieve week)
@@ -843,6 +852,11 @@ export function SchemaClient({ sessies: initSessies, doel, doelAnalyse, wilCore,
               )}
               {weekStats.totalMin > 0 && (
                 <span className="flex items-center gap-1"><Timer size={11} />{formatDuur(weekStats.totalMin)}</span>
+              )}
+              {weekStats.overigMin > 0 && (
+                <span className="flex items-center gap-1" title="Fysio, core en crosstraining">
+                  <Dumbbell size={11} />{formatDuur(weekStats.overigMin)}
+                </span>
               )}
             </div>
             <div className="flex gap-3">

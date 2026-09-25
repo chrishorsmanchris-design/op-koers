@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { planWeek, getMaandag, isZwareSessie, type Vakantie, type GeplandeSessie } from '@/lib/schema-planning'
 import { PDF_PLAN } from '@/lib/pdf-plan'
-import { beperkOpbouw } from '@/lib/opbouw'
+import { beperkOpbouw, schaalBeschrijving } from '@/lib/opbouw'
 import { bepaalWerkelijkeWeken, type VoltooideSessie } from '@/lib/werkelijke-weken'
 
 export const maxDuration = 120
@@ -206,13 +206,15 @@ export async function POST() {
         weekMaandag.setDate(weekMaandag.getDate() + i * 7)
         const schaal = schaalFactoren[Math.min(i, schaalFactoren.length - 1)]
 
-        // Gebruik PDF week 1 als basis, schaal duur en afstand
+        // Gebruik PDF week 1 als basis, schaal duur en afstand. De minuten in de
+        // beschrijving gaan mee: anders staat er "45 min D1" boven een sessie van
+        // 34 minuten, en de tekst is wat je meeneemt naar buiten.
         const pdfWeek1 = PDF_PLAN[0].map(s => ({
           ...s,
           duur_minuten: s.duur_minuten ? Math.round(s.duur_minuten * schaal) : null,
           afstand_km: s.afstand_km ? Math.round(s.afstand_km * schaal * 10) / 10 : null,
           beschrijving: s.duur_minuten
-            ? `${s.beschrijving} (opbouw ${Math.round(schaal * 100)}%)`
+            ? `${schaalBeschrijving(s.beschrijving, schaal)} (opbouw ${Math.round(schaal * 100)}%)`
             : s.beschrijving,
         }))
 
