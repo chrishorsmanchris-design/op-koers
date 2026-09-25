@@ -9,9 +9,14 @@
  * hoef je bij thuiskomst niet opnieuw op te bouwen. Andersom net zo — twee weken
  * grieperig op de bank telt niet als de trainingsweken die er stonden.
  *
- * Alleen wéken die helemaal voorbij zijn krijgen een werkelijke waarde. De week
- * die nu loopt is half gebeurd en half gepland; die half meten zou hem stelselmatig
- * te laag inschatten, en dan remt het schema af op een week die nog moet komen.
+ * Een week die voorbij is telt zoals hij gegaan is: wat je niet gelopen hebt,
+ * heb je niet gelopen. De week die nu loopt is half gebeurd en half gepland, en
+ * die kant en klaar meten zou hem stelselmatig te laag inschatten — dan remt het
+ * schema af op werk dat nog moet komen. Maar hem weglaten is net zo fout gebleken:
+ * wie woensdag 25 km liep heeft die kilometers in de benen, en het schema klemde
+ * de duurloop van zondag vast op oudere, kleinere weken alsof die loop niet
+ * bestond. Daarom is de lopende week gemarkeerd (`lopend`) in plaats van
+ * weggelaten; de rem neemt er het hoogste van plan en werkelijkheid.
  */
 
 import { sessiePunten } from './belasting'
@@ -42,7 +47,7 @@ function datumPlus(datum: string, dagen: number): string {
  *
  * @param sessies      Voltooide sessies, in willekeurige volgorde.
  * @param weekMaandagen De maandag van elke week uit het plan, op planvolgorde.
- * @param vandaag       yyyy-mm-dd; weken die hierna eindigen blijven `null`.
+ * @param vandaag       yyyy-mm-dd; weken die hierna beginnen blijven `null`.
  */
 export function bepaalWerkelijkeWeken(
   sessies: VoltooideSessie[],
@@ -51,8 +56,11 @@ export function bepaalWerkelijkeWeken(
 ): (WerkelijkeWeek | null)[] {
   return weekMaandagen.map(maandag => {
     const eind = datumPlus(maandag, 6)
-    // De lopende week is nog niet af; die laten we aan het plan.
-    if (eind >= vandaag) return null
+    // Een week die nog moet beginnen heeft niets te melden.
+    if (maandag > vandaag) return null
+    // De lopende week is nog niet af: haar weektotaal mag de rem niet als
+    // maatstaf gebruiken, haar afgemaakte loops wel.
+    const lopend = eind >= vandaag
 
     const vanDeWeek = sessies.filter(s => s.datum >= maandag && s.datum <= eind)
     // Een week zonder sessies is een echte nul — dat is precies de informatie
@@ -74,7 +82,7 @@ export function bepaalWerkelijkeWeken(
     const gevoel = gevoelUitRatings(
       vanDeWeek.map(s => s.rating).filter((r): r is string => !!r))
 
-    return { punten: Math.round(punten), langsteKm, gevoel }
+    return { punten: Math.round(punten), langsteKm, gevoel, lopend }
   })
 }
 

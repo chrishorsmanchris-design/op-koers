@@ -130,6 +130,12 @@ export interface WerkelijkeWeek {
   langsteKm: number
   /** Gemiddeld gevoel uit je feedback, -1 tot 1. `null` = geen feedback gegeven. */
   gevoel: number | null
+  /**
+   * De week is nog niet afgelopen. Dan is `punten` per definitie te laag — er
+   * staat nog werk in — en gebruikt de rem het plan als weekmaat. `langsteKm`
+   * is wél bruikbaar: een loop die af is, is af.
+   */
+  lopend?: boolean
 }
 
 export interface OpbouwAanpassing {
@@ -280,7 +286,9 @@ export function beperkOpbouw(
     const groei = (basis: number) => Math.max(basis * gevoelFactor, MIN_GROEI)
 
     // ── 1. De lange duurloop ────────────────────────────────────────────────
-    // Eerst, want inkorten hiervan verlaagt ook meteen het weektotaal.
+    // Eerst, want inkorten hiervan verlaagt ook meteen het weektotaal — waarna
+    // de volumerem eronder minder of niets meer hoeft te doen.
+    const sleutel = (s: GeplandeSessie) => s.datum + '#' + s.volgorde
     const langsteReferentie = referentie(historieLangste)
     // Loop je niet achter op het schema, dan is een lange duurloop die het
     // schema hier neerzet precies de opbouw die je gevolgd hebt. Met rust laten.
@@ -295,10 +303,9 @@ export function beperkOpbouw(
 
       if (langste && plafond / langste.afstand_km! <= 1 - MIN_ZINVOLLE_CORRECTIE) {
         const van = langste.afstand_km!
-        const teLangeIds = new Set(teLang.map(s => s.datum + s.volgorde))
-        week = week.map(s =>
-          teLangeIds.has(s.datum + s.volgorde) ? schaal(s, plafond / s.afstand_km!) : s)
-        const naar = week.find(s => s.datum + s.volgorde === langste.datum + langste.volgorde)
+        const teLangeIds = new Set(teLang.map(sleutel))
+        week = week.map(s => (teLangeIds.has(sleutel(s)) ? schaal(s, plafond / s.afstand_km!) : s))
+        const naar = week.find(s => sleutel(s) === sleutel(langste))
         aanpassingen.push({
           week_nummer: langste.week_nummer,
           reden: 'lange_duurloop',
@@ -315,9 +322,7 @@ export function beperkOpbouw(
     // vallen buiten de rem: die kort je niet in.
     const schaalbaar = week.filter(s => !s.beschermd && s.type !== 'rust')
     const schaalbarePunten = schaalbaar.reduce((som, s) => som + punten(s), 0)
-    const beschermdePunten = week
-      .filter(s => s.beschermd)
-      .reduce((som, s) => som + punten(s), 0)
+    const vastePunten = week.filter(s => s.beschermd).reduce((som, s) => som + punten(s), 0)
 
     // Zonder onderbreking grijpt de rem alleen in als je feedback een patroon
     // laat zien. Het schema mag dan zijn eigen sprongen maken — dat is de opbouw
@@ -329,9 +334,9 @@ export function beperkOpbouw(
       // plaats van terug te klemmen op wat de rekensom zegt dat je aankunt.
       const bodem = naOnderbreking
         ? 0
-        : (schaalbarePunten + beschermdePunten) * (1 - MAX_TRIM_OP_GEVOEL)
+        : (schaalbarePunten + vastePunten) * (1 - MAX_TRIM_OP_GEVOEL)
       const plafond = Math.max(aankunnen * groei(MAX_GROEI_WEEK), bodem)
-      const ruimte = plafond - beschermdePunten
+      const ruimte = plafond - vastePunten
 
       if (schaalbarePunten > ruimte && ruimte > 0 &&
           ruimte / schaalbarePunten <= 1 - MIN_ZINVOLLE_CORRECTIE) {
@@ -355,8 +360,16 @@ export function beperkOpbouw(
     // Historie bijwerken. Wat je werkelijk gedaan hebt gaat vóór het plan: een
     // vakantieweek waarin je toch drie keer gelopen hebt telt als die drie
     // trainingen, niet als de nul die er gepland stond.
-    historiePunten.push(gedaan?.punten ?? week.reduce((som, s) => som + punten(s), 0))
-    historieLangste.push(gedaan?.langsteKm ?? Math.max(0, ...week.map(s => s.afstand_km ?? 0)))
+    const planPunten = week.reduce((som, s) => som + punten(s), 0)
+    const planLangste = Math.max(0, ...week.map(s => s.afstand_km ?? 0))
+    // Een week die voorbij is telt zoals hij gegaan is: niet gelopen is niet
+    // gelopen. De lopende week telt voor het hoogste van plan en werkelijkheid.
+    // Half meten zou hem te laag inschatten, maar wegkijken ook: wie woensdag 25
+    // km liep heeft die kilometers in de benen, hoe de zondag ook uitpakt.
+    const meting = (werkelijkeWaarde: number, planWaarde: number) =>
+      gedaan ? (gedaan.lopend ? Math.max(werkelijkeWaarde, planWaarde) : werkelijkeWaarde) : planWaarde
+    historiePunten.push(meting(gedaan?.punten ?? 0, planPunten))
+    historieLangste.push(meting(gedaan?.langsteKm ?? 0, planLangste))
     historieGevoel.push(gedaan?.gevoel ?? null)
     schemaPunten.push(schemaWeek.reduce((som, s) => som + punten(s), 0))
     schemaLangste.push(Math.max(0, ...schemaWeek.map(s => s.afstand_km ?? 0)))
