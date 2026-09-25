@@ -1093,6 +1093,7 @@ export function DashboardClient({
           afstand_km={workoutSessie.afstand_km}
           intensiteit={workoutSessie.intensiteit}
           zones={(profiel as Record<string, unknown>)?.tempo_zones as never ?? undefined}
+          maxHartslag={(profiel as Record<string, unknown>)?.max_hartslag as number | null}
           onSluiten={() => setWorkoutSessie(null)}
         />
       )}

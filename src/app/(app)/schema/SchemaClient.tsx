@@ -26,6 +26,7 @@ interface Props {
   wilCore: boolean
   heeftFysio: boolean
   tempoZones?: TempoZone[] | null
+  maxHartslag?: number | null
   tempoZonesUpdatedAt?: string | null
 }
 
@@ -330,7 +331,7 @@ function AgendaWeergave({ sessies, onDatumChange, onVerwijderen, onToggleVoltooi
 }
 
 // ── Hoofdcomponent ─────────────────────────────────────────────────────────────
-export function SchemaClient({ sessies: initSessies, doel, doelAnalyse, wilCore, heeftFysio, tempoZones, tempoZonesUpdatedAt }: Props) {
+export function SchemaClient({ sessies: initSessies, doel, doelAnalyse, wilCore, heeftFysio, tempoZones, tempoZonesUpdatedAt, maxHartslag }: Props) {
   const supabase = createClient()
   const vandaag = new Date().toISOString().split('T')[0]
   // Volgende maandag — sessies vóór die datum (deze week + verleden) mogen afgevinkt worden
@@ -782,7 +783,7 @@ export function SchemaClient({ sessies: initSessies, doel, doelAnalyse, wilCore,
 
           {doelAnalyse && <DoeltempoKaart analyse={doelAnalyse} />}
 
-          <TempoZonesCard zones={tempoZones ?? undefined} bijgewerktOp={tempoZonesUpdatedAt} />
+          <TempoZonesCard zones={tempoZones ?? undefined} bijgewerktOp={tempoZonesUpdatedAt} maxHartslag={maxHartslag} />
 
           {/* ── Weergave-toggle: week-detail vs volledige agenda ─────────────── */}
           <div className="flex gap-1 p-1 bg-[#1b1b27] border border-[#2d2d3e] rounded-2xl">
@@ -1208,6 +1209,7 @@ export function SchemaClient({ sessies: initSessies, doel, doelAnalyse, wilCore,
           afstand_km={workoutSessie.afstand_km}
           intensiteit={workoutSessie.intensiteit}
           zones={tempoZones ?? undefined}
+          maxHartslag={maxHartslag}
           onSluiten={() => setWorkoutSessie(null)}
         />
       )}

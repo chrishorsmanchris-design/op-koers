@@ -1,8 +1,8 @@
 'use client'
-import { ArrowLeft, Timer, MapPin } from 'lucide-react'
+import { ArrowLeft, Timer, MapPin, Heart } from 'lucide-react'
 import { formatDuur } from '@/lib/utils'
 import { parseWorkout } from '@/lib/workout-parser'
-import type { TempoZone } from '@/lib/tempo-zones'
+import { hartslagBereik, maximaleHartslag, zonesInTekst, type TempoZone } from '@/lib/tempo-zones'
 
 interface Props {
   beschrijving: string
@@ -10,19 +10,34 @@ interface Props {
   afstand_km: number | null
   intensiteit?: string | null
   zones?: TempoZone[]
+  /** Nodig om zones naar slagen per minuut te vertalen; zonder dit blijft het tempo. */
+  maxHartslag?: number | null
   onSluiten: () => void
 }
 
-function ZoneBadge({ zone }: { zone: TempoZone }) {
+function ZoneBadge({ zone, maxHartslag }: { zone: TempoZone; maxHartslag?: number | null }) {
+  const hr = hartslagBereik(zone, maxHartslag)
   return (
     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#f97316]/10 text-[#f97316]">
       {zone.label} · {zone.pace}/km
+      {hr && <span className="text-[#f97316]/70"> · {hr.min}–{hr.max} bpm</span>}
     </span>
   )
 }
 
-export function WorkoutModal({ beschrijving, duur_minuten, afstand_km, intensiteit, zones, onSluiten }: Props) {
+export function WorkoutModal({
+  beschrijving, duur_minuten, afstand_km, intensiteit, zones, maxHartslag, onSluiten,
+}: Props) {
   const workout = parseWorkout(beschrijving, duur_minuten, zones)
+
+  // De zwaarste zone die in de beschrijving genoemd wordt bepaalt het plafond.
+  // Uit de hele tekst en niet per blok: het gaat om één getal waar je de hele
+  // sessie onder blijft, en dat is de bovenkant van het zwaarste stuk.
+  const zonesInSessie = zonesInTekst(beschrijving, zones)
+  const plafond = maximaleHartslag(zonesInSessie, maxHartslag)
+  const zwaarste = zonesInSessie.length
+    ? zonesInSessie.reduce((a, b) => (b.hrMax > a.hrMax ? b : a))
+    : null
 
   // Schermvullend scherm i.p.v. bottom sheet: geen dvh/scroll-lock-trucs nodig,
   // want `inset-0` sizeert zichzelf al op de viewport en er is geen achterliggende
@@ -59,6 +74,38 @@ export function WorkoutModal({ beschrijving, duur_minuten, afstand_km, intensite
           )}
         </div>
 
+        {/* Het antwoord op "hoe hard mag ik maximaal" hoort bovenaan te staan en
+            niet weggestopt in een badge bij een blok. */}
+        {zwaarste && (
+          <div className="rounded-2xl bg-[#222230] border border-[#2d2d3e] p-3.5 mb-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Heart size={13} className="text-red-400" />
+              <p className="text-[10px] font-semibold text-[#55556a] uppercase tracking-wide">
+                Niet harder dan
+              </p>
+            </div>
+            {plafond ? (
+              <>
+                <p className="text-2xl font-bold text-white leading-none">
+                  {plafond} <span className="text-sm font-semibold text-[#8888a8]">bpm</span>
+                </p>
+                <p className="text-xs text-[#8888a8] mt-1.5 leading-relaxed">
+                  Bovengrens van {zwaarste.label}, de zwaarste zone in deze sessie.{' '}
+                  {zwaarste.gevoel}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-white leading-snug">{zwaarste.gevoel}</p>
+                <p className="text-xs text-[#8888a8] mt-1.5 leading-relaxed">
+                  Vul je maximale hartslag in bij Instellingen, dan staat hier een getal.
+                  Tot die tijd is dit de betere controle: hij heeft geen kalibratie nodig.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
         <p className="text-[10px] font-semibold text-[#55556a] uppercase tracking-wide mb-2">Opbouw</p>
         <div className="flex flex-col gap-2">
           {workout.blokken.map((blok, i) => (
@@ -72,7 +119,7 @@ export function WorkoutModal({ beschrijving, duur_minuten, afstand_km, intensite
               {blok.detail && <p className="text-xs text-[#8888a8] mt-1">{blok.detail}</p>}
               {blok.zones.length > 0 && (
                 <div className="flex gap-1.5 flex-wrap mt-2">
-                  {blok.zones.map(z => <ZoneBadge key={z.label} zone={z} />)}
+                  {blok.zones.map(z => <ZoneBadge key={z.label} zone={z} maxHartslag={maxHartslag} />)}
                 </div>
               )}
             </div>

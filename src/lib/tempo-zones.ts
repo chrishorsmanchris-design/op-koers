@@ -9,17 +9,73 @@ export interface TempoZone {
   naam: string
   pace: string    // min:sec per km
   omschrijving: string
+  /** Onder- en bovengrens als fractie van je maximale hartslag. */
+  hrMin: number
+  hrMax: number
+  /** Hoe het voelt en klinkt — de controle die geen horloge nodig heeft. */
+  gevoel: string
 }
 
+/**
+ * De hartslaggrenzen zijn de gangbare percentages van de maximale hartslag voor
+ * dit zonesysteem. Ze zijn een vertaling, geen meting: welk percentage bij welke
+ * zone hoort verschilt per methode, en je eigen schema-PDF heeft vooraan een
+ * tabel die vóór deze gaat. Wijkt die af, dan is die van jou de juiste.
+ *
+ * Belangrijker nog is waar ze op slaan. Een percentage van je maximum is maar zo
+ * betrouwbaar als dat maximum zelf, en een formule als 220 min leeftijd heeft
+ * nooit een onderzoeksbasis gehad (Robergs & Landwehr, 2002). Ook de betere
+ * versie van Tanaka et al. (2001) houdt een standaarddeviatie van zo'n tien
+ * slagen over — twee daarvan is twintig slagen, en dan ligt deze hele tabel
+ * ergens anders. Vandaar dat elke zone ook een gevoelsomschrijving heeft: die
+ * heeft geen kalibratie nodig en is op een warme dag betrouwbaarder dan je
+ * horloge.
+ */
 export const TEMPO_ZONES: TempoZone[] = [
-  { label: 'H',  naam: 'Herstel',           pace: '6:41', omschrijving: 'Zeer rustig, herstellend tempo' },
-  { label: 'D1', naam: 'Rustige duurloop',  pace: '5:51', omschrijving: 'Comfortabel, gesprekstempo' },
-  { label: 'D2', naam: 'Tempo duurloop',    pace: '5:12', omschrijving: 'Gecontroleerd stevig' },
-  { label: 'D3', naam: 'Drempeltempo',      pace: '4:41', omschrijving: 'Net onder je snelste tempo' },
+  { label: 'H',  naam: 'Herstel',           pace: '6:41', omschrijving: 'Zeer rustig, herstellend tempo',
+    hrMin: 0.60, hrMax: 0.70, gevoel: 'Bijna ongemakkelijk langzaam. Je kunt moeiteloos doorpraten.' },
+  { label: 'D1', naam: 'Rustige duurloop',  pace: '5:51', omschrijving: 'Comfortabel, gesprekstempo',
+    hrMin: 0.70, hrMax: 0.80, gevoel: 'Hele zinnen uitspreken lukt zonder happen naar adem.' },
+  { label: 'D2', naam: 'Tempo duurloop',    pace: '5:12', omschrijving: 'Gecontroleerd stevig',
+    hrMin: 0.80, hrMax: 0.85, gevoel: 'Korte zinnen. Praten kan nog, een gesprek voeren niet.' },
+  { label: 'D3', naam: 'Drempeltempo',      pace: '4:41', omschrijving: 'Net onder je snelste tempo',
+    hrMin: 0.85, hrMax: 0.90, gevoel: 'Losse woorden. Je kunt dit ongeveer een uur volhouden.' },
   // W = weerstand (niet wedstrijd): het hoogste tempo uit de pace-tabel van het
   // schema. De pace zelf komt onveranderd uit die tabel.
-  { label: 'W',  naam: 'Weerstand',         pace: '4:27', omschrijving: 'Hoogste tempo uit je schema' },
+  { label: 'W',  naam: 'Weerstand',         pace: '4:27', omschrijving: 'Hoogste tempo uit je schema',
+    hrMin: 0.90, hrMax: 0.95, gevoel: 'Praten gaat niet meer. Alleen in korte herhalingen vol te houden.' },
 ]
+
+export interface Hartslagbereik {
+  min: number
+  max: number
+}
+
+/**
+ * De hartslag die bij een zone hoort, in slagen per minuut.
+ *
+ * Zonder bekende maximale hartslag komt er niets uit. Dat is met opzet: een
+ * verzonnen bovengrens is schadelijker dan geen bovengrens, want je gaat er
+ * wél naar lopen.
+ */
+export function hartslagBereik(zone: TempoZone, maxHR: number | null | undefined): Hartslagbereik | null {
+  if (!maxHR || maxHR < 120 || maxHR > 230) return null
+  return {
+    min: Math.round(maxHR * zone.hrMin),
+    max: Math.round(maxHR * zone.hrMax),
+  }
+}
+
+/**
+ * De bovengrens van de zwaarste zone in een sessie: het antwoord op "hoe hard
+ * mag ik maximaal". Bij "in D2-D3" is dat de bovenkant van D3.
+ */
+export function maximaleHartslag(zones: TempoZone[], maxHR: number | null | undefined): number | null {
+  const grenzen = zones
+    .map(z => hartslagBereik(z, maxHR)?.max)
+    .filter((n): n is number => typeof n === 'number')
+  return grenzen.length ? Math.max(...grenzen) : null
+}
 
 export function zoekTempoZone(label: string, zones: TempoZone[] = TEMPO_ZONES): TempoZone | undefined {
   return zones.find(z => z.label === label.toUpperCase())

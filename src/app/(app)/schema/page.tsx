@@ -37,6 +37,7 @@ export default async function SchemaPage() {
       heeftFysio={(fysioOefeningen?.length ?? 0) > 0}
       tempoZones={(profiel as Record<string, unknown>)?.tempo_zones as never ?? null}
       tempoZonesUpdatedAt={(profiel as Record<string, unknown>)?.tempo_zones_updated_at as string ?? null}
+      maxHartslag={(profiel as Record<string, unknown>)?.max_hartslag as number | null}
     />
   )
 }
